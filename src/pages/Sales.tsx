@@ -1,0 +1,426 @@
+import { useState } from 'react';
+import { useInventory } from '@/hooks/useInventory';
+import { useSales } from '@/hooks/useSales';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Plus, ShoppingCart, Search, Minus, Trash2, Calculator } from 'lucide-react';
+import { Product, SaleItem } from '@/types';
+import { toast } from 'sonner';
+
+export default function Sales() {
+  const { products, findProductByBarcode, findProductByReference, updateStock } = useInventory();
+  const { addSale, advisors, paymentMethods } = useSales();
+  
+  const [isCreatingSale, setIsCreatingSale] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedAdvisor, setSelectedAdvisor] = useState('');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('');
+  const [discount, setDiscount] = useState(0);
+  const [cart, setCart] = useState<SaleItem[]>([]);
+  const [customPrice, setCustomPrice] = useState<{[key: string]: number}>({});
+  
+  const addToCart = (product: Product, quantity: number = 1) => {
+    if (product.stock < quantity) {
+      toast.error(`Stock insuficiente. Solo hay ${product.stock} unidades disponibles.`);
+      return;
+    }
+
+    const existingItemIndex = cart.findIndex(item => item.productId === product.id);
+    const currentPrice = customPrice[product.id] || product.currentPrice;
+    
+    if (existingItemIndex >= 0) {
+      const existingItem = cart[existingItemIndex];
+      const newQuantity = existingItem.quantity + quantity;
+      
+      if (newQuantity > product.stock) {
+        toast.error(`Stock insuficiente. Solo hay ${product.stock} unidades disponibles.`);
+        return;
+      }
+      
+      const updatedCart = [...cart];
+      updatedCart[existingItemIndex] = {
+        ...existingItem,
+        quantity: newQuantity,
+        unitPrice: currentPrice,
+        total: newQuantity * currentPrice
+      };
+      setCart(updatedCart);
+    } else {
+      setCart([...cart, {
+        productId: product.id,
+        productName: product.name,
+        quantity,
+        unitPrice: currentPrice,
+        total: quantity * currentPrice
+      }]);
+    }
+  };
+
+  const updateCartItemQuantity = (productId: string, newQuantity: number) => {
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+    
+    if (newQuantity <= 0) {
+      removeFromCart(productId);
+      return;
+    }
+    
+    if (newQuantity > product.stock) {
+      toast.error(`Stock insuficiente. Solo hay ${product.stock} unidades disponibles.`);
+      return;
+    }
+    
+    setCart(cart.map(item => 
+      item.productId === productId
+        ? { ...item, quantity: newQuantity, total: newQuantity * item.unitPrice }
+        : item
+    ));
+  };
+
+  const updateCartItemPrice = (productId: string, newPrice: number) => {
+    setCustomPrice({...customPrice, [productId]: newPrice});
+    setCart(cart.map(item => 
+      item.productId === productId
+        ? { ...item, unitPrice: newPrice, total: item.quantity * newPrice }
+        : item
+    ));
+  };
+
+  const removeFromCart = (productId: string) => {
+    setCart(cart.filter(item => item.productId !== productId));
+    const newCustomPrice = {...customPrice};
+    delete newCustomPrice[productId];
+    setCustomPrice(newCustomPrice);
+  };
+
+  const handleProductSearch = (searchValue: string) => {
+    let foundProduct = null;
+    
+    // Buscar por código de barras primero
+    foundProduct = findProductByBarcode(searchValue);
+    
+    // Si no se encuentra, buscar por referencia
+    if (!foundProduct) {
+      const productsByReference = products.filter(p => 
+        p.reference.toLowerCase().includes(searchValue.toLowerCase()) ||
+        p.name.toLowerCase().includes(searchValue.toLowerCase())
+      );
+      if (productsByReference.length === 1) {
+        foundProduct = productsByReference[0];
+      }
+    }
+    
+    if (foundProduct) {
+      addToCart(foundProduct);
+      setSearchTerm('');
+      toast.success(`${foundProduct.name} agregado al carrito`);
+    } else {
+      toast.error('Producto no encontrado');
+    }
+  };
+
+  const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
+  const total = subtotal - discount;
+
+  const completeSale = () => {
+    if (cart.length === 0) {
+      toast.error('El carrito está vacío');
+      return;
+    }
+    
+    if (!selectedAdvisor || !selectedPaymentMethod) {
+      toast.error('Selecciona un asesor y método de pago');
+      return;
+    }
+    
+    const paymentMethod = paymentMethods.find(pm => pm.id === selectedPaymentMethod);
+    if (!paymentMethod) {
+      toast.error('Método de pago no válido');
+      return;
+    }
+
+    // Verificar stock antes de completar la venta
+    for (const item of cart) {
+      const product = products.find(p => p.id === item.productId);
+      if (!product || product.stock < item.quantity) {
+        toast.error(`Stock insuficiente para ${item.productName}`);
+        return;
+      }
+    }
+
+    // Crear la venta
+    const sale = addSale({
+      advisorId: selectedAdvisor,
+      items: cart,
+      paymentMethod,
+      discount,
+      type: 'sale'
+    });
+
+    // Actualizar el stock
+    cart.forEach(item => {
+      const product = products.find(p => p.id === item.productId);
+      if (product) {
+        updateStock(item.productId, product.stock - item.quantity);
+      }
+    });
+
+    toast.success(`Venta ${sale.saleNumber} completada exitosamente`);
+    
+    // Limpiar el formulario
+    setCart([]);
+    setCustomPrice({});
+    setSelectedAdvisor('');
+    setSelectedPaymentMethod('');
+    setDiscount(0);
+    setIsCreatingSale(false);
+  };
+
+  const availableProducts = products.filter(product =>
+    product.stock > 0 && (
+      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.barcode.includes(searchTerm)
+    )
+  ).slice(0, 6);
+
+  return (
+    <div className="p-6">
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Punto de Venta</h1>
+          <p className="mt-2 text-gray-600">
+            Registra ventas y gestiona transacciones
+          </p>
+        </div>
+        <Dialog open={isCreatingSale} onOpenChange={setIsCreatingSale}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Nueva Venta
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Nueva Venta</DialogTitle>
+            </DialogHeader>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Panel izquierdo - Búsqueda y productos */}
+              <div className="space-y-4">
+                <div>
+                  <Label>Búsqueda de Productos</Label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                      <Input
+                        placeholder="Código de barras o referencia..."
+                        className="pl-10"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter' && searchTerm) {
+                            handleProductSearch(searchTerm);
+                          }
+                        }}
+                      />
+                    </div>
+                    <Button 
+                      onClick={() => searchTerm && handleProductSearch(searchTerm)}
+                      disabled={!searchTerm}
+                    >
+                      <Search className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 max-h-96 overflow-y-auto">
+                  {availableProducts.map(product => (
+                    <Card 
+                      key={product.id} 
+                      className="cursor-pointer hover:bg-gray-50"
+                      onClick={() => addToCart(product)}
+                    >
+                      <CardContent className="p-3">
+                        <div className="text-sm font-medium">{product.name}</div>
+                        <div className="text-xs text-gray-600">{product.reference}</div>
+                        <div className="flex justify-between items-center mt-2">
+                          <Badge variant="secondary">{product.stock} unid.</Badge>
+                          <span className="text-sm font-bold">
+                            ${product.currentPrice.toLocaleString('es-CO')}
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+
+              {/* Panel derecho - Carrito */}
+              <div className="space-y-4">
+                <div>
+                  <Label>Carrito de Compras</Label>
+                  <div className="border rounded-lg max-h-96 overflow-y-auto">
+                    {cart.length === 0 ? (
+                      <div className="p-4 text-center text-gray-500">
+                        Carrito vacío
+                      </div>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[200px]">Producto</TableHead>
+                            <TableHead className="w-[80px]">Cant.</TableHead>
+                            <TableHead className="w-[100px]">Precio</TableHead>
+                            <TableHead className="w-[100px]">Total</TableHead>
+                            <TableHead className="w-[50px]"></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {cart.map((item) => (
+                            <TableRow key={item.productId}>
+                              <TableCell className="font-medium">
+                                {item.productName}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-1">
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    onClick={() => updateCartItemQuantity(item.productId, item.quantity - 1)}
+                                  >
+                                    <Minus className="h-3 w-3" />
+                                  </Button>
+                                  <span className="w-8 text-center">{item.quantity}</span>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    onClick={() => updateCartItemQuantity(item.productId, item.quantity + 1)}
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  value={item.unitPrice}
+                                  onChange={(e) => updateCartItemPrice(item.productId, parseFloat(e.target.value) || 0)}
+                                  className="w-20"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                ${item.total.toLocaleString('es-CO')}
+                              </TableCell>
+                              <TableCell>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => removeFromCart(item.productId)}
+                                >
+                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </div>
+                </div>
+
+                {/* Resumen de venta */}
+                <Card>
+                  <CardContent className="p-4 space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Asesor</Label>
+                        <Select value={selectedAdvisor} onValueChange={setSelectedAdvisor}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar asesor" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {advisors.map(advisor => (
+                              <SelectItem key={advisor.id} value={advisor.id}>
+                                {advisor.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Método de Pago</Label>
+                        <Select value={selectedPaymentMethod} onValueChange={setSelectedPaymentMethod}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Método de pago" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {paymentMethods.map(method => (
+                              <SelectItem key={method.id} value={method.id}>
+                                {method.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label>Descuento</Label>
+                      <Input
+                        type="number"
+                        value={discount}
+                        onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
+                        placeholder="0"
+                      />
+                    </div>
+
+                    <div className="space-y-2 border-t pt-4">
+                      <div className="flex justify-between">
+                        <span>Subtotal:</span>
+                        <span>${subtotal.toLocaleString('es-CO')}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Descuento:</span>
+                        <span>-${discount.toLocaleString('es-CO')}</span>
+                      </div>
+                      <div className="flex justify-between font-bold text-lg">
+                        <span>Total:</span>
+                        <span>${total.toLocaleString('es-CO')}</span>
+                      </div>
+                    </div>
+
+                    <Button 
+                      className="w-full" 
+                      onClick={completeSale}
+                      disabled={cart.length === 0}
+                    >
+                      <Calculator className="h-4 w-4 mr-2" />
+                      Completar Venta
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <div className="text-center py-12">
+        <ShoppingCart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-gray-900 mb-2">
+          Punto de Venta
+        </h3>
+        <p className="text-gray-500 mb-4">
+          Haz clic en "Nueva Venta" para comenzar una transacción
+        </p>
+      </div>
+    </div>
+  );
+}
