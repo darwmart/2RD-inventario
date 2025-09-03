@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useSales } from '@/hooks/useSales';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +19,25 @@ export default function CashRegister() {
     const dd = String(d.getDate()).padStart(2, '0');
     return `${y}-${m}-${dd}`;
   });
+
+  // Base del día por fecha (persistencia en localStorage)
+  const [dailyBaseMap, setDailyBaseMap] = useLocalStorage<Record<string, { amount: number; updatedAt: string }>>('dailyBaseMap', {});
+  const baseAmount = dailyBaseMap[selectedDate]?.amount ?? 0;
+
+  // Control del input editable
+  const [baseInput, setBaseInput] = useState<string>('');
+  useEffect(() => {
+    setBaseInput(baseAmount ? String(baseAmount) : '');
+  }, [selectedDate, baseAmount]);
+
+  const handleSaveBase = () => {
+    const value = Number(baseInput);
+    if (isNaN(value) || value < 0) return;
+    setDailyBaseMap(prev => ({
+      ...prev,
+      [selectedDate]: { amount: Math.round(value), updatedAt: new Date().toISOString() }
+    }));
+  };
   
   const dailySales = useMemo(() => {
     return getSalesByDate(selectedDate).filter(sale => sale.status === 'completed');
@@ -155,6 +175,11 @@ const depositRecordsOfDay = useMemo(() => {
     };
   }, [summary, depositSummary]);
 
+  // Cierre estimado en efectivo: base del día + efectivo ingresado en el día
+  const estimatedCloseCash = useMemo(() => {
+    return baseAmount + totalsWithDeposits.cash;
+  }, [baseAmount, totalsWithDeposits]);
+ 
   const getPaymentIcon = (type: 'cash' | 'electronic' | 'credit') => {
     switch (type) {
       case 'cash':
@@ -188,6 +213,56 @@ const depositRecordsOfDay = useMemo(() => {
         </div>
       </div>
 
+      {/* Base del Día */}
+      <Card className="mb-8">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Base del Día</CardTitle>
+          <div className="text-xs text-muted-foreground">
+            {dailyBaseMap[selectedDate]?.updatedAt
+              ? new Date(dailyBaseMap[selectedDate].updatedAt).toLocaleDateString('es-CO')
+              : null}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+            <div className="p-3 bg-gray-50 rounded-lg">
+              <p className="text-xs text-gray-600">Base registrada</p>
+              <p className="text-xl font-bold">${baseAmount.toLocaleString('es-CO')}</p>
+            </div>
+            <div className="p-3 bg-gray-50 rounded-lg">
+              <p className="text-xs text-gray-600">Efectivo del día</p>
+              <p className="text-xl font-bold text-green-600">${totalsWithDeposits.cash.toLocaleString('es-CO')}</p>
+            </div>
+            <div className="p-3 bg-gray-50 rounded-lg">
+              <p className="text-xs text-gray-600">Cierre estimado</p>
+              <p className="text-xl font-bold text-indigo-600">${estimatedCloseCash.toLocaleString('es-CO')}</p>
+            </div>
+            <div className="p-3 bg-gray-50 rounded-lg">
+              <p className="text-xs text-gray-600">Transacciones</p>
+              <p className="text-xl font-bold">
+                {summary.totalTransactions + depositSummary.totalTransactions}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-3 items-end">
+            <div className="flex-1">
+              <Label>Ingresar/actualizar base</Label>
+              <Input
+                type="number"
+                min={0}
+                value={baseInput}
+                onChange={(e) => setBaseInput(e.target.value)}
+                placeholder="0"
+              />
+            </div>
+            <Button onClick={handleSaveBase} className="mt-2">
+              Guardar base
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+ 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

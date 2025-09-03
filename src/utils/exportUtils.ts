@@ -75,11 +75,13 @@ export const exportSalesToPDF = (
   sales: Sale[],
   startDate?: string,
   endDate?: string,
-  advisor?: string
+  advisor?: string,
+  reference?: string
 ) => {
-  const filteredSales = sales.filter(sale => {
+   const filteredSales = sales.filter(sale => {
     let includeDate = true;
     let includeAdvisor = true;
+    let includeReference = true;
 
     if (startDate) {
       const saleDate = new Date(sale.createdAt).toDateString();
@@ -97,7 +99,11 @@ export const exportSalesToPDF = (
       includeAdvisor = sale.advisorId === advisor || sale.advisorName.toLowerCase().includes(advisor.toLowerCase());
     }
 
-    return includeDate && includeAdvisor && sale.status === 'completed';
+    if (reference) {
+      includeReference = sale.reference?.toLowerCase().includes(reference.toLowerCase());
+    }
+
+    return includeDate && includeAdvisor && includeReference && sale.status === 'completed';
   });
 
   const doc = new jsPDF();

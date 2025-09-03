@@ -64,14 +64,14 @@ export default function Reports() {
   const handleInventoryExcelExport = () => {
     const category = inventoryFilters.category !== 'all' ? inventoryFilters.category : undefined;
     const reference = inventoryFilters.reference || undefined;
-    exportInventoryToExcel(products, categories, suppliers, category, inventoryFilters.lowStockOnly, reference);
+    exportInventoryToExcel(products, categories, suppliers, category, inventoryFilters.lowStockOnly);
     toast.success('Reporte de inventario exportado a Excel');
   };
 
   const handleInventoryPDFExport = () => {
     const category = inventoryFilters.category !== 'all' ? inventoryFilters.category : undefined;
     const reference = inventoryFilters.reference || undefined;
-    exportInventoryToPDF(products, categories, suppliers, category, inventoryFilters.lowStockOnly, reference);
+    exportInventoryToPDF(products, categories, suppliers, category, inventoryFilters.lowStockOnly);
     toast.success('Reporte de inventario exportado a PDF');
   };
 
@@ -161,7 +161,7 @@ export default function Reports() {
         <TabsList>
           <TabsTrigger value="sales">Reportes de Ventas</TabsTrigger>
           <TabsTrigger value="inventory">Reportes de Inventario</TabsTrigger>
-          <TabsTrigger value="backup">Copias de Seguridad</TabsTrigger>
+          <TabsTrigger value="backup">Copias de Seguridad</TabsTnrigger>
         </TabsList>
 
         {/* Reportes de Ventas */}

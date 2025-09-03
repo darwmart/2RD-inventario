@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Plus, Settings, CreditCard, Trash2 } from 'lucide-react';
+import { Plus, Settings as SettingsIcon, CreditCard, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function Settings() {
@@ -130,41 +130,41 @@ export default function Settings() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {paymentMethods.map(method => (
-                <div key={method.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <CreditCard className="h-4 w-4 text-gray-500" />
-                    <div>
-                      <p className="font-medium">{method.name}</p>
-                      <Badge 
-                        variant={getPaymentTypeBadgeColor(method.type)}
-                        className="text-xs"
-                      >
-                        {getPaymentTypeLabel(method.type)}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Switch 
-                      checked={method.isActive}
-                      onCheckedChange={() => {
-                        // En una implementación real, aquí actualizarías el estado del método
-                        toast.info('Funcionalidad disponible próximamente');
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
+  <div className="space-y-3">
+    {paymentMethods && paymentMethods.length > 0 ? (
+      paymentMethods.map(method => (
+        <div key={method.id} className="flex items-center justify-between p-3 border rounded-lg">
+          <div className="flex items-center gap-3">
+            <CreditCard className="h-4 w-4 text-gray-500" />
+            <div>
+              <p className="font-medium">{method.name}</p>
+              <Badge 
+                variant={getPaymentTypeBadgeColor(method.type)}
+                className="text-xs"
+              >
+                {getPaymentTypeLabel(method.type)}
+              </Badge>
             </div>
-          </CardContent>
+          </div>
+          <Switch 
+            checked={method.isActive}
+            onCheckedChange={() => toast.info('Funcionalidad disponible próximamente')}
+          />
+        </div>
+      ))
+    ) : (
+      <p className="text-sm text-gray-500">No hay métodos de pago configurados</p>
+    )}
+  </div>
+</CardContent>
+
         </Card>
 
         {/* Configuraciones Generales */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center">
-              <Settings className="h-5 w-5 mr-2" />
+              <SettingsIcon className="h-5 w-5 mr-2" />
               Configuración General
             </CardTitle>
           </CardHeader>
