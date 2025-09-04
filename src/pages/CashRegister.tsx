@@ -11,6 +11,10 @@ import { PaymentMethod } from '@/types';
 
 export default function CashRegister() {
   const { sales, paymentMethods, getSalesByDate } = useSales();
+
+   // --- Filtro de cédula ---
+  const [documentFilter, setDocumentFilter] = useState("");
+
   // Fecha seleccionada en formato local YYYY-MM-DD (evita desfases por zona horaria)
   const [selectedDate, setSelectedDate] = useState(() => {
     const d = new Date();
@@ -19,6 +23,21 @@ export default function CashRegister() {
     const dd = String(d.getDate()).padStart(2, '0');
     return `${y}-${m}-${dd}`;
   });
+
+    // --- Ventas del día (todas las completadas) ---
+ const dailySales: Sale[] = useMemo(() => {
+    return getSalesByDate(selectedDate).filter(sale => sale.status === 'completed');
+  }, [selectedDate, getSalesByDate]);
+
+  // --- Ventas filtradas por cédula ---
+  const filteredDailySales = useMemo(() => {
+    return dailySales
+      .filter(sale => sale.type === "sale") // Solo facturas
+      .filter(sale => {
+        if (!documentFilter) return true;
+        return sale.customerDocument?.toLowerCase().includes(documentFilter.toLowerCase());
+      });
+  }, [dailySales, documentFilter]);
 
   // Base del día por fecha (persistencia en localStorage)
   const [dailyBaseMap, setDailyBaseMap] = useLocalStorage<Record<string, { amount: number; updatedAt: string }>>('dailyBaseMap', {});
@@ -38,10 +57,7 @@ export default function CashRegister() {
       [selectedDate]: { amount: Math.round(value), updatedAt: new Date().toISOString() }
     }));
   };
-  
-  const dailySales = useMemo(() => {
-    return getSalesByDate(selectedDate).filter(sale => sale.status === 'completed');
-  }, [selectedDate, getSalesByDate]);
+
 // Registros de abonos de separados del día (por fecha del abono)
 // Nota: comparamos por clave local 'YYYY-MM-DD' para evitar desfases de zona horaria.
 const depositRecordsOfDay = useMemo(() => {
@@ -58,7 +74,7 @@ const depositRecordsOfDay = useMemo(() => {
   const records: { amount: number; method: PaymentMethod }[] = [];
 
   sales.forEach(sale => {
-    if (sale.type !== 'reserved' || sale.status !== 'pending') return;
+      if (sale.type !== 'reserved') return;
 
     // Si hay historial de abonos, usar su fecha real de creación
     if (sale.deposits && sale.deposits.length > 0) {
@@ -89,6 +105,7 @@ const depositRecordsOfDay = useMemo(() => {
     const paymentBreakdown: { [key: string]: { count: number; amount: number } } = {};
 
     dailySales.forEach(sale => {
+      
       totalSales += sale.total;
 
       // Inicializar si no existe
@@ -376,49 +393,62 @@ const depositRecordsOfDay = useMemo(() => {
 
         {/* Lista de ventas del día */}
         <Card>
-          <CardHeader>
-            <CardTitle>Ventas del Día</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {dailySales.length === 0 ? (
-                <p className="text-gray-500 text-center py-4">
-                  No hay ventas para la fecha seleccionada
+  <CardHeader>
+    <CardTitle>Ventas del Día</CardTitle>
+    <div className="mt-2">
+      <Input
+        type="text"
+        placeholder="Buscar por cédula..."
+        value={documentFilter}
+        onChange={(e) => setDocumentFilter(e.target.value)}
+        className="w-full"
+      />
+    </div>
+  </CardHeader>
+  <CardContent>
+    <div className="space-y-2 max-h-96 overflow-y-auto">
+      {filteredDailySales.length === 0 ? (
+        <p className="text-gray-500 text-center py-4">
+          No hay ventas para la fecha seleccionada {documentFilter ? `con cédula ${documentFilter}` : ""}
+        </p>
+      ) : (
+        filteredDailySales.map((sale) => (
+          <div key={sale.id} className="flex items-center justify-between p-3 border rounded-lg">
+            <div>
+              <p className="font-medium">{sale.saleNumber}</p>
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <span>{sale.advisorName}</span>
+                <Badge variant="outline" className="text-xs">
+                  {sale.paymentMethod.name}
+                </Badge>
+              </div>
+              <p className="text-xs text-gray-500">
+                Cliente: {sale.customerName} ({sale.customerDocument})
+              </p>
+              <p className="text-xs text-gray-500">
+                {new Date(sale.createdAt).toLocaleTimeString('es-CO', {
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="font-bold text-green-600">
+                ${sale.total.toLocaleString('es-CO')}
+              </p>
+              {sale.discount > 0 && (
+                <p className="text-xs text-red-500">
+                  Desc: ${sale.discount.toLocaleString('es-CO')}
                 </p>
-              ) : (
-                dailySales.map((sale) => (
-                  <div key={sale.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div>
-                      <p className="font-medium">{sale.saleNumber}</p>
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <span>{sale.advisorName}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {sale.paymentMethod.name}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-gray-500">
-                        {new Date(sale.createdAt).toLocaleTimeString('es-CO', {
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-green-600">
-                        ${sale.total.toLocaleString('es-CO')}
-                      </p>
-                      {sale.discount > 0 && (
-                        <p className="text-xs text-red-500">
-                          Desc: ${sale.discount.toLocaleString('es-CO')}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))
               )}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        ))
+      )}
+    </div>
+  </CardContent>
+</Card>
+
       </div>
     </div>
   );

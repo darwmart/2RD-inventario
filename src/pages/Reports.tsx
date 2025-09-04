@@ -174,7 +174,17 @@ export default function Reports() {
                   Filtros de Ventas
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent classN<Dialog open={isCreatingSale} onOpenChange={setIsCreatingSale}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Nueva Venta00000
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Nueva Venta</DialogTitle>
+            </DialogHeader>ame="space-y-4">
                 <div>
                   <Label>Fecha Inicio</Label>
                   <Input
@@ -193,7 +203,17 @@ export default function Reports() {
                 </div>
                 <div>
                   <Label>Asesor</Label>
-                  <Select 
+                  <Select <Dialog open={isCreatingSale} onOpenChange={setIsCreatingSale}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Nueva Venta00000
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Nueva Venta</DialogTitle>
+            </DialogHeader>
                     value={salesFilters.advisor} 
                     onValueChange={(value) => setSalesFilters({...salesFilters, advisor: value})}
                   >
