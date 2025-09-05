@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { POSInvoice } from '@/components/ui/POSInvoice';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -201,24 +202,11 @@ export default function Sales() {
   ).slice(0, 6);
 
   return (
-    <div className="p-6">
+    <div className="mx-4 h-full">
       <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Punto de Venta</h1>
-          <p className="mt-2 text-gray-600">
-            Registra ventas y gestiona transacciones
-          </p>
-        </div>
         <Dialog open={isCreatingSale} onOpenChange={setIsCreatingSale}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Crear Factura
-            </Button>
-          </DialogTrigger>
           <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Nueva Venta</DialogTitle>
             </DialogHeader>
              <div>
             <Label>Nombre del Cliente</Label>
@@ -446,18 +434,9 @@ export default function Sales() {
           </DialogContent>
         </Dialog>
       </div>
-      <div className="text-center py-12">
-        <ShoppingCart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">
-          Punto de Venta
-        </h3>
-        <p className="text-gray-500 mb-4">
-          Haz clic en "Nueva Venta" para comenzar una transacción
-        </p>
-      </div>
        <Card>
   <CardHeader>
-    <CardTitle>Ventas del Día</CardTitle>
+    <CardTitle>Factura de Venta</CardTitle>
     <div className="mt-2"></div>
   </CardHeader>
   <CardContent>
@@ -516,27 +495,7 @@ export default function Sales() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 max-h-96 overflow-y-auto">
-                  {availableProducts.map(product => (
-                    <Card 
-                      key={product.id} 
-                      className="cursor-pointer hover:bg-gray-50"
-                      onClick={() => addToCart(product)}
-                    >
-                      <CardContent className="p-3">
-                        <div className="text-sm font-medium">{product.name}</div>
-                        <div className="text-xs text-gray-600">{product.reference}</div>
-                        <div className="flex justify-between items-center mt-2">
-                          <Badge variant="secondary">{product.stock} unid.</Badge>
-                          <span className="text-sm font-bold">
-                            ${product.currentPrice.toLocaleString('es-CO')}
-                          </span>
-                        </div>
-                        
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               </div>
