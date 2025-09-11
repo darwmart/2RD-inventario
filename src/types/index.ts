@@ -18,6 +18,17 @@ export interface Product {
   updatedAt: Date;
 }
 
+export interface SaleItem {
+  id?: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;  // Precio de venta unitario
+  total: number;      // unitPrice * quantity
+  cost: number;       // Costo unitario desde Product
+  
+}
+
 export interface Category {
   id: string;
   name: string;

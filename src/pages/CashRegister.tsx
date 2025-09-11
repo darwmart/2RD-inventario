@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSales } from '@/hooks/useSales';
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -211,7 +212,8 @@ const depositRecordsOfDay = useMemo(() => {
   };
 
   return (
-    <div className="p-6 overflow-auto h-screen">
+
+    <ScrollArea className="h-screen p-6 ">
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Arqueo de Caja</h1>
@@ -393,7 +395,7 @@ const depositRecordsOfDay = useMemo(() => {
 
         {/* Lista de ventas del día */}
         <Card>
-  <CardHeader>
+    <CardHeader>
     <CardTitle>Ventas del Día</CardTitle>
     <div className="mt-2">
       <Input
@@ -404,9 +406,32 @@ const depositRecordsOfDay = useMemo(() => {
         className="w-full"
       />
     </div>
-  </CardHeader>
-  <CardContent>
-    <div className="space-y-2 max-h-96 overflow-y-auto">
+        </CardHeader>
+      <CardContent>
+    
+              <ScrollArea className="h-96">
+                {sales.map((sale) => (
+                  <div key={sale.id} className="p-3 border rounded-lg mb-2">
+                    <p className="font-medium">{sale.saleNumber}</p>
+                    <p className="text-sm text-gray-600">
+                      {new Date(sale.createdAt).toLocaleString('es-CO')}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Cliente: {sale.customerName || "Consumidor Final"} ({sale.customerDocument || "N/A"})
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Método: {sale.paymentMethod.name}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Tipo: {sale.type === 'sale' ? 'Venta' : sale.type === 'quote' ? 'Cotización' : 'Separado'}
+                    </p>
+                    <p className="font-bold text-green-600">
+                      ${sale.total.toLocaleString('es-CO')}
+                    </p>
+                  </div>
+                ))}
+              </ScrollArea>
+    <div className="space-y-2">
       {filteredDailySales.length === 0 ? (
         <p className="text-gray-500 text-center py-4">
           No hay ventas para la fecha seleccionada {documentFilter ? `con cédula ${documentFilter}` : ""}
@@ -446,10 +471,9 @@ const depositRecordsOfDay = useMemo(() => {
         ))
       )}
     </div>
-  </CardContent>
-</Card>
-
-      </div>
+      </CardContent>
+    </Card>
     </div>
+  </ScrollArea>
   );
 }

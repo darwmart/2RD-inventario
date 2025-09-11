@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { POSInvoice } from '@/components/ui/POSInvoice';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -25,9 +24,7 @@ export default function Sales() {
   const [discount, setDiscount] = useState(0);
   const [cart, setCart] = useState<SaleItem[]>([]);
   const [customPrice, setCustomPrice] = useState<{[key: string]: number}>({});
-  const [customerName, setCustomerName] = useState('');
-  const [customerDocument, setCustomerDocument] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
+  const { sales } = useSales()
 
   
   const addToCart = (product: Product, quantity: number = 1) => {
@@ -58,12 +55,14 @@ export default function Sales() {
       setCart(updatedCart);
     } else {
       setCart([...cart, {
-        productId: product.id,
-        productName: product.name,
-        quantity,
-        unitPrice: currentPrice,
-        total: quantity * currentPrice
-      }]);
+      productId: product.id,
+      productName: product.name,
+      quantity,
+      unitPrice: currentPrice,
+      total: quantity * currentPrice,
+       cost: product.cost ?? 0,   //asegura que exista
+       description: product.name
+    }]);
     }
   };
 
@@ -165,10 +164,7 @@ export default function Sales() {
       items: cart,
       paymentMethod,
       discount,
-      type: 'sale',
-      customerName,
-      customerDocument,
-      customerPhone
+      type: 'sale'
     });
 
     // Actualizar el stock
@@ -187,9 +183,6 @@ export default function Sales() {
     setSelectedAdvisor('');
     setSelectedPaymentMethod('');
     setDiscount(0);
-    setCustomerName('');
-    setCustomerDocument('');
-    setCustomerPhone('');
     setIsCreatingSale(false);
   };
 
@@ -202,36 +195,24 @@ export default function Sales() {
   ).slice(0, 6);
 
   return (
-    <div className="mx-4 h-full">
+    <div className="p-6">
       <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-2xl font-bold mb-4">Ventas Diarias</h1>
+        </div>
+         
         <Dialog open={isCreatingSale} onOpenChange={setIsCreatingSale}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Nueva Venta
+            </Button>
+          </DialogTrigger>
           <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
+              <DialogTitle>Nueva Venta</DialogTitle>
             </DialogHeader>
-             <div>
-            <Label>Nombre del Cliente</Label>
-            <Input
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              placeholder="Ej: Juan Pérez"
-            />
-          </div>
-          <div>
-            <Label>Cédula</Label>
-            <Input
-              value={customerDocument}
-              onChange={(e) => setCustomerDocument(e.target.value)}
-              placeholder="Ej: 1234567890"
-            />
-          </div>
-          <div>
-            <Label>Teléfono</Label>
-            <Input
-              value={customerPhone}
-              onChange={(e) => setCustomerPhone(e.target.value)}
-              placeholder="Ej: 3001234567"
-            />
-            </div>
+            
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Panel izquierdo - Búsqueda y productos */}
               <div className="space-y-4">
@@ -277,14 +258,12 @@ export default function Sales() {
                             ${product.currentPrice.toLocaleString('es-CO')}
                           </span>
                         </div>
-                        
                       </CardContent>
                     </Card>
                   ))}
                 </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              </div>
+
               {/* Panel derecho - Carrito */}
               <div className="space-y-4">
                 <div>
@@ -376,10 +355,10 @@ export default function Sales() {
                             ))}
                           </SelectContent>
                         </Select>
-                      </div>
+                    </div>
                       <div>
                         <Label>Método de Pago</Label>
-                        <Select value={selectedPaymentMethod} onValueChange={setSelectedPaymentMethod}>
+                          <Select value={selectedPaymentMethod} onValueChange={setSelectedPaymentMethod}>
                           <SelectTrigger>
                             <SelectValue placeholder="Método de pago" />
                           </SelectTrigger>
@@ -390,12 +369,12 @@ export default function Sales() {
                               </SelectItem>
                             ))}
                           </SelectContent>
-                        </Select>
+                          </Select>
                       </div>
                     </div>
 
-                    <div>
-                      <Label>Descuento</Label>
+                            <div>
+                        <Label>Descuento</Label>
                       <Input
                         type="number"
                         value={discount}
@@ -434,222 +413,59 @@ export default function Sales() {
           </DialogContent>
         </Dialog>
       </div>
-       <Card>
-  <CardHeader>
-    <CardTitle>Factura de Venta</CardTitle>
-    <div className="mt-2"></div>
-  </CardHeader>
-  <CardContent>
-    <div className="space-y-2 max-h-96 overflow-y-auto backgra">
+      <Card>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Fecha</TableHead>
+                <TableHead>Asesor</TableHead>
+                <TableHead>Descripción</TableHead>
+                <TableHead>Cantidad</TableHead>
+                <TableHead>Costo</TableHead>
+                <TableHead>Venta</TableHead>
+                <TableHead>Rentabilidad</TableHead>
+                <TableHead>Tipo de Pago</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sales.map((sale) =>
+                sale.items.map((item) => {
+                  const descripcion =
+                    sale.type === "productName"
+                      ? `SEPARADO - ${item.productName}`
+                      : item.productName;
+
+                  const rentabilidad =
+                    (item.total || 0) - (item.cost * item.quantity)
+
+                  return (
+                    <TableRow key={`${sale.id}-${item.id}`}>
+                      <TableCell>
+                        {new Date(sale.createdAt).toLocaleDateString("es-CO")}
+                      </TableCell>
+                      <TableCell>{sale.advisorName}</TableCell>
+                      <TableCell>{descripcion}</TableCell>
+                      <TableCell>{item.quantity}</TableCell>
+                      <TableCell>
+                      ${(item.cost ?? 0).toLocaleString("es-CO")}
+                      </TableCell>
+                      <TableCell>
+                      ${(item.total ?? 0).toLocaleString("es-CO")}
+                      </TableCell>
+                      <TableCell className="text-green-600 font-bold">
+                      ${(((item.total ?? 0) - (item.cost ?? 0) * item.quantity) || 0).toLocaleString("es-CO")}
+                    </TableCell>
+
+                      <TableCell>{sale.paymentMethod.name}</TableCell>
+                    </TableRow>
+                  )
+                })
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
-    <div>
-            <Label>Nombre del Cliente</Label>
-            <Input
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              placeholder="Ej: Juan Pérez"
-            />
-          </div>
-          <div>
-            <Label>Cédula</Label>
-            <Input
-              value={customerDocument}
-              onChange={(e) => setCustomerDocument(e.target.value)}
-              placeholder="Ej: 1234567890"
-            />
-          </div>
-          <div>
-            <Label>Teléfono</Label>
-            <Input
-              value={customerPhone}
-              onChange={(e) => setCustomerPhone(e.target.value)}
-              placeholder="Ej: 3001234567"
-            />
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Panel izquierdo - Búsqueda y productos */}
-              <div className="space-y-4">
-                <div>
-                  <Label>Búsqueda de Productos</Label>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                      <Input
-                        placeholder="Código de barras o referencia..."
-                        className="pl-10"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter' && searchTerm) {
-                            handleProductSearch(searchTerm);
-                          }
-                        }}
-                      />
-                    </div>
-                    <Button 
-                      onClick={() => searchTerm && handleProductSearch(searchTerm)}
-                      disabled={!searchTerm}
-                    >
-                      <Search className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              </div>
-              {/* Panel derecho - Carrito */}
-              <div className="space-y-4">
-                <div>
-                  <Label>Carrito de Compras</Label>
-                  <div className="border rounded-lg max-h-96 overflow-y-auto">
-                    {cart.length === 0 ? (
-                      <div className="p-4 text-center text-gray-500">
-                        Carrito vacío
-                      </div>
-                    ) : (
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-[200px]">Producto</TableHead>
-                            <TableHead className="w-[80px]">Cant.</TableHead>
-                            <TableHead className="w-[100px]">Precio</TableHead>
-                            <TableHead className="w-[100px]">Total</TableHead>
-                            <TableHead className="w-[50px]"></TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {cart.map((item) => (
-                            <TableRow key={item.productId}>
-                              <TableCell className="font-medium">
-                                {item.productName}
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-1">
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline"
-                                    onClick={() => updateCartItemQuantity(item.productId, item.quantity - 1)}
-                                  >
-                                    <Minus className="h-3 w-3" />
-                                  </Button>
-                                  <span className="w-8 text-center">{item.quantity}</span>
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline"
-                                    onClick={() => updateCartItemQuantity(item.productId, item.quantity + 1)}
-                                  >
-                                    <Plus className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <Input
-                                  type="number"
-                                  value={item.unitPrice}
-                                  onChange={(e) => updateCartItemPrice(item.productId, parseFloat(e.target.value) || 0)}
-                                  className="w-20"
-                                />
-                              </TableCell>
-                              <TableCell>
-                                ${item.total.toLocaleString('es-CO')}
-                              </TableCell>
-                              <TableCell>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => removeFromCart(item.productId)}
-                                >
-                                  <Trash2 className="h-4 w-4 text-red-500" />
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    )}
-                  </div>
-                </div>
-
-                {/* Resumen de venta */}
-                <Card>
-                  <CardContent className="p-4 space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label>Asesor</Label>
-                        <Select value={selectedAdvisor} onValueChange={setSelectedAdvisor}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar asesor" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {advisors.map(advisor => (
-                              <SelectItem key={advisor.id} value={advisor.id}>
-                                {advisor.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label>Método de Pago</Label>
-                        <Select value={selectedPaymentMethod} onValueChange={setSelectedPaymentMethod}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Método de pago" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {paymentMethods.map(method => (
-                              <SelectItem key={method.id} value={method.id}>
-                                {method.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label>Descuento</Label>
-                      <Input
-                        type="number"
-                        value={discount}
-                        onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
-                        placeholder="0"
-                      />
-                    </div>
-
-                    <div className="space-y-2 border-t pt-4">
-                      <div className="flex justify-between">
-                        <span>Subtotal:</span>
-                        <span>${subtotal.toLocaleString('es-CO')}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Descuento:</span>
-                        <span>-${discount.toLocaleString('es-CO')}</span>
-                      </div>
-                      <div className="flex justify-between font-bold text-lg">
-                        <span>Total:</span>
-                        <span>${total.toLocaleString('es-CO')}</span>
-                      </div>
-                    </div>
-
-                    <Button 
-                      className="w-full" 
-                      onClick={completeSale}
-                      disabled={cart.length === 0}
-                    >
-                      <Calculator className="h-4 w-4 mr-2" />
-                      Completar Venta
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-  </CardContent>
-</Card>
-
-    </div>
-    
-
   );
 }
