@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useInventory } from '@/hooks/useInventory';
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSales } from '@/hooks/useSales';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,13 +10,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, ShoppingCart, Search, Minus, Trash2, Calculator } from 'lucide-react';
+import { Plus, ShoppingCart, Search, Minus, Trash2, Calculator, Calendar } from 'lucide-react';
 import { Product, SaleItem } from '@/types';
 import { toast } from 'sonner';
 
 export default function Sales() {
   const { products, findProductByBarcode, findProductByReference, updateStock } = useInventory();
-  const { addSale, advisors, paymentMethods } = useSales();
+  const { sales, addSale, advisors, paymentMethods, getSalesByDate } = useSales();
   
   const [isCreatingSale, setIsCreatingSale] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -24,8 +25,21 @@ export default function Sales() {
   const [discount, setDiscount] = useState(0);
   const [cart, setCart] = useState<SaleItem[]>([]);
   const [customPrice, setCustomPrice] = useState<{[key: string]: number}>({});
-  const { sales } = useSales()
 
+
+  // Fecha seleccionada en formato local YYYY-MM-DD 
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
+  });
+
+     // --- Ventas del día (todas las completadas) ---
+   const dailySales: Sale[] = useMemo(() => {
+      return getSalesByDate(selectedDate).filter(sale => sale.status === 'completed');
+    }, [selectedDate, getSalesByDate]);
   
   const addToCart = (product: Product, quantity: number = 1) => {
     if (product.stock < quantity) {
@@ -60,8 +74,8 @@ export default function Sales() {
       quantity,
       unitPrice: currentPrice,
       total: quantity * currentPrice,
-       cost: product.cost ?? 0,   //asegura que exista
-       description: product.name
+      cost: product.cost,   //asegura que exista
+      description: product.name
     }]);
     }
   };
@@ -200,6 +214,19 @@ export default function Sales() {
         <div>
           <h1 className="text-2xl font-bold mb-4">Ventas Diarias</h1>
         </div>
+          <div className="flex justify-between items-center mb-6">
+        <div>          
+        </div>
+        <div className="flex items-center gap-2">
+          <Calendar className="h-5 w-5 text-gray-400" />
+          <Input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="w-auto"
+          />
+        </div>
+      </div>
          
         <Dialog open={isCreatingSale} onOpenChange={setIsCreatingSale}>
           <DialogTrigger asChild>
@@ -372,8 +399,7 @@ export default function Sales() {
                           </Select>
                       </div>
                     </div>
-
-                            <div>
+                    <div>
                         <Label>Descuento</Label>
                       <Input
                         type="number"
@@ -414,26 +440,29 @@ export default function Sales() {
         </Dialog>
       </div>
       <Card>
-        <CardContent>
+        <ScrollArea className="h-[51rem] p-6 ">
+        <div className="flex justify-between items-center mb-6">
+        </div>
+          <CardContent>
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Asesor</TableHead>
-                <TableHead>Descripción</TableHead>
-                <TableHead>Cantidad</TableHead>
-                <TableHead>Costo</TableHead>
-                <TableHead>Venta</TableHead>
-                <TableHead>Rentabilidad</TableHead>
-                <TableHead>Tipo de Pago</TableHead>
-              </TableRow>
+               <TableRow>
+            <TableHead className="sticky top-0 bg-white z-10">Fecha</TableHead>
+            <TableHead className="sticky top-0 bg-white z-10">Asesor</TableHead>
+            <TableHead className="sticky top-0 bg-white z-10">Descripción</TableHead>
+            <TableHead className="sticky top-0 bg-white z-10">Cantidad</TableHead>
+            <TableHead className="sticky top-0 bg-white z-10">Costo</TableHead>
+            <TableHead className="sticky top-0 bg-white z-10">Venta</TableHead>
+            <TableHead className="sticky top-0 bg-white z-10">Rentabilidad</TableHead>
+            <TableHead className="sticky top-0 bg-white z-10">Tipo de Pago</TableHead>
+          </TableRow>
             </TableHeader>
             <TableBody>
-              {sales.map((sale) =>
+              {dailySales.map((sale) =>
                 sale.items.map((item) => {
                   const descripcion =
-                    sale.type === "productName"
-                      ? `SEPARADO - ${item.productName}`
+                    sale.type === "reserved"
+                      ? `CANCELADO SEPARADO - ${item.productName}`
                       : item.productName;
 
                   const rentabilidad =
@@ -447,12 +476,9 @@ export default function Sales() {
                       <TableCell>{sale.advisorName}</TableCell>
                       <TableCell>{descripcion}</TableCell>
                       <TableCell>{item.quantity}</TableCell>
+                      <TableCell>${(item.cost ?? 0).toLocaleString("es-CO")}</TableCell>
                       <TableCell>
-                      ${(item.cost ?? 0).toLocaleString("es-CO")}
-                      </TableCell>
-                      <TableCell>
-                      ${(item.total ?? 0).toLocaleString("es-CO")}
-                      </TableCell>
+                      ${(item.total ?? 0).toLocaleString("es-CO")}</TableCell>
                       <TableCell className="text-green-600 font-bold">
                       ${(((item.total ?? 0) - (item.cost ?? 0) * item.quantity) || 0).toLocaleString("es-CO")}
                     </TableCell>
@@ -463,8 +489,9 @@ export default function Sales() {
                 })
               )}
             </TableBody>
-          </Table>
-        </CardContent>
+            </Table>
+          </CardContent>
+        </ScrollArea>
       </Card>
     </div>
   );

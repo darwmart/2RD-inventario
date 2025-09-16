@@ -22,6 +22,7 @@ export interface SaleItem {
   id?: string;
   productId: string;
   productName: string;
+  description: string;
   quantity: number;
   unitPrice: number;  // Precio de venta unitario
   total: number;      // unitPrice * quantity
@@ -79,14 +80,6 @@ export interface Sale {
   status: 'completed' | 'pending' | 'cancelled';
   type: 'sale' | 'quote' | 'reserved';
   createdAt: Date;
-}
-
-export interface SaleItem {
-  productId: string;
-  productName: string;
-  quantity: number;
-  unitPrice: number;
-  total: number;
 }
 
 export interface CashRegister {
