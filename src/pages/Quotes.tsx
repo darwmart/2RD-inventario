@@ -1,6 +1,7 @@
 import { useState } from 'react'; // Importa el hook useState para manejar estados locales.
 import { useInventory } from '@/hooks/useInventory'; // Hook personalizado para obtener datos de inventario.
 import { useSales } from '@/hooks/useSales'; // Hook personalizado para manejar ventas.
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from '@/components/ui/button'; // Componente de botón reutilizable.
 import { Input } from '@/components/ui/input'; // Componente de entrada reutilizable.
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'; // Componentes para tarjetas.
@@ -218,6 +219,9 @@ export default function Quotes() {
   ).slice(0, 8); // Limita los resultados a 8 productos.
 
   return (
+    <ScrollArea className="h-[51rem] p-6 ">
+        <div className="flex justify-between items-center mb-6">
+        </div>
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <div>
@@ -226,6 +230,7 @@ export default function Quotes() {
             Gestiona cotizaciones y productos separados
           </p>
         </div>
+        
         <Dialog open={isCreatingQuote} onOpenChange={setIsCreatingQuote}>
           <DialogTrigger asChild>
             <Button>
@@ -659,6 +664,8 @@ export default function Quotes() {
           )}
         </DialogContent>
       </Dialog>
+      
     </div>
+    </ScrollArea>
   );
 }

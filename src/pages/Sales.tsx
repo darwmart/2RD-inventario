@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useInventory } from '@/hooks/useInventory';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSales } from '@/hooks/useSales';
@@ -10,13 +10,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, ShoppingCart, Search, Minus, Trash2, Calculator, Calendar } from 'lucide-react';
-import { Product, SaleItem } from '@/types';
+import { Plus, Search, Minus, Trash2, Calculator, Calendar } from 'lucide-react';
+import { Product, SaleItem, Sale } from '@/types';
 import { toast } from 'sonner';
 
 export default function Sales() {
   const { products, findProductByBarcode, findProductByReference, updateStock } = useInventory();
-  const { sales, addSale, advisors, paymentMethods, getSalesByDate } = useSales();
+  const { sales, addSale, advisors, paymentMethods, getSalesByDate, updateSale } = useSales();
   
   const [isCreatingSale, setIsCreatingSale] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -26,6 +26,14 @@ export default function Sales() {
   const [cart, setCart] = useState<SaleItem[]>([]);
   const [customPrice, setCustomPrice] = useState<{[key: string]: number}>({});
 
+  // helper: convierte Date -> 'YYYY-MM-DD'
+  const toKey = (d: Date | string) => {
+    const date = new Date(d);
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
+  };
 
   // Fecha seleccionada en formato local YYYY-MM-DD 
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -36,29 +44,115 @@ export default function Sales() {
     return `${y}-${m}-${dd}`;
   });
 
-     // --- Ventas del día (todas las completadas) ---
-   const dailySales: Sale[] = useMemo(() => {
-      return getSalesByDate(selectedDate).filter(sale => sale.status === 'completed');
-    }, [selectedDate, getSalesByDate]);
-  
+  // --- Preparar array con abonos realizados EN selectedDate ---
+  // agrupados por sale.id + paymentMethod.id (para que métodos distintos sean filas separadas)
+  const depositsGroupedForDay = useMemo(() => {
+  const map = new Map<string, {
+    key: string;
+    saleId: string;
+    saleNumber: string;
+    advisorName: string;
+    description: string;
+    paymentMethodId: string;
+    paymentMethodName: string;
+    dayDepositSum: number;        // suma abonos del día (para este sale+method)
+    totalPaidAllTime: number;     // total acumulado histórico (deposits[])
+    saleTotal: number;
+    initialDeposit: number;       // si existe sale.deposit como fallback
+  }>();
+
+    // recorrer todas las ventas (o usa getSalesByDate si prefieres filtrar antes)
+    sales.forEach(sale => {
+    const saleDescription = (sale.items || []).map(i => i.productName).join(', ');
+    const saleTotal = sale.total ?? 0;
+
+    // total histórico pagado: preferimos sumar sale.deposits[]
+    const totalPaidAllTime = (sale.deposits ?? []).reduce((s, d) => s + (d.amount ?? 0), 0);
+
+      
+    // 1) Si hay deposits[] -> procesar cada deposit cuya createdAt === selectedDate
+    (sale.deposits ?? []).forEach(dep => {
+      if (toKey(dep.createdAt) !== selectedDate) return;
+      const methodId = dep.method?.id ?? sale.paymentMethod?.id ?? 'unknown';
+      const key = `${sale.id}::${methodId}`;
+      const existing = map.get(key);
+      if (existing) {
+        existing.dayDepositSum += (dep.amount ?? 0);
+      } else {
+        map.set(key, {
+          key,
+          saleId: sale.id,
+          saleNumber: sale.saleNumber,
+          advisorName: sale.advisorName,
+          description: saleDescription,
+          paymentMethodId: methodId,
+          paymentMethodName: dep.method?.name ?? sale.paymentMethod?.name ?? '-',
+          dayDepositSum: dep.amount ?? 0,
+          totalPaidAllTime,
+          saleTotal,
+          initialDeposit: sale.deposit ?? 0
+        });
+      }
+    });
+
+    // 2) Caso fallback: si no hay deposits[] pero existe sale.deposit y fue creado hoy
+    if ((sale.deposits ?? []).length === 0 && (sale.deposit ?? 0) > 0 && toKey(sale.createdAt) === selectedDate) {
+      const methodId = sale.paymentMethod?.id ?? 'unknown';
+      const key = `${sale.id}::${methodId}`;
+      const existing = map.get(key);
+      if (existing) {
+        existing.dayDepositSum += (sale.deposit ?? 0);
+      } else {
+        map.set(key, {
+          key,
+          saleId: sale.id,
+          saleNumber: sale.saleNumber,
+          advisorName: sale.advisorName,
+          description: saleDescription,
+          paymentMethodId: methodId,
+          paymentMethodName: sale.paymentMethod?.name ?? '-',
+          dayDepositSum: sale.deposit ?? 0,
+          totalPaidAllTime: sale.deposit ?? 0,
+          saleTotal,
+          initialDeposit: sale.deposit ?? 0
+        });
+      }
+    }
+  });
+
+  return Array.from(map.values());
+}, [sales, selectedDate]);
+
+  // Opcional: si quieres marcar automáticamente como completed cuando el histórico >= total
+  useEffect(() => {
+    depositsGroupedForDay.forEach(entry => {
+      if ((entry.totalPaidAllTime ?? 0) >= (entry.saleTotal ?? 0)) {
+        try {
+          updateSale(entry.saleId, { status: 'completed' });
+        } catch (e) {
+          // si updateSale no existe o falla, lo ignoramos
+          // console.warn('No se pudo actualizar sale a completed', e);
+        }
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [depositsGroupedForDay]);
+
+  // ----------------------- carrito / venta -----------------------
   const addToCart = (product: Product, quantity: number = 1) => {
     if (product.stock < quantity) {
       toast.error(`Stock insuficiente. Solo hay ${product.stock} unidades disponibles.`);
       return;
     }
-
     const existingItemIndex = cart.findIndex(item => item.productId === product.id);
     const currentPrice = customPrice[product.id] || product.currentPrice;
-    
     if (existingItemIndex >= 0) {
       const existingItem = cart[existingItemIndex];
       const newQuantity = existingItem.quantity + quantity;
-      
       if (newQuantity > product.stock) {
         toast.error(`Stock insuficiente. Solo hay ${product.stock} unidades disponibles.`);
         return;
       }
-      
       const updatedCart = [...cart];
       updatedCart[existingItemIndex] = {
         ...existingItem,
@@ -69,45 +163,28 @@ export default function Sales() {
       setCart(updatedCart);
     } else {
       setCart([...cart, {
-      productId: product.id,
-      productName: product.name,
-      quantity,
-      unitPrice: currentPrice,
-      total: quantity * currentPrice,
-      cost: product.cost,   //asegura que exista
-      description: product.name
-    }]);
+        productId: product.id,
+        productName: product.name,
+        quantity,
+        unitPrice: currentPrice,
+        total: quantity * currentPrice,
+        cost: product.cost,
+        description: product.name
+      }]);
     }
   };
 
   const updateCartItemQuantity = (productId: string, newQuantity: number) => {
     const product = products.find(p => p.id === productId);
     if (!product) return;
-    
-    if (newQuantity <= 0) {
-      removeFromCart(productId);
-      return;
-    }
-    
-    if (newQuantity > product.stock) {
-      toast.error(`Stock insuficiente. Solo hay ${product.stock} unidades disponibles.`);
-      return;
-    }
-    
-    setCart(cart.map(item => 
-      item.productId === productId
-        ? { ...item, quantity: newQuantity, total: newQuantity * item.unitPrice }
-        : item
-    ));
+    if (newQuantity <= 0) { removeFromCart(productId); return; }
+    if (newQuantity > product.stock) { toast.error(`Stock insuficiente. Solo hay ${product.stock} unidades disponibles.`); return; }
+    setCart(cart.map(item => item.productId === productId ? { ...item, quantity: newQuantity, total: newQuantity * item.unitPrice } : item));
   };
 
   const updateCartItemPrice = (productId: string, newPrice: number) => {
     setCustomPrice({...customPrice, [productId]: newPrice});
-    setCart(cart.map(item => 
-      item.productId === productId
-        ? { ...item, unitPrice: newPrice, total: item.quantity * newPrice }
-        : item
-    ));
+    setCart(cart.map(item => item.productId === productId ? { ...item, unitPrice: newPrice, total: item.quantity * newPrice } : item));
   };
 
   const removeFromCart = (productId: string) => {
@@ -118,86 +195,37 @@ export default function Sales() {
   };
 
   const handleProductSearch = (searchValue: string) => {
-    let foundProduct = null;
-    
-    // Buscar por código de barras primero
-    foundProduct = findProductByBarcode(searchValue);
-    
-    // Si no se encuentra, buscar por referencia
+    let foundProduct = findProductByBarcode(searchValue);
     if (!foundProduct) {
-      const productsByReference = products.filter(p => 
-        p.reference.toLowerCase().includes(searchValue.toLowerCase()) ||
-        p.name.toLowerCase().includes(searchValue.toLowerCase())
-      );
-      if (productsByReference.length === 1) {
-        foundProduct = productsByReference[0];
-      }
+      const productsByReference = products.filter(p => p.reference.toLowerCase().includes(searchValue.toLowerCase()) || p.name.toLowerCase().includes(searchValue.toLowerCase()));
+      if (productsByReference.length === 1) foundProduct = productsByReference[0];
     }
-    
     if (foundProduct) {
       addToCart(foundProduct);
       setSearchTerm('');
       toast.success(`${foundProduct.name} agregado al carrito`);
-    } else {
-      toast.error('Producto no encontrado');
-    }
+    } else toast.error('Producto no encontrado');
   };
 
   const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
   const total = subtotal - discount;
 
   const completeSale = () => {
-    if (cart.length === 0) {
-      toast.error('El carrito está vacío');
-      return;
-    }
-    
-    if (!selectedAdvisor || !selectedPaymentMethod) {
-      toast.error('Selecciona un asesor y método de pago');
-      return;
-    }
-    
+    if (cart.length === 0) { toast.error('El carrito está vacío'); return; }
+    if (!selectedAdvisor || !selectedPaymentMethod) { toast.error('Selecciona un asesor y método de pago'); return; }
     const paymentMethod = paymentMethods.find(pm => pm.id === selectedPaymentMethod);
-    if (!paymentMethod) {
-      toast.error('Método de pago no válido');
-      return;
-    }
-
-    // Verificar stock antes de completar la venta
+    if (!paymentMethod) { toast.error('Método de pago no válido'); return; }
     for (const item of cart) {
       const product = products.find(p => p.id === item.productId);
-      if (!product || product.stock < item.quantity) {
-        toast.error(`Stock insuficiente para ${item.productName}`);
-        return;
-      }
+      if (!product || product.stock < item.quantity) { toast.error(`Stock insuficiente para ${item.productName}`); return; }
     }
-
-    // Crear la venta
-    const sale = addSale({
-      advisorId: selectedAdvisor,
-      items: cart,
-      paymentMethod,
-      discount,
-      type: 'sale'
-    });
-
-    // Actualizar el stock
+    const sale = addSale({ advisorId: selectedAdvisor, items: cart, paymentMethod, discount, type: 'sale' });
     cart.forEach(item => {
       const product = products.find(p => p.id === item.productId);
-      if (product) {
-        updateStock(item.productId, product.stock - item.quantity);
-      }
+      if (product) updateStock(item.productId, product.stock - item.quantity);
     });
-
     toast.success(`Venta ${sale.saleNumber} completada exitosamente`);
-    
-    // Limpiar el formulario
-    setCart([]);
-    setCustomPrice({});
-    setSelectedAdvisor('');
-    setSelectedPaymentMethod('');
-    setDiscount(0);
-    setIsCreatingSale(false);
+    setCart([]); setCustomPrice({}); setSelectedAdvisor(''); setSelectedPaymentMethod(''); setDiscount(0); setIsCreatingSale(false);
   };
 
   const availableProducts = products.filter(product =>
@@ -395,7 +423,7 @@ export default function Sales() {
                                 {method.name}
                               </SelectItem>
                             ))}
-                          </SelectContent>
+                          </SelectContent>75095213
                           </Select>
                       </div>
                     </div>
@@ -407,7 +435,7 @@ export default function Sales() {
                         onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
                         placeholder="0"
                       />
-                    </div>
+                    </div>75095213
 
                     <div className="space-y-2 border-t pt-4">
                       <div className="flex justify-between">
@@ -427,8 +455,7 @@ export default function Sales() {
                     <Button 
                       className="w-full" 
                       onClick={completeSale}
-                      disabled={cart.length === 0}
-                    >
+                      disabled={cart.length === 0}>
                       <Calculator className="h-4 w-4 mr-2" />
                       Completar Venta
                     </Button>
@@ -439,56 +466,93 @@ export default function Sales() {
           </DialogContent>
         </Dialog>
       </div>
-      <Card>
-        <ScrollArea className="h-[51rem] p-6 ">
-        <div className="flex justify-between items-center mb-6">
-        </div>
+      
+       <Card>
+        <ScrollArea className="h-[51rem] p-6">
           <CardContent>
-          <Table>
-            <TableHeader>
-               <TableRow>
-            <TableHead className="sticky top-0 bg-white z-10">Fecha</TableHead>
-            <TableHead className="sticky top-0 bg-white z-10">Asesor</TableHead>
-            <TableHead className="sticky top-0 bg-white z-10">Descripción</TableHead>
-            <TableHead className="sticky top-0 bg-white z-10">Cantidad</TableHead>
-            <TableHead className="sticky top-0 bg-white z-10">Costo</TableHead>
-            <TableHead className="sticky top-0 bg-white z-10">Venta</TableHead>
-            <TableHead className="sticky top-0 bg-white z-10">Rentabilidad</TableHead>
-            <TableHead className="sticky top-0 bg-white z-10">Tipo de Pago</TableHead>
-          </TableRow>
-            </TableHeader>
-            <TableBody>
-              {dailySales.map((sale) =>
-                sale.items.map((item) => {
-                  const descripcion =
-                    sale.type === "reserved"
-                      ? `CANCELADO SEPARADO - ${item.productName}`
-                      : item.productName;
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="sticky top-0 bg-white z-10">Fecha</TableHead>
+                  <TableHead className="sticky top-0 bg-white z-10">Asesor</TableHead>
+                  <TableHead className="sticky top-0 bg-white z-10">Descripción</TableHead>
+                  <TableHead className="sticky top-0 bg-white z-10">Cantidad</TableHead>
+                  <TableHead className="sticky top-0 bg-white z-10">Costo</TableHead>
+                  <TableHead className="sticky top-0 bg-white z-10">Venta & Abonos</TableHead>
+                  <TableHead className="sticky top-0 bg-white z-10">Utilidad</TableHead>
+                  <TableHead className="sticky top-0 bg-white z-10">Estado</TableHead>
+                  <TableHead className="sticky top-0 bg-white z-10">Método</TableHead>
 
-                  const rentabilidad =
-                    (item.total || 0) - (item.cost * item.quantity)
+                </TableRow>
+                
+              </TableHeader>
 
-                  return (
-                    <TableRow key={`${sale.id}-${item.id}`}>
-                      <TableCell>
-                        {new Date(sale.createdAt).toLocaleDateString("es-CO")}
+                <TableBody>
+                  {/*  Filas para abonos realizados hoy (agrupados por sale + método) */}
+                  {depositsGroupedForDay.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={11} className="text-center text-gray-500">
+                        No hay abonos en la fecha seleccionada
                       </TableCell>
-                      <TableCell>{sale.advisorName}</TableCell>
-                      <TableCell>{descripcion}</TableCell>
-                      <TableCell>{item.quantity}</TableCell>
-                      <TableCell>${(item.cost ?? 0).toLocaleString("es-CO")}</TableCell>
-                      <TableCell>
-                      ${(item.total ?? 0).toLocaleString("es-CO")}</TableCell>
-                      <TableCell className="text-green-600 font-bold">
-                      ${(((item.total ?? 0) - (item.cost ?? 0) * item.quantity) || 0).toLocaleString("es-CO")}
-                    </TableCell>
-
-                      <TableCell>{sale.paymentMethod.name}</TableCell>
                     </TableRow>
-                  )
-                })
-              )}
-            </TableBody>
+                  ) : (
+                    depositsGroupedForDay.map(entry => {
+                      const remaining = Math.max(0, (entry.saleTotal ?? 0) - (entry.totalPaidAllTime ?? 0));
+                      const isCompleted = (entry.totalPaidAllTime ?? 0) >= (entry.saleTotal ?? 0);
+
+                      return (
+                        <TableRow key={entry.key}>
+                          <TableCell>{selectedDate}</TableCell>
+                          <TableCell>{entry.advisorName}</TableCell>
+                          <TableCell>{`Abono - ${entry.description}`}</TableCell>
+                          <TableCell>{/* Costo (si lo quieres aquí) */}</TableCell>
+
+                          {/* Valor venta (total del separado) 
+                          <TableCell>${(entry.saleTotal ?? 0).toLocaleString('es-CO')}</TableCell>*/}
+                          <TableCell>-</TableCell>
+
+                          {/* Abono del día */}
+                          <TableCell className="text-blue-600">${(entry.dayDepositSum ?? 0).toLocaleString('es-CO')}</TableCell>
+
+                          {/* Total abonado hasta ahora (historico) */}
+                          {/*<TableCell className="font-medium">${(entry.totalPaidAllTime ?? 0).toLocaleString('es-CO')}</TableCell>*/}
+
+                          {/* Saldo restante 
+                          <TableCell className="text-red-600 font-bold">${remaining.toLocaleString('es-CO')}</TableCell>*/}
+                          <TableCell></TableCell>
+                          {/* Estado / Tipo */}
+                          <TableCell>{isCompleted ? 'CANCELADO' : 'SEPARADO'}</TableCell>
+
+                          {/* Método de pago */}
+                          <TableCell>{entry.paymentMethodName}</TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+
+                  {/*  Filas para ventas normales del día (una fila por item) */}
+                  {sales
+                    .filter(s => toKey(s.createdAt) === selectedDate && s.type === 'sale')
+                    .flatMap(sale =>
+                      sale.items.map(item => {
+                        const rent = (item.total ?? 0) - ((item.cost ?? 0) * (item.quantity ?? 0));
+                        return (
+                          <TableRow key={`${sale.id}-${item.productId}`}>
+                            <TableCell>{toKey(sale.createdAt)}</TableCell>
+                            <TableCell>{sale.advisorName}</TableCell>
+                            <TableCell>{item.productName}</TableCell>
+                            <TableCell>{item.quantity}</TableCell>
+                            <TableCell>${(item.cost ?? 0).toLocaleString('es-CO')}</TableCell>
+                            <TableCell>${(item.total ?? 0).toLocaleString('es-CO')}</TableCell>
+                            <TableCell colSpan={2} className="text-green-600 font-bold">
+                              ${rent.toLocaleString('es-CO')}
+                            </TableCell>
+                            <TableCell>{sale.paymentMethod?.name ?? '-'}</TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                </TableBody>
             </Table>
           </CardContent>
         </ScrollArea>
