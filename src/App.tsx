@@ -12,6 +12,7 @@ import Advisors from './pages/Advisors';
 import Alerts from './pages/Alerts';
 import Settings from './pages/Settings';
 import NotFound from './pages/NotFound';
+import Accounting from './pages/Accounting';
 
 const queryClient = new QueryClient();
 
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="/sales" element={<Sales />} />
             <Route path="/quotes" element={<Quotes />} />
             <Route path="/cash-register" element={<CashRegister />} />
+            <Route path="/accounting" element={<Accounting />} />
             <Route path="/advisors" element={<Advisors />} />
             <Route path="/alerts" element={<Alerts />} />
             <Route path="/settings" element={<Settings />} />

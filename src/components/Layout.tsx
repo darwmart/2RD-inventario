@@ -18,6 +18,7 @@ interface LayoutProps {
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: BarChart3 },
+  { name: 'Contabilidad', href: '/accounting', icon: Package },
   { name: 'Inventario', href: '/inventory', icon: Package },
   { name: 'Ventas', href: '/sales', icon: ShoppingCart },
   { name: 'Cotizaciones', href: '/quotes', icon: FileText },
@@ -39,7 +40,7 @@ export default function Layout({ children }: LayoutProps) {
             <div className="flex items-center flex-shrink-0 px-4">
               <Package className="h-8 w-8 text-blue-600" />
               <span className="ml-2 text-xl font-bold text-gray-900">
-                Ventas & Inventario
+                "2Ruedas Shop"
               </span>
             </div>
             <div className="mt-8 flex-grow flex flex-col">

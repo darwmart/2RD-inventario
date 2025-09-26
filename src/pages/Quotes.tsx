@@ -37,10 +37,28 @@ export default function Quotes() {
   const [depositSaleId, setDepositSaleId] = useState('');
   const [depositAmountNew, setDepositAmountNew] = useState<number>(0);
   const [depositPaymentMethodIdNew, setDepositPaymentMethodIdNew] = useState('');
+
+ 
+
+
   // Filtra las ventas para obtener cotizaciones pendientes.
   const quotes = sales.filter(sale => sale.type === 'quote' && sale.status === 'pending');
   // Filtra las ventas para obtener productos separados pendientes.
   const reserved = sales.filter(sale => sale.type === 'reserved' && sale.status === 'pending');
+
+   const [searchQuoteReserved, setSearchQuoteReserved] = useState('');
+
+  const filteredReserved = reserved.filter(reservation => {
+  const customerMatch =
+    (reservation.customerName?.toLowerCase().includes(searchQuoteReserved.toLowerCase()) ?? false) ||
+    (reservation.customerDocument?.includes(searchQuoteReserved) ?? false);
+
+  const itemsMatch = reservation.items.some(item =>
+    item.productName.toLowerCase().includes(searchQuoteReserved.toLowerCase())
+  );
+
+  return customerMatch || itemsMatch;
+});
 
   // Venta seleccionada para abono (diálogo)
   const selectedSaleForDeposit = sales.find(s => s.id === depositSaleId);
@@ -66,6 +84,8 @@ export default function Quotes() {
       setCart([...cart, {
         productId: product.id,
         productName: product.name,
+        description: product.description,
+        cost: product.cost,
         quantity,
         unitPrice: product.currentPrice,
         total: quantity * product.currentPrice
@@ -450,6 +470,7 @@ export default function Quotes() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
         {/* Cotizaciones */}
         <Card>
           <CardHeader>
@@ -514,19 +535,30 @@ export default function Quotes() {
         {/* Separados */}
         <Card>
           <CardHeader>
+            
             <CardTitle className="flex items-center">
               <Clock className="h-5 w-5 mr-2" />
               Separados ({reserved.length})
             </CardTitle>
+             <div className="mb-6">
+              <div className="relative w-full max-w-md">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="Buscar por cédula, nombre o artículo..."
+                  className="pl-10"
+                  value={searchQuoteReserved}
+                  onChange={(e) => setSearchQuoteReserved(e.target.value)}/>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {reserved.length === 0 ? (
+              {filteredReserved.length === 0 ?(
                 <p className="text-gray-500 text-center py-4">
                   No hay productos separados
                 </p>
               ) : (
-                reserved.map(reservation => (
+                filteredReserved.map(reservation => (
                   <div key={reservation.id} className="border rounded-lg p-4">
                     <div className="flex justify-between items-start mb-2">
                       <div>

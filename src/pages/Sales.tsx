@@ -424,7 +424,7 @@ export default function Sales() {
                               </SelectItem>
                             ))}
                           </SelectContent>75095213
-                          </Select>
+</Select>
                       </div>
                     </div>
                     <div>
@@ -435,8 +435,7 @@ export default function Sales() {
                         onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
                         placeholder="0"
                       />
-                    </div>75095213
-
+                    </div>
                     <div className="space-y-2 border-t pt-4">
                       <div className="flex justify-between">
                         <span>Subtotal:</span>

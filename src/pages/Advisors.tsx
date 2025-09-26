@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useSales } from '@/hooks/useSales';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -12,6 +13,8 @@ import { toast } from 'sonner';
 
 export default function Advisors() {
   const { advisors, addAdvisor, sales, getSalesByAdvisor } = useSales();
+  const [expenses] = useLocalStorage<Expense[]>("expenses", []);
+
   
   const [isAddingAdvisor, setIsAddingAdvisor] = useState(false);
   const [advisorForm, setAdvisorForm] = useState({
@@ -57,11 +60,28 @@ export default function Advisors() {
     });
     const monthlyRevenue = monthlySales.reduce((sum, sale) => sum + sale.total, 0);
 
+      // Prestamos del asesor
+  const advisorLoans = expenses.filter(
+    e => e.advisor === advisor.name && e.type === "prestamo"
+  );
+
+  // Prestamos solo del mes actual
+  const loansThisMonth = advisorLoans.filter(e => {
+    const d = new Date(e.createdAt);
+    return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+  }).reduce((sum, e) => sum + e.amount, 0);
+
+  // Deuda total acumulada de este asesor
+  const totalDebt = advisorLoans.reduce((sum, e) => sum + Number(e.amount), 0);
+
+
     return {
       totalSales,
       totalRevenue,
       monthlySales: monthlySales.length,
-      monthlyRevenue
+      monthlyRevenue, 
+      loansThisMonth,
+      totalDebt
     };
   };
 
@@ -168,25 +188,20 @@ export default function Advisors() {
                 </div>
 
                 {/* Estadísticas */}
-                <div className="border-t pt-4 space-y-3">
-                  <div className="flex items-center gap-2 text-sm">
-                    <TrendingUp className="h-4 w-4 text-green-600" />
-                    <span className="font-medium">Estadísticas Generales</span>
+               <div className="grid grid-cols-2 gap-3">
+                <div className="text-center p-2 bg-gray-50 rounded">
+                  <div className="font-bold text-lg text-blue-600">
+                    {stats.loansThisMonth}
                   </div>
-                  
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="text-center p-2 bg-gray-50 rounded">
-                      <div className="font-bold text-lg">{stats.totalSales}</div>
-                      <div className="text-xs text-gray-600">Ventas Totales</div>
-                    </div>
-                    <div className="text-center p-2 bg-gray-50 rounded">
-                      <div className="font-bold text-lg text-green-600">
-                        ${stats.totalRevenue.toLocaleString('es-CO')}
-                      </div>
-                      <div className="text-xs text-gray-600">Ingresos Totales</div>
-                    </div>
+                  <div className="text-xs text-gray-600">Préstamos del Mes</div>
+                </div>
+                <div className="text-center p-2 bg-gray-50 rounded">
+                  <div className="font-bold text-lg text-red-600">
+                    ${stats.totalDebt.toLocaleString('es-CO')}
                   </div>
-
+                  <div className="text-xs text-gray-600">Deuda Total</div>
+                </div>
+              </div>
                   <div className="border-t pt-3">
                     <div className="text-xs text-gray-600 mb-2">Este Mes</div>
                     <div className="grid grid-cols-2 gap-3">
@@ -202,8 +217,7 @@ export default function Advisors() {
                       </div>
                     </div>
                   </div>
-                </div>
-
+                  
                 <div className="text-xs text-gray-500 border-t pt-2">
                   Registrado: {new Date(advisor.createdAt).toLocaleDateString('es-CO')}
                 </div>

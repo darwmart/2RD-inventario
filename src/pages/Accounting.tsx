@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, ReactNode } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useSales } from '@/hooks/useSales';
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useLocalStorage } from '@/hooks/useLocalStorage';
@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Calendar, Calculator, CreditCard, Banknote, Smartphone } from 'lucide-react';
-import { PaymentMethod, Sale } from '@/types';
+import { PaymentMethod } from '@/types';
 
 
 type Expense = {
@@ -19,7 +19,7 @@ type Expense = {
   createdAt: string;
 };
 
-export default function CashRegister() {
+export default function Accounting() {
   const { sales, paymentMethods, getSalesByDate } = useSales();
   const [expenseInput, setExpenseInput] = useState({ type: 'gasto', advisor: '', amount: '', note: '' });
 
@@ -32,9 +32,7 @@ export default function CashRegister() {
   
 
   const [expensesMap, setExpensesMap] = useLocalStorage<
-  Record<string, {
-    description: ReactNode; id: string; type: 'gasto' | 'prestamo'; advisor: string; amount: number; note?: string; createdAt: string 
-}[]>
+  Record<string, { id: string; type: 'gasto' | 'prestamo'; advisor: string; amount: number; note?: string; createdAt: string }[]>
 >("expensesMap", {});
 
    // --- Filtro de cédula ---
@@ -268,7 +266,7 @@ const depositRecordsOfDay = useMemo(() => {
     <ScrollArea className="h-screen p-6 ">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Arqueo de Caja</h1>
+          <h1 className="text-3xl font-bold text-gray-900">CAJA FUERTE</h1>
           <p className="mt-2 text-gray-600">
             Resumen diario de ventas y métodos de pago
           </p>
@@ -297,7 +295,7 @@ const depositRecordsOfDay = useMemo(() => {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
             <div className="p-3 bg-gray-50 rounded-lg">
-              <p className="text-xs text-gray-600">Base registrada</p>
+              <p className="text-xs text-gray-600">EFECTIVO EN CAJA</p>
               <p className="text-xl font-bold">${baseAmount.toLocaleString('es-CO')}</p>
             </div>
             <div className="p-3 bg-gray-50 rounded-lg">
