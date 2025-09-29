@@ -103,3 +103,14 @@ export interface Advisor {
   isActive: boolean;
   createdAt: Date;
 }
+export type RecordType = "ingreso" | "egreso" | "compra" | "credito";
+export interface AccountingRecord {
+  id: number;
+  tipo: RecordType;
+  descripcion: string;
+  proveedor?: string;
+  factura?: string;
+  monto: number;
+  banco: string;
+  fecha: string;
+}

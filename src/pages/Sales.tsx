@@ -4,19 +4,19 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSales } from '@/hooks/useSales';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent} from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Search, Minus, Trash2, Calculator, Calendar } from 'lucide-react';
-import { Product, SaleItem, Sale } from '@/types';
+import { Product, SaleItem} from '@/types';
 import { toast } from 'sonner';
 
 export default function Sales() {
-  const { products, findProductByBarcode, findProductByReference, updateStock } = useInventory();
-  const { sales, addSale, advisors, paymentMethods, getSalesByDate, updateSale } = useSales();
+  const { products, findProductByBarcode, updateStock } = useInventory();
+  const { sales, addSale, advisors, paymentMethods, updateSale } = useSales();
   
   const [isCreatingSale, setIsCreatingSale] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -424,7 +424,7 @@ export default function Sales() {
                               </SelectItem>
                             ))}
                           </SelectContent>75095213
-</Select>
+                      </Select>
                       </div>
                     </div>
                     <div>

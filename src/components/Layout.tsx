@@ -9,7 +9,8 @@ import {
   BarChart3,
   Settings,
   FileText,
-  AlertCircle
+  AlertCircle,
+  Banknote
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -18,7 +19,7 @@ interface LayoutProps {
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: BarChart3 },
-  { name: 'Contabilidad', href: '/accounting', icon: Package },
+  { name: 'Contabilidad', href: '/accounting', icon: Banknote },
   { name: 'Inventario', href: '/inventory', icon: Package },
   { name: 'Ventas', href: '/sales', icon: ShoppingCart },
   { name: 'Cotizaciones', href: '/quotes', icon: FileText },
