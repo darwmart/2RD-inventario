@@ -1,22 +1,20 @@
 import { useMemo, useState } from 'react'; // Importa el hook useState para manejar estados locales.
-import { useInventory } from '@/hooks/useInventory'; // Hook personalizado para obtener datos de inventario.
-import { useSales } from '@/hooks/useSales'; // Hook personalizado para manejar ventas.
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from '@/components/ui/button'; // Componente de botón reutilizable.
 import { Input } from '@/components/ui/input'; // Componente de entrada reutilizable.
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'; // Componentes para tarjetas.
-import { Badge } from '@/components/ui/badge'; // Componente para mostrar etiquetas.
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'; // Componentes para diálogos modales.
 import { Label } from '@/components/ui/label'; // Componente para etiquetas de formularios.
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Componentes para menús desplegables.
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'; // Componentes para tablas.
-import { Plus, FileText, Search, ShoppingCart, Clock, Minus, Trash2, Banknote, ShoppingBag, CreditCard, Smartphone, Calculator } from 'lucide-react'; // Iconos de la librería Lucide.
-import { Product, SaleItem, PaymentMethod,AccountingRecord, RecordType } from '@/types'; // Tipos personalizados para productos, elementos de venta y métodos de pago.
+import { Plus, FileText, Minus, Banknote, ShoppingBag, CreditCard, Smartphone, Calculator } from 'lucide-react'; // Iconos de la librería Lucide.
+import { AccountingRecord, RecordType } from '@/types'; // Tipos personalizados para productos, elementos de venta y métodos de pago.
 import { toast } from 'sonner'; // Librería para mostrar notificaciones.
+import { useLocalStorage } from '@/hooks/useLocalStorage';
 
 
 export default function Accounting() {
-  const [records, setRecords] = useState<AccountingRecord[]>([]);
+const [records, setRecords] = useLocalStorage<AccountingRecord[]>("accountingRecords",[]);
   const [isCreating, setIsCreating] = useState(false);
 
   // campos del formulario
@@ -26,6 +24,11 @@ export default function Accounting() {
   const [factura, setFactura] = useState('');
   const [monto, setMonto] = useState<number>(0);
   const [banco, setBanco] = useState('');
+
+
+  const [fechaInicio, setFechaInicio] = useState<string>("");
+  const [fechaFin, setFechaFin] = useState<string>("");
+
 
   const addRecord = () => {
     if (!monto || !banco) {
@@ -92,6 +95,16 @@ export default function Accounting() {
       .reduce((acc, r) => acc + r.monto, 0);
   }, [records]);
 
+     // Filtrar por rango de fechas
+  const filteredRecords = useMemo(() => {
+    return records.filter((r) => {
+      const fecha = new Date(r.fecha);
+      return (
+        (!fechaInicio || fecha >= new Date(fechaInicio)) &&
+        (!fechaFin || fecha <= new Date(fechaFin))
+      );
+    });
+  }, [records, fechaInicio, fechaFin]);
   return (
     <ScrollArea className="h-[51rem] p-6">
       <div className="flex justify-between items-center mb-6">
@@ -299,7 +312,27 @@ export default function Accounting() {
           </CardContent>
         </Card>
       </div>
-
+             {/* filtros de fecha */}
+      <div className="flex gap-4 mb-4">
+        <div>
+          <label className="block text-sm">Desde:</label>
+          <input
+            type="date"
+            value={fechaInicio}
+            onChange={e => setFechaFin(e.target.value)}
+            className="border p-1 rounded"
+          />
+        </div>
+        <div>
+          <label className="block text-sm">Hasta:</label>
+          <input
+            type="date"
+            value={fechaFin}
+            onChange={e => setFechaFin(e.target.value)}
+            className="border p-1 rounded"
+          />
+        </div>
+      </div>
       {/* Tabla de registros */}
       <Card>
         <CardHeader>

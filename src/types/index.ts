@@ -114,3 +114,4 @@ export interface AccountingRecord {
   banco: string;
   fecha: string;
 }
+
