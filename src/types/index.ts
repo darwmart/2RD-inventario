@@ -1,4 +1,4 @@
-export interface Product {
+export type Product = {
   id: string;
   name: string;
   barcode: string;
@@ -12,32 +12,50 @@ export interface Product {
   currentPrice: number;
   stock: number;
   minStock: number;
+  reservedStock?: number;
+  hasIva: boolean; // Si el precio incluye IVA o no
   categoryId: string;
   supplierId: string;
   createdAt: Date;
   updatedAt: Date;
-}
+};
 
-export interface SaleItem {
-  id?: string;
+export type SaleItem = {
   productId: string;
   productName: string;
   description: string;
+  cost: number;
   quantity: number;
-  unitPrice: number;  // Precio de venta unitario
-  total: number;      // unitPrice * quantity
-  cost: number;       // Costo unitario desde Product
-  
-}
+  unitPrice: number;
+  total: number;
+  hasIva?: boolean; // Si el item tiene IVA incluido
+  ivaAmount?: number; // Monto del IVA calculado
+};
 
-export interface Category {
+export type PaymentMethod = {
+  id: string;
+  name: string;
+  type: 'cash' | 'electronic' | 'credit';
+  isActive: boolean;
+};
+
+export type Advisor = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  isActive: boolean;
+  createdAt: Date;
+};
+
+export type Category = {
   id: string;
   name: string;
   description: string;
   createdAt: Date;
-}
+};
 
-export interface Supplier {
+export type Supplier = {
   id: string;
   name: string;
   contact: string;
@@ -45,66 +63,48 @@ export interface Supplier {
   email: string;
   address: string;
   createdAt: Date;
-}
+};
 
-export interface PaymentMethod {
+export type Expense = {
   id: string;
-  name: string;
-  type: 'cash' | 'electronic' | 'credit';
-  isActive: boolean;
-}
+  advisor: string;
+  type: 'gasto' | 'prestamo';
+  amount: number;
+  description: string;
+  createdAt: string;
+};
 
-export interface Sale {
+export type Deposit = {
+  id: string;
+  amount: number;
+  method: PaymentMethod;
+  createdAt: Date;
+};
+
+export type Sale = {
   id: string;
   saleNumber: string;
   advisorId: string;
   advisorName: string;
   items: SaleItem[];
   subtotal: number;
-  discount: number;
+  discount?: number;
   total: number;
+  ivaTotal?: number; // Total de IVA de la venta
   paymentMethod: PaymentMethod;
-  // Datos del cliente (opcionales para cotización, usados en separado)
   customerName?: string;
   customerDocument?: string;
   customerPhone?: string;
-  // Abono inicial (aplica para separados)
   deposit?: number;
-  // Historial de abonos por método de pago
-  deposits?: Array<{
-    id: string;
-    amount: number;
-    method: PaymentMethod;
-    createdAt: Date;
-  }>;
-  status: 'completed' | 'pending' | 'cancelled';
+  deposits?: Deposit[];
+  status: 'pending' | 'completed' | 'cancelled';
   type: 'sale' | 'quote' | 'reserved';
   createdAt: Date;
-}
+};
 
-export interface CashRegister {
-  id: string;
-  date: string;
-  openingBalance: number;
-  sales: Sale[];
-  cashSales: number;
-  electronicSales: number;
-  creditSales: number;
-  totalSales: number;
-  closingBalance: number;
-  isOpen: boolean;
-}
+export type RecordType = 'ingreso' | 'egreso' | 'compra' | 'credito';
 
-export interface Advisor {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  isActive: boolean;
-  createdAt: Date;
-}
-export type RecordType = "ingreso" | "egreso" | "compra" | "credito";
-export interface AccountingRecord {
+export type AccountingRecord = {
   id: number;
   tipo: RecordType;
   descripcion: string;
@@ -113,5 +113,62 @@ export interface AccountingRecord {
   monto: number;
   banco: string;
   fecha: string;
-}
+};
 
+export type CardSettings = {
+  // Configuración de retraso de acreditación
+  delayEnabled: boolean; // Activar/desactivar retraso
+
+  // Configuración de comisiones
+  debitCommission: number; // Porcentaje de comisión para débito
+  creditCommission: number; // Porcentaje de comisión para crédito
+  reteiva: number; // Porcentaje de reteiva
+
+  // Activar/desactivar descuentos
+  commissionsEnabled: boolean;
+  reteivaEnabled: boolean;
+};
+
+export type CompanyInfo = {
+  name: string;
+  nit: string;
+  address: string;
+  phone: string;
+  email?: string;
+};
+
+export type TaxSettings = {
+  ivaEnabled: boolean;
+  ivaPercentage: number;
+};
+
+export type PurchaseItem = {
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitCost: number;
+  total: number;
+};
+
+export type Purchase = {
+  id: string;
+  invoiceNumber: string;
+  supplierId: string;
+  supplierName: string;
+  items: PurchaseItem[];
+  subtotal: number;
+  tax?: number;
+  total: number;
+  paymentMethod: PaymentMethod;
+  paymentDetails?: {
+    // Para crédito
+    creditDays?: number;
+    // Para transferencia
+    bankId?: string;
+    bankName?: string;
+    // Para consignación (se resta del efectivo)
+    isCashPayment?: boolean;
+  };
+  notes?: string;
+  createdAt: Date;
+};

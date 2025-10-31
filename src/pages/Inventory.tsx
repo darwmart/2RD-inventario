@@ -7,9 +7,12 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Plus, Search, Package, Edit, Trash2, AlertTriangle } from 'lucide-react';
 import { Product } from '@/types';
+
 
 export default function Inventory() {
   const {
@@ -52,7 +55,8 @@ export default function Inventory() {
     stock: 0,
     minStock: 1,
     categoryId: '',
-    supplierId: ''
+    supplierId: '',
+    hasIva: false
   });
 
   const filteredProducts = products.filter(product => {
@@ -84,7 +88,8 @@ export default function Inventory() {
         stock: 0,
         minStock: 1,
         categoryId: '',
-        supplierId: ''
+        supplierId: '',
+        hasIva: false
       });
       setIsAddingProduct(false);
     }
@@ -108,7 +113,8 @@ export default function Inventory() {
         stock: 0,
         minStock: 1,
         categoryId: '',
-        supplierId: ''
+        supplierId: '',
+        hasIva: false
       });
     }
   };
@@ -129,7 +135,8 @@ export default function Inventory() {
       stock: product.stock,
       minStock: product.minStock,
       categoryId: product.categoryId,
-      supplierId: product.supplierId
+      supplierId: product.supplierId,
+      hasIva: product.hasIva || false
     });
   };
 
@@ -154,7 +161,7 @@ export default function Inventory() {
   };
 
   return (
-    <div className="p-6">
+    <ScrollArea className="h-screen p-6">
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Inventario</h1>
@@ -341,6 +348,18 @@ export default function Inventory() {
                   onChange={(e) => setProductForm({...productForm, currentPrice: parseFloat(e.target.value) || 0})}
                 />
               </div>
+              <div className="col-span-2">
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div>
+                    <Label className="font-medium text-sm">Precio incluye IVA</Label>
+                    <p className="text-xs text-gray-600">El precio ya tiene el IVA incluido</p>
+                  </div>
+                  <Switch
+                    checked={productForm.hasIva || false}
+                    onCheckedChange={(checked) => setProductForm({...productForm, hasIva: checked})}
+                  />
+                </div>
+              </div>
               <div>
                 <Label htmlFor="stock">Stock Actual</Label>
                 <Input
@@ -492,6 +511,18 @@ export default function Inventory() {
                 value={productForm.currentPrice}
                 onChange={(e) => setProductForm({...productForm, currentPrice: parseFloat(e.target.value) || 0})}
               />
+            </div>
+            <div className="col-span-2">
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div>
+                  <Label className="font-medium text-sm">Precio incluye IVA</Label>
+                  <p className="text-xs text-gray-600">El precio ya tiene el IVA incluido</p>
+                </div>
+                <Switch
+                  checked={productForm.hasIva || false}
+                  onCheckedChange={(checked) => setProductForm({...productForm, hasIva: checked})}
+                />
+              </div>
             </div>
             <div>
               <Label htmlFor="edit-stock">Stock Actual</Label>
@@ -709,6 +740,6 @@ export default function Inventory() {
           </p>
         </div>
       )}
-    </div>
+    </ScrollArea>
   );
 }

@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useInventory } from '@/hooks/useInventory';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSales } from '@/hooks/useSales';
+import { useSettings } from '@/hooks/useSettings';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent} from '@/components/ui/card';
@@ -10,13 +11,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Search, Minus, Trash2, Calculator, Calendar } from 'lucide-react';
+import { Plus, Search, Minus, Trash2, Calculator, Calendar, Printer } from 'lucide-react';
 import { Product, SaleItem} from '@/types';
 import { toast } from 'sonner';
+import { printPOSInvoice } from '@/utils/printUtils';
 
 export default function Sales() {
   const { products, findProductByBarcode, updateStock } = useInventory();
   const { sales, addSale, advisors, paymentMethods, updateSale } = useSales();
+  const { companyInfo, taxSettings } = useSettings();
   
   const [isCreatingSale, setIsCreatingSale] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -66,11 +69,10 @@ export default function Sales() {
     const saleDescription = (sale.items || []).map(i => i.productName).join(', ');
     const saleTotal = sale.total ?? 0;
 
-    // total histórico pagado: preferimos sumar sale.deposits[]
-    const totalPaidAllTime = (sale.deposits ?? []).reduce((s, d) => s + (d.amount ?? 0), 0);
-
-      
+          
     // 1) Si hay deposits[] -> procesar cada deposit cuya createdAt === selectedDate
+    const totalPaidAllTime = (sale.deposits ?? []).reduce((sum, d) => sum + (d.amount ?? 0), 0) || sale.deposit || 0;
+
     (sale.deposits ?? []).forEach(dep => {
       if (toKey(dep.createdAt) !== selectedDate) return;
       const methodId = dep.method?.id ?? sale.paymentMethod?.id ?? 'unknown';
@@ -139,6 +141,22 @@ export default function Sales() {
   }, [depositsGroupedForDay]);
 
   // ----------------------- carrito / venta -----------------------
+  const calculateItemIVA = (product: Product, unitPrice: number, quantity: number) => {
+    if (!taxSettings.ivaEnabled) {
+      return { hasIva: false, ivaAmount: 0 };
+    }
+
+    // Si el producto tiene IVA incluido, calculamos el IVA del precio
+    if (product.hasIva) {
+      const ivaRate = taxSettings.ivaPercentage / 100;
+      const priceWithoutIva = unitPrice / (1 + ivaRate);
+      const ivaPerUnit = unitPrice - priceWithoutIva;
+      return { hasIva: true, ivaAmount: ivaPerUnit * quantity };
+    }
+
+    return { hasIva: false, ivaAmount: 0 };
+  };
+
   const addToCart = (product: Product, quantity: number = 1) => {
     if (product.stock < quantity) {
       toast.error(`Stock insuficiente. Solo hay ${product.stock} unidades disponibles.`);
@@ -146,6 +164,8 @@ export default function Sales() {
     }
     const existingItemIndex = cart.findIndex(item => item.productId === product.id);
     const currentPrice = customPrice[product.id] || product.currentPrice;
+    const { hasIva, ivaAmount } = calculateItemIVA(product, currentPrice, quantity);
+
     if (existingItemIndex >= 0) {
       const existingItem = cart[existingItemIndex];
       const newQuantity = existingItem.quantity + quantity;
@@ -153,12 +173,15 @@ export default function Sales() {
         toast.error(`Stock insuficiente. Solo hay ${product.stock} unidades disponibles.`);
         return;
       }
+      const newIVA = calculateItemIVA(product, currentPrice, newQuantity);
       const updatedCart = [...cart];
       updatedCart[existingItemIndex] = {
         ...existingItem,
         quantity: newQuantity,
         unitPrice: currentPrice,
-        total: newQuantity * currentPrice
+        total: newQuantity * currentPrice,
+        hasIva: newIVA.hasIva,
+        ivaAmount: newIVA.ivaAmount
       };
       setCart(updatedCart);
     } else {
@@ -169,7 +192,9 @@ export default function Sales() {
         unitPrice: currentPrice,
         total: quantity * currentPrice,
         cost: product.cost,
-        description: product.name
+        description: product.name,
+        hasIva,
+        ivaAmount
       }]);
     }
   };
@@ -179,12 +204,40 @@ export default function Sales() {
     if (!product) return;
     if (newQuantity <= 0) { removeFromCart(productId); return; }
     if (newQuantity > product.stock) { toast.error(`Stock insuficiente. Solo hay ${product.stock} unidades disponibles.`); return; }
-    setCart(cart.map(item => item.productId === productId ? { ...item, quantity: newQuantity, total: newQuantity * item.unitPrice } : item));
+
+    setCart(cart.map(item => {
+      if (item.productId === productId) {
+        const { hasIva, ivaAmount } = calculateItemIVA(product, item.unitPrice, newQuantity);
+        return {
+          ...item,
+          quantity: newQuantity,
+          total: newQuantity * item.unitPrice,
+          hasIva,
+          ivaAmount
+        };
+      }
+      return item;
+    }));
   };
 
   const updateCartItemPrice = (productId: string, newPrice: number) => {
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+
     setCustomPrice({...customPrice, [productId]: newPrice});
-    setCart(cart.map(item => item.productId === productId ? { ...item, unitPrice: newPrice, total: item.quantity * newPrice } : item));
+    setCart(cart.map(item => {
+      if (item.productId === productId) {
+        const { hasIva, ivaAmount } = calculateItemIVA(product, newPrice, item.quantity);
+        return {
+          ...item,
+          unitPrice: newPrice,
+          total: item.quantity * newPrice,
+          hasIva,
+          ivaAmount
+        };
+      }
+      return item;
+    }));
   };
 
   const removeFromCart = (productId: string) => {
@@ -208,6 +261,7 @@ export default function Sales() {
   };
 
   const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
+  const totalIVA = cart.reduce((sum, item) => sum + (item.ivaAmount || 0), 0);
   const total = subtotal - discount;
 
   const completeSale = () => {
@@ -219,12 +273,23 @@ export default function Sales() {
       const product = products.find(p => p.id === item.productId);
       if (!product || product.stock < item.quantity) { toast.error(`Stock insuficiente para ${item.productName}`); return; }
     }
-    const sale = addSale({ advisorId: selectedAdvisor, items: cart, paymentMethod, discount, type: 'sale' });
+    const sale = addSale({
+      advisorId: selectedAdvisor,
+      items: cart,
+      paymentMethod,
+      discount,
+      type: 'sale',
+      ivaTotal: totalIVA
+    });
     cart.forEach(item => {
       const product = products.find(p => p.id === item.productId);
       if (product) updateStock(item.productId, product.stock - item.quantity);
     });
     toast.success(`Venta ${sale.saleNumber} completada exitosamente`);
+
+    // Imprimir factura automáticamente
+    printPOSInvoice(sale, companyInfo);
+
     setCart([]); setCustomPrice({}); setSelectedAdvisor(''); setSelectedPaymentMethod(''); setDiscount(0); setIsCreatingSale(false);
   };
 
@@ -235,6 +300,8 @@ export default function Sales() {
       product.barcode.includes(searchTerm)
     )
   ).slice(0, 6);
+
+
 
   return (
     <div className="p-6">
@@ -281,7 +348,7 @@ export default function Sales() {
                         className="pl-10"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        onKeyPress={(e) => {
+                        onKeyDown={(e) => {
                           if (e.key === 'Enter' && searchTerm) {
                             handleProductSearch(searchTerm);
                           }
@@ -441,6 +508,12 @@ export default function Sales() {
                         <span>Subtotal:</span>
                         <span>${subtotal.toLocaleString('es-CO')}</span>
                       </div>
+                      {totalIVA > 0 && taxSettings.ivaEnabled && (
+                        <div className="flex justify-between text-gray-600">
+                          <span>IVA ({taxSettings.ivaPercentage}% incluido):</span>
+                          <span>${totalIVA.toLocaleString('es-CO')}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between">
                         <span>Descuento:</span>
                         <span>-${discount.toLocaleString('es-CO')}</span>
@@ -496,7 +569,6 @@ export default function Sales() {
                     </TableRow>
                   ) : (
                     depositsGroupedForDay.map(entry => {
-                      const remaining = Math.max(0, (entry.saleTotal ?? 0) - (entry.totalPaidAllTime ?? 0));
                       const isCompleted = (entry.totalPaidAllTime ?? 0) >= (entry.saleTotal ?? 0);
 
                       return (

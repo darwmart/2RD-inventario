@@ -1,6 +1,7 @@
-import { useState, useMemo, useEffect, ReactNode } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useSales } from '@/hooks/useSales';
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { useExpenses } from '@/hooks/useExpenses';
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,38 +10,14 @@ import { Label } from '@/components/ui/label';
 import { Calendar, Calculator, CreditCard, Banknote, Smartphone } from 'lucide-react';
 import { PaymentMethod, Sale } from '@/types';
 
-
-type Expense = {
-  id: string;
-  advisor: string;
-  type: "gasto" | "prestamo";
-  amount: number;
-  description: string;
-  createdAt: string;
-};
-
 export default function CashRegister() {
-  const { sales, paymentMethods, getSalesByDate } = useSales();
-  const [expenseInput, setExpenseInput] = useState({ type: 'gasto', advisor: '', amount: '', note: '' });
-
-  const [expenses, setExpenses] = useLocalStorage<Expense[]>("expenses", []);
-  const [advisorFilter, setAdvisorFilter] = useState<string>(""); // filtro de asesor
-  const [advisorInput, setAdvisorInput] = useState(""); // input actual
-  const [expenseType, setExpenseType] = useState<"gasto" | "prestamo">("gasto");
-  const [expenseAmount, setExpenseAmount] = useState<string>("");
-  const [expenseDesc, setExpenseDesc] = useState("");
-  
-
-  const [expensesMap, setExpensesMap] = useLocalStorage<
-  Record<string, {
-    description: ReactNode; id: string; type: 'gasto' | 'prestamo'; advisor: string; amount: number; note?: string; createdAt: string 
-}[]>
->("expensesMap", {});
-
-   // --- Filtro de cédula ---
-  const [documentFilter, setDocumentFilter] = useState("");
-
-  // Fecha seleccionada en formato local YYYY-MM-DD (evita desfases por zona horaria)
+  const { sales, paymentMethods, getSalesByDate, advisors } = useSales();
+  const { addExpense, getExpensesByDate } = useExpenses();
+  const [advisorInput, setAdvisorInput] = useState('');
+  const [expenseType, setExpenseType] = useState<'gasto' | 'prestamo'>('gasto');
+  const [expenseAmount, setExpenseAmount] = useState<string>('');
+  const [expenseDesc, setExpenseDesc] = useState('');
+  const [advisorFilter, setAdvisorFilter] = useState<string>('');
   const [selectedDate, setSelectedDate] = useState(() => {
     const d = new Date();
     const y = d.getFullYear();
@@ -49,11 +26,23 @@ export default function CashRegister() {
     return `${y}-${m}-${dd}`;
   });
 
-   const dailyExpenses = expensesMap[selectedDate] ?? [];
+  const dailyExpenses = getExpensesByDate(selectedDate);
   const totalExpenses = dailyExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const filteredExpenses = useMemo(() => {
+    if (!advisorFilter) return dailyExpenses;
+    return dailyExpenses.filter(e => e.advisor === advisorFilter);
+  }, [advisorFilter, dailyExpenses]);
 
-    // --- Ventas del día (todas las completadas) ---
- const dailySales: Sale[] = useMemo(() => {
+  const handleAddExpense = () => {
+    const amount = Number(expenseAmount);
+    if (!advisorInput || isNaN(amount) || amount <= 0) return;
+    addExpense(advisorInput, expenseType, amount, expenseDesc);
+    setExpenseAmount('');
+    setExpenseDesc('');
+  };
+
+  // --- Ventas del día (todas las completadas del mismo día) ---
+  const dailySales: Sale[] = useMemo(() => {
     return getSalesByDate(selectedDate).filter(sale => sale.status === 'completed');
   }, [selectedDate, getSalesByDate]);
 
@@ -76,11 +65,7 @@ export default function CashRegister() {
       [selectedDate]: { amount: Math.round(value), updatedAt: new Date().toISOString() }
     }));
   };
-
-  // Lista única de asesores (para el select)
-const { advisors } = useSales();
-
-  const handleAddExpense = () => {
+  /*const handleAddExpense = () => {
     const amount = Number(expenseAmount);
     if (!advisorInput || isNaN(amount) || amount <= 0) return;
 
@@ -101,7 +86,7 @@ const { advisors } = useSales();
 
     setExpenseAmount("");
     setExpenseDesc("");
-  };
+  };*/
 
 // Registros de abonos de separados del día (por fecha del abono)
 // Nota: comparamos por clave local 'YYYY-MM-DD' para evitar desfases de zona horaria.
@@ -119,7 +104,7 @@ const depositRecordsOfDay = useMemo(() => {
   const records: { amount: number; method: PaymentMethod }[] = [];
 
   sales.forEach(sale => {
-      if (sale.type !== 'reserved') return;
+    if (sale.type !== 'reserved') return;
 
     // Si hay historial de abonos, usar su fecha real de creación
     if (sale.deposits && sale.deposits.length > 0) {
@@ -255,13 +240,6 @@ const depositRecordsOfDay = useMemo(() => {
         return <Calculator className="h-4 w-4" />;
     }
   };
-
-  // Filtrar egresos según asesor seleccionado
-  const filteredExpenses = useMemo(() => {
-  if (!advisorFilter) return dailyExpenses;
-  return dailyExpenses.filter(e => e.advisor === advisorFilter);
-  }, [advisorFilter, dailyExpenses]);
-
 
   return (
 

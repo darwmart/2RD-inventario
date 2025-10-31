@@ -1,6 +1,7 @@
 import { useState } from 'react'; // Importa el hook useState para manejar estados locales.
 import { useInventory } from '@/hooks/useInventory'; // Hook personalizado para obtener datos de inventario.
 import { useSales } from '@/hooks/useSales'; // Hook personalizado para manejar ventas.
+import { useSettings } from '@/hooks/useSettings'; // Hook personalizado para configuraciones.
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from '@/components/ui/button'; // Componente de botón reutilizable.
 import { Input } from '@/components/ui/input'; // Componente de entrada reutilizable.
@@ -10,13 +11,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from '@/components/ui/label'; // Componente para etiquetas de formularios.
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Componentes para menús desplegables.
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'; // Componentes para tablas.
-import { Plus, FileText, Search, ShoppingCart, Clock, Minus, Trash2 } from 'lucide-react'; // Iconos de la librería Lucide.
-import { Product, SaleItem, PaymentMethod } from '@/types'; // Tipos personalizados para productos, elementos de venta y métodos de pago.
+import { Plus, FileText, Search, ShoppingCart, Clock, Minus, Trash2, Printer } from 'lucide-react'; // Iconos de la librería Lucide.
+import { Product, SaleItem } from '@/types'; // Tipos personalizados para productos, elementos de venta y métodos de pago.
 import { toast } from 'sonner'; // Librería para mostrar notificaciones.
+import { printPOSInvoice } from '@/utils/printUtils'; // Utilidad de impresión
 
 export default function Quotes() {
-  const { products } = useInventory(); // Obtiene los productos del inventario.
+  const { products, updateStock } = useInventory(); // Obtiene los productos del inventario.
   const { addSale, advisors, sales, updateSale, paymentMethods, addSaleDeposit } = useSales(); // Obtiene funciones y datos relacionados con ventas.
+  const { companyInfo, taxSettings } = useSettings(); // Obtiene la información de la empresa y configuración de impuestos
 
   // Estados locales para manejar la lógica de la página.
   const [isCreatingQuote, setIsCreatingQuote] = useState(false); // Controla si el diálogo de creación está abierto.
@@ -65,18 +68,40 @@ export default function Quotes() {
   const paidSelected = selectedSaleForDeposit ? (selectedSaleForDeposit.deposit ?? 0) : 0;
   const remainingSelected = selectedSaleForDeposit ? Math.max(0, selectedSaleForDeposit.total - paidSelected) : 0;
 
+  // Función para calcular IVA de un item
+  const calculateItemIVA = (product: Product, unitPrice: number, quantity: number) => {
+    if (!taxSettings.ivaEnabled) {
+      return { hasIva: false, ivaAmount: 0 };
+    }
+
+    // Si el producto tiene IVA incluido, calculamos el IVA del precio
+    if (product.hasIva) {
+      const ivaRate = taxSettings.ivaPercentage / 100;
+      const priceWithoutIva = unitPrice / (1 + ivaRate);
+      const ivaPerUnit = unitPrice - priceWithoutIva;
+      return { hasIva: true, ivaAmount: ivaPerUnit * quantity };
+    }
+
+    return { hasIva: false, ivaAmount: 0 };
+  };
+
   // Función para agregar productos al carrito.
   const addToCart = (product: Product, quantity: number = 1) => {
     const existingItemIndex = cart.findIndex(item => item.productId === product.id); // Busca si el producto ya está en el carrito.
+    const { hasIva, ivaAmount } = calculateItemIVA(product, product.currentPrice, quantity);
+
     if (existingItemIndex >= 0) {
       // Si el producto ya está, actualiza la cantidad y el total.
       const existingItem = cart[existingItemIndex];
       const newQuantity = existingItem.quantity + quantity;
+      const newIVA = calculateItemIVA(product, existingItem.unitPrice, newQuantity);
       const updatedCart = [...cart];
       updatedCart[existingItemIndex] = {
         ...existingItem,
         quantity: newQuantity,
-        total: newQuantity * existingItem.unitPrice
+        total: newQuantity * existingItem.unitPrice,
+        hasIva: newIVA.hasIva,
+        ivaAmount: newIVA.ivaAmount
       };
       setCart(updatedCart); // Actualiza el carrito.
     } else {
@@ -88,7 +113,9 @@ export default function Quotes() {
         cost: product.cost,
         quantity,
         unitPrice: product.currentPrice,
-        total: quantity * product.currentPrice
+        total: quantity * product.currentPrice,
+        hasIva,
+        ivaAmount
       }]);
     }
   };
@@ -99,78 +126,121 @@ export default function Quotes() {
       setCart(cart.filter(item => item.productId !== productId)); // Elimina el producto si la cantidad es 0.
       return;
     }
-    setCart(cart.map(item => 
-      item.productId === productId
-        ? { ...item, quantity: newQuantity, total: newQuantity * item.unitPrice }
-        : item
-    )); // Actualiza la cantidad y el total.
+
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+
+    setCart(cart.map(item => {
+      if (item.productId === productId) {
+        const { hasIva, ivaAmount } = calculateItemIVA(product, item.unitPrice, newQuantity);
+        return {
+          ...item,
+          quantity: newQuantity,
+          total: newQuantity * item.unitPrice,
+          hasIva,
+          ivaAmount
+        };
+      }
+      return item;
+    }));
   };
 
   // Función para actualizar el precio de un producto en el carrito.
   const updateCartItemPrice = (productId: string, newPrice: number) => {
-    setCart(cart.map(item => 
-      item.productId === productId
-        ? { ...item, unitPrice: newPrice, total: item.quantity * newPrice }
-        : item
-    ));
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+
+    setCart(cart.map(item => {
+      if (item.productId === productId) {
+        const { hasIva, ivaAmount } = calculateItemIVA(product, newPrice, item.quantity);
+        return {
+          ...item,
+          unitPrice: newPrice,
+          total: item.quantity * newPrice,
+          hasIva,
+          ivaAmount
+        };
+      }
+      return item;
+    }));
   };
 
   // Calcula el subtotal del carrito.
   const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
+  const totalIVA = cart.reduce((sum, item) => sum + (item.ivaAmount || 0), 0);
 
   // Crea una nueva cotización o separado.
   const createQuoteOrReservation = () => {
-    if (cart.length === 0) {
-      toast.error('Agrega productos para crear la cotización'); // Muestra error si el carrito está vacío.
+  if (cart.length === 0) {
+    toast.error('Agrega productos para crear la cotización');
+    return;
+  }
+  if (!selectedAdvisor) {
+    toast.error('Selecciona un asesor');
+    return;
+  }
+  if (quoteType === 'reserved') {
+    if (!selectedPaymentMethodId) {
+      toast.error('Selecciona un método de pago');
       return;
     }
-    if (!selectedAdvisor) {
-      toast.error('Selecciona un asesor'); // Muestra error si no hay asesor seleccionado.
+    const pm = paymentMethods.find(p => p.id === selectedPaymentMethodId);
+    if (!pm) {
+      toast.error('Método de pago inválido');
       return;
     }
-
-    // Determinar método de pago
-    let method: PaymentMethod = { id: 'pending', name: 'Pendiente', type: 'cash', isActive: true };
-    if (quoteType === 'reserved') {
-      if (!selectedPaymentMethodId) {
-        toast.error('Selecciona un método de pago');
+    // Validar stock disponible
+    for (const item of cart) {
+      const product = products.find(p => p.id === item.productId);
+      if (!product || product.stock < item.quantity) {
+        toast.error(`Stock insuficiente para ${item.productName}`);
         return;
       }
-      const pm = paymentMethods.find(p => p.id === selectedPaymentMethodId);
-      if (!pm) {
-        toast.error('Método de pago inválido');
-        return;
-      }
-      method = pm;
     }
+  }
 
-    const sale = addSale({
-      advisorId: selectedAdvisor,
-      items: cart,
-      paymentMethod: method,
-      type: quoteType,
-      ...(quoteType === 'reserved'
-        ? {
-            deposit,
-            customerName: customerName || undefined,
-            customerDocument: customerDocument || undefined,
-            customerPhone: customerPhone || undefined
-          }
-        : {})
-    }); // Crea la venta con los datos proporcionados.
+  const method = quoteType === 'reserved'
+    ? paymentMethods.find(p => p.id === selectedPaymentMethodId)!
+    : { id: 'pending', name: 'Pendiente', type: 'cash' as const, isActive: true };
 
-    toast.success(`${quoteType === 'quote' ? 'Cotización' : 'Separado'} ${sale.saleNumber} creada exitosamente`);
-    // Reset de campos
-    setCart([]);
-    setSelectedAdvisor('');
-    setSelectedPaymentMethodId('');
-    setDeposit(0);
-    setCustomerName('');
-    setCustomerDocument('');
-    setCustomerPhone('');
-    setQuoteType('quote');
-    setIsCreatingQuote(false);
-  };
+  // Crear la venta
+  const sale = addSale({
+    advisorId: selectedAdvisor,
+    items: cart,
+    paymentMethod: method,
+    type: quoteType,
+    ivaTotal: totalIVA,
+    ...(quoteType === 'reserved'
+      ? {
+          deposit,
+          customerName: customerName || undefined,
+          customerDocument: customerDocument || undefined,
+          customerPhone: customerPhone || undefined,
+        }
+      : {}),
+  });
+
+  // Reservar stock para separados
+  if (quoteType === 'reserved') {
+    cart.forEach(item => {
+      const product = products.find(p => p.id === item.productId);
+      if (product) {
+        updateStock(item.productId, product.stock, (product.reservedStock ?? 0) + item.quantity);
+      }
+    });
+  }
+
+  toast.success(`${quoteType === 'quote' ? 'Cotización' : 'Separado'} ${sale.saleNumber} creada exitosamente`);
+  setCart([]);
+  setSelectedAdvisor('');
+  setSelectedPaymentMethodId('');
+  setDeposit(0);
+  setCustomerName('');
+  setCustomerDocument('');
+  setCustomerPhone('');
+  setQuoteType('quote');
+  setIsCreatingQuote(false);
+};
 
   // Abrir diálogo de abono para un separado
   const openDepositDialog = (saleId: string) => {
@@ -221,15 +291,35 @@ export default function Quotes() {
 
   // Convierte una cotización o separado en una venta.
   const convertToSale = (saleId: string) => {
-    updateSale(saleId, { status: 'completed' }); // Actualiza el estado de la venta.
-    toast.success('Convertido a venta exitosamente'); // Muestra notificación de éxito.
-  };
+  const sale = sales.find(s => s.id === saleId);
+  if (sale?.type === 'reserved') {
+    // Reducir stock real y limpiar reservedStock
+    sale.items.forEach(item => {
+      const product = products.find(p => p.id === item.productId);
+      if (product) {
+        updateStock(item.productId, product.stock - item.quantity, 0);
+      }
+    });
+  }
+  updateSale(saleId, { status: 'completed' });
+  toast.success('Convertido a venta exitosamente');
+};
 
   // Cancela una cotización.
   const cancelQuote = (saleId: string) => {
-    updateSale(saleId, { status: 'cancelled' }); // Actualiza el estado de la venta a cancelado.
-    toast.success('Cotización cancelada'); // Muestra notificación de éxito.
-  };
+  const sale = sales.find(s => s.id === saleId);
+  if (sale?.type === 'reserved') {
+    // Liberar reservedStock
+    sale.items.forEach(item => {
+      const product = products.find(p => p.id === item.productId);
+      if (product) {
+        updateStock(item.productId, product.stock, (product.reservedStock ?? 0) - item.quantity);
+      }
+    });
+  }
+  updateSale(saleId, { status: 'cancelled' });
+  toast.success('Cotización cancelada');
+};
 
   // Filtra los productos disponibles según el término de búsqueda.
   const availableProducts = products.filter(product =>
@@ -451,11 +541,22 @@ export default function Quotes() {
                 </div>
               </div>
 
-              <div className="flex justify-between items-center pt-4 border-t">
-                <div className="text-lg font-bold">
-                  Total: ${subtotal.toLocaleString('es-CO')}
+              <div className="pt-4 border-t space-y-2">
+                <div className="flex justify-between">
+                  <span>Subtotal:</span>
+                  <span>${subtotal.toLocaleString('es-CO')}</span>
                 </div>
-                <div className="flex gap-2">
+                {totalIVA > 0 && taxSettings.ivaEnabled && (
+                  <div className="flex justify-between text-gray-600 text-sm">
+                    <span>IVA ({taxSettings.ivaPercentage}% incluido):</span>
+                    <span>${totalIVA.toLocaleString('es-CO')}</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center font-bold text-lg pt-2 border-t">
+                  <span>Total:</span>
+                  <span>${subtotal.toLocaleString('es-CO')}</span>
+                </div>
+                <div className="flex gap-2 pt-2">
                   <Button variant="outline" onClick={() => setIsCreatingQuote(false)}>
                     Cancelar
                   </Button>
@@ -509,16 +610,24 @@ export default function Quotes() {
                     </div>
                     
                     <div className="flex gap-2">
-                      <Button 
-                        size="sm" 
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => printPOSInvoice(quote, companyInfo)}
+                      >
+                        <Printer className="h-4 w-4 mr-1" />
+                        Imprimir
+                      </Button>
+                      <Button
+                        size="sm"
                         onClick={() => convertToSale(quote.id)}
                         className="flex-1"
                       >
                         <ShoppingCart className="h-4 w-4 mr-1" />
                         Convertir a Venta
                       </Button>
-                      <Button 
-                        size="sm" 
+                      <Button
+                        size="sm"
                         variant="outline"
                         onClick={() => cancelQuote(quote.id)}
                       >
@@ -606,7 +715,15 @@ export default function Quotes() {
                       )}
                     </div>
                     
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => printPOSInvoice(reservation, companyInfo)}
+                      >
+                        <Printer className="h-4 w-4 mr-1" />
+                        Imprimir
+                      </Button>
                       <Button
                         size="sm"
                         variant="outline"

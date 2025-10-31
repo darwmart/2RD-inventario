@@ -2,25 +2,23 @@ import { useState } from 'react';
 import { useSales } from '@/hooks/useSales';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Plus, Users, Mail, Phone, TrendingUp } from 'lucide-react';
+import { Plus, Users, Mail, Phone } from 'lucide-react';
 import { Advisor } from '@/types';
 import { toast } from 'sonner';
+import { useExpenses } from '@/hooks/useExpenses';
 
 export default function Advisors() {
-  const { advisors, addAdvisor, sales, getSalesByAdvisor } = useSales();
-  const [expenses] = useLocalStorage<Expense[]>("expenses", []);
-
-  
+  const { advisors, addAdvisor, getSalesByAdvisor } = useSales();
+  const { getExpensesByAdvisor } = useExpenses();
   const [isAddingAdvisor, setIsAddingAdvisor] = useState(false);
   const [advisorForm, setAdvisorForm] = useState({
     name: '',
     email: '',
-    phone: ''
+    phone: '',
   });
 
   const handleAddAdvisor = () => {
@@ -28,21 +26,14 @@ export default function Advisors() {
       toast.error('El nombre es requerido');
       return;
     }
-
     addAdvisor({
       name: advisorForm.name.trim(),
       email: advisorForm.email.trim(),
       phone: advisorForm.phone.trim(),
-      isActive: true
+      isActive: true,
     });
-
     toast.success('Asesor agregado exitosamente');
-    
-    setAdvisorForm({
-      name: '',
-      email: '',
-      phone: ''
-    });
+    setAdvisorForm({ name: '', email: '', phone: '' });
     setIsAddingAdvisor(false);
   };
 
@@ -50,8 +41,6 @@ export default function Advisors() {
     const advisorSales = getSalesByAdvisor(advisor.id).filter(sale => sale.status === 'completed');
     const totalSales = advisorSales.length;
     const totalRevenue = advisorSales.reduce((sum, sale) => sum + sale.total, 0);
-    
-    // Ventas del mes actual
     const currentMonth = new Date().getMonth();
     const currentYear = new Date().getFullYear();
     const monthlySales = advisorSales.filter(sale => {
@@ -59,29 +48,21 @@ export default function Advisors() {
       return saleDate.getMonth() === currentMonth && saleDate.getFullYear() === currentYear;
     });
     const monthlyRevenue = monthlySales.reduce((sum, sale) => sum + sale.total, 0);
-
-      // Prestamos del asesor
-  const advisorLoans = expenses.filter(
-    e => e.advisor === advisor.name && e.type === "prestamo"
-  );
-
-  // Prestamos solo del mes actual
-  const loansThisMonth = advisorLoans.filter(e => {
-    const d = new Date(e.createdAt);
-    return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-  }).reduce((sum, e) => sum + e.amount, 0);
-
-  // Deuda total acumulada de este asesor
-  const totalDebt = advisorLoans.reduce((sum, e) => sum + Number(e.amount), 0);
-
-
+    const advisorLoans = getExpensesByAdvisor(advisor.name).filter(e => e.type === 'prestamo');
+    const loansThisMonth = advisorLoans
+      .filter(e => {
+        const d = new Date(e.createdAt);
+        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+      })
+      .reduce((sum, e) => sum + e.amount, 0);
+    const totalDebt = advisorLoans.reduce((sum, e) => sum + e.amount, 0);
     return {
       totalSales,
       totalRevenue,
       monthlySales: monthlySales.length,
-      monthlyRevenue, 
+      monthlyRevenue,
       loansThisMonth,
-      totalDebt
+      totalDebt,
     };
   };
 

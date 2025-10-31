@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { Sale, SaleItem, PaymentMethod, Advisor } from '@/types';
 import { useLocalStorage } from './useLocalStorage';
 import { v4 as uuidv4 } from 'uuid';
@@ -33,6 +33,8 @@ export function useSales() {
     customerPhone?: string;
     // Abono inicial (para separados)
     deposit?: number;
+    // IVA total de la venta
+    ivaTotal?: number;
   }) => {
     const advisor = advisors.find(a => a.id === saleData.advisorId);
     const subtotal = saleData.items.reduce((sum, item) => sum + item.total, 0);
@@ -57,6 +59,7 @@ export function useSales() {
       subtotal,
       discount: saleData.discount || 0,
       total,
+      ivaTotal: saleData.ivaTotal,
       paymentMethod: saleData.paymentMethod,
       // Información del cliente y abono (si aplica)
       customerName: saleData.customerName,
@@ -137,16 +140,28 @@ export function useSales() {
     return updatedSale!;
   }, [setSales, paymentMethods]);
 
-  return {
-    sales,
-    paymentMethods,
-    advisors,
-    addSale,
-    updateSale,
-    getSalesByDate,
-    getSalesByAdvisor,
-    addPaymentMethod,
-    addAdvisor,
-    addSaleDeposit
-  };
+ const updatePaymentMethod = useCallback((id: string, updates: Partial<PaymentMethod>) => {
+  setPaymentMethods(prev => prev.map(method =>
+    method.id === id ? { ...method, ...updates } : method
+  ));
+}, [setPaymentMethods]);
+
+const deletePaymentMethod = useCallback((id: string) => {
+  setPaymentMethods(prev => prev.filter(method => method.id !== id));
+}, [setPaymentMethods]);
+
+return {
+  sales,
+  paymentMethods,
+  advisors,
+  addSale,
+  updateSale,
+  getSalesByDate,
+  getSalesByAdvisor,
+  addPaymentMethod,
+  updatePaymentMethod,
+  deletePaymentMethod,
+  addAdvisor,
+  addSaleDeposit,
+};
 }

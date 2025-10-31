@@ -11,10 +11,14 @@ import { Plus, FileText, Minus, Banknote, ShoppingBag, CreditCard, Smartphone, C
 import { AccountingRecord, RecordType } from '@/types'; // Tipos personalizados para productos, elementos de venta y métodos de pago.
 import { toast } from 'sonner'; // Librería para mostrar notificaciones.
 import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { useSales } from '@/hooks/useSales';
+import { useSettings } from '@/hooks/useSettings';
 
 
 export default function Accounting() {
 const [records, setRecords] = useLocalStorage<AccountingRecord[]>("accountingRecords",[]);
+  const { sales } = useSales();
+  const { cardSettings } = useSettings();
   const [isCreating, setIsCreating] = useState(false);
 
   // campos del formulario
@@ -31,12 +35,20 @@ const [records, setRecords] = useLocalStorage<AccountingRecord[]>("accountingRec
 
 
   const addRecord = () => {
-    if (!monto || !banco) {
-      toast.error('Monto y banco son obligatorios');
+    if (!monto || monto <= 0) {
+      toast.error('El monto debe ser mayor que 0');
       return;
     }
+    if (!banco) {
+      toast.error('Selecciona un banco');
+      return;
+    }
+    if (tipo === 'compra' && (!proveedor || !factura)) {
+      toast.error('Proveedor y número de factura son obligatorios para compras');
+      return;
+  }
 
-    const newRecord: AccountingRecord = {
+  const newRecord: AccountingRecord = {
       id: Date.now(),
       tipo,
       descripcion,
@@ -45,7 +57,7 @@ const [records, setRecords] = useLocalStorage<AccountingRecord[]>("accountingRec
       monto,
       banco,
       fecha: new Date().toISOString(),
-    };
+  };
 
     setRecords([...records, newRecord]);
     toast.success('Registro agregado');
@@ -105,6 +117,160 @@ const [records, setRecords] = useLocalStorage<AccountingRecord[]>("accountingRec
       );
     });
   }, [records, fechaInicio, fechaFin]);
+
+  // Función para calcular el siguiente día hábil
+  const getNextBusinessDay = (date: Date): Date => {
+    const result = new Date(date);
+    result.setDate(result.getDate() + 1); // Sumar 1 día
+
+    // Si es sábado (6), sumar 2 días para llegar a lunes
+    if (result.getDay() === 6) {
+      result.setDate(result.getDate() + 2);
+    }
+    // Si es domingo (0), sumar 1 día para llegar a lunes
+    else if (result.getDay() === 0) {
+      result.setDate(result.getDate() + 1);
+    }
+
+    return result;
+  };
+
+  // Verificar si un método de pago es tarjeta (débito o crédito)
+  const isCardPayment = (paymentMethodName: string): boolean => {
+    const name = paymentMethodName.toLowerCase();
+    return name.includes('débito') || name.includes('crédito') || name.includes('tarjeta');
+  };
+
+  // Mapeo de métodos de pago a bancos
+  const mapPaymentMethodToBank = (paymentMethodName: string): string => {
+    const name = paymentMethodName.toLowerCase();
+    if (name.includes('nequi')) return 'nequi';
+    if (name.includes('daviplata')) return 'daviplata';
+    if (name.includes('colpatria')) return 'colpatria';
+    if (name.includes('bbva')) return 'bbva';
+    if (name.includes('efectivo')) return 'efectivo';
+    if (name.includes('transferencia') || name.includes('débito') || name.includes('crédito') || name.includes('transfiya')) {
+      return 'colpatria'; // Por defecto las transferencias/tarjetas van a Colpatria
+    }
+    return 'efectivo'; // Por defecto va a efectivo
+  };
+
+  // Calcular el monto neto después de aplicar comisiones y reteiva
+  const calculateNetAmount = (amount: number, paymentMethodName: string): number => {
+    if (!isCardPayment(paymentMethodName)) {
+      return amount; // Sin descuentos para pagos que no sean tarjetas
+    }
+
+    let netAmount = amount;
+    const name = paymentMethodName.toLowerCase();
+
+    // Aplicar comisión si está habilitada
+    if (cardSettings.commissionsEnabled) {
+      if (name.includes('débito')) {
+        netAmount -= (amount * cardSettings.debitCommission / 100);
+      } else if (name.includes('crédito')) {
+        netAmount -= (amount * cardSettings.creditCommission / 100);
+      }
+    }
+
+    // Aplicar reteiva si está habilitada
+    if (cardSettings.reteivaEnabled) {
+      netAmount -= (amount * cardSettings.reteiva / 100);
+    }
+
+    return netAmount;
+  };
+
+  // Calcular totales por banco desde las ventas y abonos
+  const bankTotals = useMemo(() => {
+    const totals: { [bank: string]: { total: number; count: number } } = {
+      colpatria: { total: 0, count: 0 },
+      bbva: { total: 0, count: 0 },
+      nequi: { total: 0, count: 0 },
+      daviplata: { total: 0, count: 0 },
+      efectivo: { total: 0, count: 0 }
+    };
+
+    // Filtrar por rango de fechas si aplica
+    const filterByDate = (date: Date) => {
+      if (!fechaInicio && !fechaFin) return true;
+      return (
+        (!fechaInicio || date >= new Date(fechaInicio)) &&
+        (!fechaFin || date <= new Date(fechaFin))
+      );
+    };
+
+    // Sumar ventas completadas
+    sales
+      .filter(sale => sale.status === 'completed' && sale.type === 'sale')
+      .forEach(sale => {
+        const paymentMethodName = sale.paymentMethod?.name || 'efectivo';
+        const bank = mapPaymentMethodToBank(paymentMethodName);
+        const saleDate = new Date(sale.createdAt);
+
+        // Determinar la fecha de acreditación
+        let creditDate = saleDate;
+        if (cardSettings.delayEnabled && isCardPayment(paymentMethodName) && bank === 'colpatria') {
+          creditDate = getNextBusinessDay(saleDate);
+        }
+
+        // Verificar si la fecha de acreditación está en el rango seleccionado
+        if (filterByDate(creditDate)) {
+          const netAmount = calculateNetAmount(sale.total, paymentMethodName);
+          totals[bank].total += netAmount;
+          totals[bank].count += 1;
+        }
+      });
+
+    // Sumar abonos de separados (deposits)
+    sales
+      .filter(sale => sale.type === 'reserved' && sale.deposits && sale.deposits.length > 0)
+      .forEach(sale => {
+        sale.deposits?.forEach(deposit => {
+          const paymentMethodName = deposit.method?.name || sale.paymentMethod?.name || 'efectivo';
+          const bank = mapPaymentMethodToBank(paymentMethodName);
+          const depositDate = new Date(deposit.createdAt);
+
+          // Determinar la fecha de acreditación
+          let creditDate = depositDate;
+          if (cardSettings.delayEnabled && isCardPayment(paymentMethodName) && bank === 'colpatria') {
+            creditDate = getNextBusinessDay(depositDate);
+          }
+
+          // Verificar si la fecha de acreditación está en el rango seleccionado
+          if (filterByDate(creditDate)) {
+            const netAmount = calculateNetAmount(deposit.amount, paymentMethodName);
+            totals[bank].total += netAmount;
+            totals[bank].count += 1;
+          }
+        });
+      });
+
+    // Sumar abonos iniciales de separados (si no tienen deposits array pero sí deposit inicial)
+    sales
+      .filter(sale => sale.type === 'reserved' && sale.deposit && sale.deposit > 0 && (!sale.deposits || sale.deposits.length === 0))
+      .forEach(sale => {
+        const paymentMethodName = sale.paymentMethod?.name || 'efectivo';
+        const bank = mapPaymentMethodToBank(paymentMethodName);
+        const saleDate = new Date(sale.createdAt);
+
+        // Determinar la fecha de acreditación
+        let creditDate = saleDate;
+        if (cardSettings.delayEnabled && isCardPayment(paymentMethodName) && bank === 'colpatria') {
+          creditDate = getNextBusinessDay(saleDate);
+        }
+
+        // Verificar si la fecha de acreditación está en el rango seleccionado
+        if (filterByDate(creditDate)) {
+          const netAmount = calculateNetAmount(sale.deposit || 0, paymentMethodName);
+          totals[bank].total += netAmount;
+          totals[bank].count += 1;
+        }
+      });
+
+    return totals;
+  }, [sales, fechaInicio, fechaFin, cardSettings]);
+
   return (
     <ScrollArea className="h-[51rem] p-6">
       <div className="flex justify-between items-center mb-6">
@@ -157,9 +323,13 @@ const [records, setRecords] = useLocalStorage<AccountingRecord[]>("accountingRec
                 <Label>Monto</Label>
                 <Input
                   type="number"
-                  value={monto}
-                  onChange={(e) => setMonto(parseFloat(e.target.value) || 0)}
+                  value={monto || ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setMonto(value ? parseFloat(value) : 0);
+                  }}
                   placeholder="0"
+                  min="0"
                 />
               </div>
 
@@ -253,10 +423,10 @@ const [records, setRecords] = useLocalStorage<AccountingRecord[]>("accountingRec
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ${('es-CO')}
+              ${bankTotals.colpatria.total.toLocaleString('es-CO')}
             </div>
             <p className="text-xs text-muted-foreground">
-              {} abonos
+              {bankTotals.colpatria.count} transacciones
             </p>
           </CardContent>
         </Card>
@@ -270,10 +440,10 @@ const [records, setRecords] = useLocalStorage<AccountingRecord[]>("accountingRec
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              ${('es-CO')}
+              ${bankTotals.bbva.total.toLocaleString('es-CO')}
             </div>
             <p className="text-xs text-muted-foreground">
-              {}% del total
+              {bankTotals.bbva.count} transacciones
             </p>
           </CardContent>
         </Card>
@@ -287,10 +457,10 @@ const [records, setRecords] = useLocalStorage<AccountingRecord[]>("accountingRec
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
-              ${('es-CO')}
+              ${bankTotals.nequi.total.toLocaleString('es-CO')}
             </div>
             <p className="text-xs text-muted-foreground">
-              {}% del total
+              {bankTotals.nequi.count} transacciones
             </p>
           </CardContent>
         </Card>
@@ -304,10 +474,10 @@ const [records, setRecords] = useLocalStorage<AccountingRecord[]>("accountingRec
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">
-              ${('es-CO')}
+              ${bankTotals.daviplata.total.toLocaleString('es-CO')}
             </div>
             <p className="text-xs text-muted-foreground">
-              { }% del total
+              {bankTotals.daviplata.count} transacciones
             </p>
           </CardContent>
         </Card>
@@ -319,7 +489,7 @@ const [records, setRecords] = useLocalStorage<AccountingRecord[]>("accountingRec
           <input
             type="date"
             value={fechaInicio}
-            onChange={e => setFechaFin(e.target.value)}
+            onChange={(e) => setFechaInicio(e.target.value)} // Cambiar setFechaFin por setFechaInicio
             className="border p-1 rounded"
           />
         </div>
@@ -328,7 +498,7 @@ const [records, setRecords] = useLocalStorage<AccountingRecord[]>("accountingRec
           <input
             type="date"
             value={fechaFin}
-            onChange={e => setFechaFin(e.target.value)}
+            onChange={(e) => setFechaFin(e.target.value)}
             className="border p-1 rounded"
           />
         </div>
@@ -338,11 +508,11 @@ const [records, setRecords] = useLocalStorage<AccountingRecord[]>("accountingRec
         <CardHeader>
           <CardTitle className="flex items-center">
             <FileText className="h-5 w-5 mr-2" />
-            Registros ({records.length})
+            Registros ({filteredRecords.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {records.length === 0 ? (
+          {filteredRecords.length === 0 ? (
             <p className="text-gray-500 text-center py-4">
               No hay registros aún
             </p>
@@ -360,7 +530,7 @@ const [records, setRecords] = useLocalStorage<AccountingRecord[]>("accountingRec
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {records.map((r) => (
+                {filteredRecords.map((r) => (
                   <TableRow key={r.id}>
                     <TableCell>{new Date(r.fecha).toLocaleDateString('es-CO')}</TableCell>
                     <TableCell>

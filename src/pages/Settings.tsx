@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useSales } from '@/hooks/useSales';
+import { useSettings } from '@/hooks/useSettings';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,11 +9,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Plus, Settings as SettingsIcon, CreditCard, Trash2 } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Plus, Settings as SettingsIcon, CreditCard, Trash2, Calendar, Percent } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function Settings() {
   const { paymentMethods, addPaymentMethod } = useSales();
+  const { cardSettings, updateCardSettings, companyInfo, updateCompanyInfo, taxSettings, updateTaxSettings } = useSettings();
   
   const [isAddingPaymentMethod, setIsAddingPaymentMethod] = useState(false);
   const [newPaymentMethod, setNewPaymentMethod] = useState({
@@ -60,13 +63,14 @@ export default function Settings() {
   };
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Configuración</h1>
-        <p className="mt-2 text-gray-600">
-          Personaliza tu sistema de ventas e inventario
-        </p>
-      </div>
+    <ScrollArea className="h-[51rem]">
+      <div className="p-6">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-gray-900">Configuración</h1>
+          <p className="mt-2 text-gray-600">
+            Personaliza tu sistema de ventas e inventario
+          </p>
+        </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Métodos de Pago */}
@@ -244,29 +248,260 @@ export default function Settings() {
             </div>
 
             <div className="border-t pt-4">
+              <h4 className="font-medium mb-3">Configuración de IVA</h4>
+              <p className="text-sm text-gray-600 mb-3">
+                Configura el impuesto sobre las ventas (IVA)
+              </p>
+
+              <div className="space-y-4">
+                {/* Activar/Desactivar IVA */}
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div>
+                    <p className="font-medium text-sm">Aplicar IVA</p>
+                    <p className="text-xs text-gray-600">Incluir impuesto en los precios de venta</p>
+                  </div>
+                  <Switch
+                    checked={taxSettings.ivaEnabled}
+                    onCheckedChange={(checked) => {
+                      updateTaxSettings({ ivaEnabled: checked });
+                      toast.success(checked ? 'IVA activado' : 'IVA desactivado');
+                    }}
+                  />
+                </div>
+
+                {/* Porcentaje de IVA */}
+                <div>
+                  <Label>Porcentaje de IVA (%)</Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="100"
+                    value={taxSettings.ivaPercentage}
+                    onChange={(e) => updateTaxSettings({ ivaPercentage: parseFloat(e.target.value) || 0 })}
+                    placeholder="19"
+                    disabled={!taxSettings.ivaEnabled}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Ejemplo: 19 = 19% de IVA
+                  </p>
+                </div>
+
+                {/* Vista previa del cálculo */}
+                {taxSettings.ivaEnabled && (
+                  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <p className="text-sm font-medium text-blue-900 mb-2">Ejemplo de Cálculo:</p>
+                    <div className="space-y-1 text-sm text-blue-800">
+                      <p>Precio base: $100.000</p>
+                      <p>IVA ({taxSettings.ivaPercentage}%): ${(100000 * taxSettings.ivaPercentage / 100).toLocaleString('es-CO')}</p>
+                      <p className="font-bold pt-2 border-t border-blue-300">
+                        Precio final con IVA: ${(100000 + (100000 * taxSettings.ivaPercentage / 100)).toLocaleString('es-CO')}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="border-t pt-4">
               <h4 className="font-medium mb-3">Información de la Empresa</h4>
+              <p className="text-sm text-gray-600 mb-3">
+                Esta información se imprimirá en las facturas POS
+              </p>
               <div className="space-y-3">
                 <div>
                   <Label>Nombre de la Empresa</Label>
-                  <Input placeholder="Mi Tienda" />
+                  <Input
+                    placeholder="Mi Tienda"
+                    value={companyInfo.name}
+                    onChange={(e) => updateCompanyInfo({ name: e.target.value })}
+                  />
                 </div>
                 <div>
                   <Label>NIT/RUT</Label>
-                  <Input placeholder="123456789-0" />
+                  <Input
+                    placeholder="123456789-0"
+                    value={companyInfo.nit}
+                    onChange={(e) => updateCompanyInfo({ nit: e.target.value })}
+                  />
                 </div>
                 <div>
                   <Label>Dirección</Label>
-                  <Input placeholder="Calle 123 #45-67" />
+                  <Input
+                    placeholder="Calle 123 #45-67"
+                    value={companyInfo.address}
+                    onChange={(e) => updateCompanyInfo({ address: e.target.value })}
+                  />
                 </div>
                 <div>
                   <Label>Teléfono</Label>
-                  <Input placeholder="(57) 300 123 4567" />
+                  <Input
+                    placeholder="(57) 300 123 4567"
+                    value={companyInfo.phone}
+                    onChange={(e) => updateCompanyInfo({ phone: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>Email (Opcional)</Label>
+                  <Input
+                    type="email"
+                    placeholder="contacto@mitienda.com"
+                    value={companyInfo.email || ''}
+                    onChange={(e) => updateCompanyInfo({ email: e.target.value })}
+                  />
                 </div>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Configuración de Tarjetas */}
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <CreditCard className="h-5 w-5 mr-2" />
+            Configuración de Tarjetas Débito y Crédito
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Retraso de Acreditación */}
+          <div className="border-b pb-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-gray-500" />
+                <div>
+                  <p className="font-medium">Retraso de Acreditación</p>
+                  <p className="text-sm text-gray-600">
+                    Las tarjetas se acreditan al día siguiente (lunes si es fin de semana)
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={cardSettings.delayEnabled}
+                onCheckedChange={(checked) => {
+                  updateCardSettings({ delayEnabled: checked });
+                  toast.success(checked ? 'Retraso de acreditación activado' : 'Retraso de acreditación desactivado');
+                }}
+              />
+            </div>
+            <div className="p-3 bg-amber-50 rounded-lg">
+              <p className="text-sm text-amber-800">
+                <strong>Nota:</strong> Cuando está activo, las ventas con tarjeta en Colpatria
+                se verán reflejadas el día siguiente hábil (no fines de semana).
+              </p>
+            </div>
+          </div>
+
+          {/* Comisiones y Retenciones */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Percent className="h-4 w-4 text-gray-500" />
+              <h4 className="font-medium">Comisiones y Retenciones</h4>
+            </div>
+
+            {/* Activar Comisiones */}
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div>
+                <p className="font-medium text-sm">Aplicar Comisiones</p>
+                <p className="text-xs text-gray-600">Descontar comisión bancaria de las tarjetas</p>
+              </div>
+              <Switch
+                checked={cardSettings.commissionsEnabled}
+                onCheckedChange={(checked) => {
+                  updateCardSettings({ commissionsEnabled: checked });
+                  toast.success(checked ? 'Comisiones activadas' : 'Comisiones desactivadas');
+                }}
+              />
+            </div>
+
+            {/* Configuración de Comisiones */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>Comisión Tarjeta Débito (%)</Label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  value={cardSettings.debitCommission}
+                  onChange={(e) => updateCardSettings({ debitCommission: parseFloat(e.target.value) || 0 })}
+                  placeholder="1.9"
+                  disabled={!cardSettings.commissionsEnabled}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Ejemplo: 1.9 = 1.9% de comisión
+                </p>
+              </div>
+              <div>
+                <Label>Comisión Tarjeta Crédito (%)</Label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  value={cardSettings.creditCommission}
+                  onChange={(e) => updateCardSettings({ creditCommission: parseFloat(e.target.value) || 0 })}
+                  placeholder="2.9"
+                  disabled={!cardSettings.commissionsEnabled}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Ejemplo: 2.9 = 2.9% de comisión
+                </p>
+              </div>
+            </div>
+
+            {/* Activar Reteiva */}
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div>
+                <p className="font-medium text-sm">Aplicar Reteiva</p>
+                <p className="text-xs text-gray-600">Descontar retención del IVA</p>
+              </div>
+              <Switch
+                checked={cardSettings.reteivaEnabled}
+                onCheckedChange={(checked) => {
+                  updateCardSettings({ reteivaEnabled: checked });
+                  toast.success(checked ? 'Reteiva activada' : 'Reteiva desactivada');
+                }}
+              />
+            </div>
+
+            {/* Configuración de Reteiva */}
+            <div>
+              <Label>Reteiva (%)</Label>
+              <Input
+                type="number"
+                step="0.1"
+                value={cardSettings.reteiva}
+                onChange={(e) => updateCardSettings({ reteiva: parseFloat(e.target.value) || 0 })}
+                placeholder="0.4"
+                disabled={!cardSettings.reteivaEnabled}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Ejemplo: 0.4 = 0.4% de retención
+              </p>
+            </div>
+
+            {/* Vista previa del cálculo */}
+            {(cardSettings.commissionsEnabled || cardSettings.reteivaEnabled) && (
+              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <p className="text-sm font-medium text-blue-900 mb-2">Ejemplo de Cálculo:</p>
+                <div className="space-y-1 text-sm text-blue-800">
+                  <p>Venta con Tarjeta Débito: $100.000</p>
+                  {cardSettings.commissionsEnabled && (
+                    <p>- Comisión débito ({cardSettings.debitCommission}%): ${(100000 * cardSettings.debitCommission / 100).toLocaleString('es-CO')}</p>
+                  )}
+                  {cardSettings.reteivaEnabled && (
+                    <p>- Reteiva ({cardSettings.reteiva}%): ${(100000 * cardSettings.reteiva / 100).toLocaleString('es-CO')}</p>
+                  )}
+                  <p className="font-bold pt-2 border-t border-blue-300">
+                    Total recibido: ${(100000 -
+                      (cardSettings.commissionsEnabled ? 100000 * cardSettings.debitCommission / 100 : 0) -
+                      (cardSettings.reteivaEnabled ? 100000 * cardSettings.reteiva / 100 : 0)
+                    ).toLocaleString('es-CO')}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Información del Sistema */}
       <Card className="mt-6">
@@ -290,12 +525,13 @@ export default function Settings() {
           </div>
           <div className="mt-4 p-4 bg-blue-50 rounded-lg">
             <p className="text-sm text-blue-800">
-              <strong>Nota:</strong> Este sistema utiliza almacenamiento local del navegador. 
+              <strong>Nota:</strong> Este sistema utiliza almacenamiento local del navegador.
               Los datos se mantienen en tu dispositivo de forma segura.
             </p>
           </div>
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </ScrollArea>
   );
 }

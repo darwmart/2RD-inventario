@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { Product, Category, Supplier } from '@/types';
 import { useLocalStorage } from './useLocalStorage';
 import { v4 as uuidv4 } from 'uuid';
@@ -12,16 +12,17 @@ export function useInventory() {
   ]);
   const [suppliers, setSuppliers] = useLocalStorage<Supplier[]>('suppliers', []);
 
-  const addProduct = useCallback((productData: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => {
-    const newProduct: Product = {
-      ...productData,
-      id: uuidv4(),
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    setProducts(prev => [...prev, newProduct]);
-    return newProduct;
-  }, [setProducts]);
+ const addProduct = useCallback((productData: Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'reservedStock'>) => {
+  const newProduct: Product = {
+    ...productData,
+    id: uuidv4(),
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    reservedStock: 0,
+  };
+  setProducts(prev => [...prev, newProduct]);
+  return newProduct;
+}, [setProducts]);
 
   const updateProduct = useCallback((id: string, updates: Partial<Product>) => {
     setProducts(prev => prev.map(product => 
@@ -35,13 +36,13 @@ export function useInventory() {
     setProducts(prev => prev.filter(product => product.id !== id));
   }, [setProducts]);
 
-  const updateStock = useCallback((productId: string, newStock: number) => {
-    setProducts(prev => prev.map(product =>
-      product.id === productId
-        ? { ...product, stock: newStock, updatedAt: new Date() }
-        : product
-    ));
-  }, [setProducts]);
+  const updateStock = useCallback((productId: string, newStock: number, newReservedStock?: number) => {
+  setProducts(prev => prev.map(product =>
+    product.id === productId
+      ? { ...product, stock: newStock, reservedStock: newReservedStock ?? product.reservedStock ?? 0, updatedAt: new Date() }
+      : product
+  ));
+}, [setProducts]);
 
   const findProductByBarcode = useCallback((barcode: string) => {
     return products.find(product => product.barcode === barcode);

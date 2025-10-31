@@ -4,28 +4,13 @@ import { useSales } from '@/hooks/useSales';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Download, 
-  FileSpreadsheet, 
-  FileText, 
-  Database, 
-  Upload,
-  Calendar,
-  Filter
-} from 'lucide-react';
+import { Filter, Plus} from 'lucide-react';
 import { toast } from 'sonner';
-import {
-  exportSalesToExcel,
-  exportSalesToPDF,
-  exportInventoryToExcel,
-  exportInventoryToPDF,
-  exportBackup,
-  importBackup
+import { exportSalesToExcel, exportSalesToPDF, exportInventoryToExcel, exportInventoryToPDF,  exportBackup,  importBackup
 } from '@/utils/exportUtils';
 
 export default function Reports() {
@@ -39,7 +24,7 @@ export default function Reports() {
     reference: ''
   });
   
-  const [inventoryFilters, setInventoryFilters] = useState({
+  const [inventoryFilters] = useState({
     category: 'all',
     lowStockOnly: false,
     reference: ''
@@ -119,7 +104,9 @@ export default function Reports() {
       }
 
       if (salesFilters.reference) {
-        includeReference = sale.reference?.toLowerCase().includes(salesFilters.reference.toLowerCase());
+        includeReference = sale.items.some(item =>
+          item.productName.toLowerCase().includes(salesFilters.reference.toLowerCase())
+        );
       }
 
       return includeDate && includeAdvisor && includeReference && sale.status === 'completed';
@@ -161,7 +148,7 @@ export default function Reports() {
         <TabsList>
           <TabsTrigger value="sales">Reportes de Ventas</TabsTrigger>
           <TabsTrigger value="inventory">Reportes de Inventario</TabsTrigger>
-          <TabsTrigger value="backup">Copias de Seguridad</TabsTnrigger>
+          <TabsTrigger value="backup">Copias de Seguridad</TabsTrigger>
         </TabsList>
 
         {/* Reportes de Ventas */}
@@ -174,17 +161,7 @@ export default function Reports() {
                   Filtros de Ventas
                 </CardTitle>
               </CardHeader>
-              <CardContent classN<Dialog open={isCreatingSale} onOpenChange={setIsCreatingSale}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Nueva Venta00000
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Nueva Venta</DialogTitle>
-            </DialogHeader>ame="space-y-4">
+              <CardContent className= "space-y-4">
                 <div>
                   <Label>Fecha Inicio</Label>
                   <Input
@@ -203,17 +180,7 @@ export default function Reports() {
                 </div>
                 <div>
                   <Label>Asesor</Label>
-                  <Select <Dialog open={isCreatingSale} onOpenChange={setIsCreatingSale}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Nueva Venta00000
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Nueva Venta</DialogTitle>
-            </DialogHeader>
+                  <Select 
                     value={salesFilters.advisor} 
                     onValueChange={(value) => setSalesFilters({...salesFilters, advisor: value})}
                   >
@@ -245,6 +212,15 @@ export default function Reports() {
                 </div>
               </CardContent>
             </Card>
+            <DialogTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Nueva Venta00000
+            </Button>
+          </DialogTrigger>
+            <DialogHeader>
+              <DialogTitle>Nueva Venta</DialogTitle>
+            </DialogHeader>ame="space-y-4"
           </div>
         </TabsContent>
       </Tabs>

@@ -10,7 +10,8 @@ import {
   Settings,
   FileText,
   AlertCircle,
-  Banknote
+  Banknote,
+  ShoppingBag
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -23,6 +24,7 @@ const navigation = [
   { name: 'Inventario', href: '/inventory', icon: Package },
   { name: 'Ventas', href: '/sales', icon: ShoppingCart },
   { name: 'Cotizaciones', href: '/quotes', icon: FileText },
+  { name: 'Compras', href: '/purchases', icon: ShoppingBag },
   { name: 'Arqueo de Caja', href: '/cash-register', icon: Calculator },
   { name: 'Asesores', href: '/advisors', icon: Users },
   { name: 'Alertas', href: '/alerts', icon: AlertCircle },
