@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { CardSettings, CompanyInfo, TaxSettings } from '@/types';
+import { CardSettings, CompanyInfo, TaxSettings, Bank } from '@/types';
 import { useLocalStorage } from './useLocalStorage';
 
 const defaultCardSettings: CardSettings = {
@@ -24,6 +24,14 @@ const defaultTaxSettings: TaxSettings = {
   ivaPercentage: 19,
 };
 
+const defaultBanks: Bank[] = [
+  { id: 'efectivo', name: 'Efectivo', isActive: true },
+  { id: 'colpatria', name: 'Colpatria', isActive: true },
+  { id: 'bbva', name: 'BBVA', isActive: true },
+  { id: 'nequi', name: 'Nequi', isActive: true },
+  { id: 'daviplata', name: 'Daviplata', isActive: true },
+];
+
 export function useSettings() {
   const [cardSettings, setCardSettings] = useLocalStorage<CardSettings>(
     'cardSettings',
@@ -38,6 +46,11 @@ export function useSettings() {
   const [taxSettings, setTaxSettings] = useLocalStorage<TaxSettings>(
     'taxSettings',
     defaultTaxSettings
+  );
+
+  const [banks, setBanks] = useLocalStorage<Bank[]>(
+    'banks',
+    defaultBanks
   );
 
   const updateCardSettings = useCallback(
@@ -61,6 +74,29 @@ export function useSettings() {
     [setTaxSettings]
   );
 
+  const addBank = useCallback(
+    (bank: Bank) => {
+      setBanks((prev) => [...prev, bank]);
+    },
+    [setBanks]
+  );
+
+  const updateBank = useCallback(
+    (bankId: string, updates: Partial<Bank>) => {
+      setBanks((prev) =>
+        prev.map((bank) => (bank.id === bankId ? { ...bank, ...updates } : bank))
+      );
+    },
+    [setBanks]
+  );
+
+  const deleteBank = useCallback(
+    (bankId: string) => {
+      setBanks((prev) => prev.filter((bank) => bank.id !== bankId));
+    },
+    [setBanks]
+  );
+
   return {
     cardSettings,
     updateCardSettings,
@@ -68,5 +104,9 @@ export function useSettings() {
     updateCompanyInfo,
     taxSettings,
     updateTaxSettings,
+    banks,
+    addBank,
+    updateBank,
+    deleteBank,
   };
 }

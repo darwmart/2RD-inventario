@@ -10,17 +10,24 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Settings as SettingsIcon, CreditCard, Trash2, Calendar, Percent } from 'lucide-react';
+import { Plus, Settings as SettingsIcon, CreditCard, Trash2, Calendar, Percent, Landmark, Edit } from 'lucide-react';
 import { toast } from 'sonner';
+import { Bank } from '@/types';
 
 export default function Settings() {
   const { paymentMethods, addPaymentMethod } = useSales();
-  const { cardSettings, updateCardSettings, companyInfo, updateCompanyInfo, taxSettings, updateTaxSettings } = useSettings();
+  const { cardSettings, updateCardSettings, companyInfo, updateCompanyInfo, taxSettings, updateTaxSettings, banks, addBank, updateBank, deleteBank } = useSettings();
   
   const [isAddingPaymentMethod, setIsAddingPaymentMethod] = useState(false);
   const [newPaymentMethod, setNewPaymentMethod] = useState({
     name: '',
     type: 'electronic' as 'cash' | 'electronic' | 'credit'
+  });
+
+  const [isBankDialogOpen, setIsBankDialogOpen] = useState(false);
+  const [editingBank, setEditingBank] = useState<Bank | null>(null);
+  const [bankForm, setBankForm] = useState({
+    name: '',
   });
 
   const handleAddPaymentMethod = () => {
@@ -59,6 +66,50 @@ export default function Settings() {
         return 'destructive';
       default:
         return 'default';
+    }
+  };
+
+  const handleOpenBankDialog = (bank?: Bank) => {
+    if (bank) {
+      setEditingBank(bank);
+      setBankForm({ name: bank.name });
+    } else {
+      setEditingBank(null);
+      setBankForm({ name: '' });
+    }
+    setIsBankDialogOpen(true);
+  };
+
+  const handleSaveBank = () => {
+    if (!bankForm.name.trim()) {
+      toast.error('El nombre del banco es requerido');
+      return;
+    }
+
+    if (editingBank) {
+      // Editar banco existente
+      updateBank(editingBank.id, { name: bankForm.name.trim() });
+      toast.success('Banco actualizado exitosamente');
+    } else {
+      // Agregar nuevo banco
+      const newBank: Bank = {
+        id: bankForm.name.toLowerCase().replace(/\s+/g, '-'),
+        name: bankForm.name.trim(),
+        isActive: true,
+      };
+      addBank(newBank);
+      toast.success('Banco agregado exitosamente');
+    }
+
+    setBankForm({ name: '' });
+    setEditingBank(null);
+    setIsBankDialogOpen(false);
+  };
+
+  const handleDeleteBank = (bankId: string) => {
+    if (confirm('¿Estás seguro de que deseas eliminar este banco?')) {
+      deleteBank(bankId);
+      toast.success('Banco eliminado exitosamente');
     }
   };
 
@@ -162,6 +213,98 @@ export default function Settings() {
   </div>
 </CardContent>
 
+        </Card>
+
+        {/* Gestión de Bancos */}
+        <Card>
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <CardTitle className="flex items-center">
+                <Landmark className="h-5 w-5 mr-2" />
+                Bancos / Entidades Financieras
+              </CardTitle>
+              <Dialog open={isBankDialogOpen} onOpenChange={setIsBankDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" onClick={() => handleOpenBankDialog()}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Agregar
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>
+                      {editingBank ? 'Editar Banco' : 'Agregar Banco'}
+                    </DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="bank-name">Nombre del Banco</Label>
+                      <Input
+                        id="bank-name"
+                        value={bankForm.name}
+                        onChange={(e) => setBankForm({ name: e.target.value })}
+                        placeholder="Ej: Bancolombia, Davivienda, etc."
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" onClick={() => setIsBankDialogOpen(false)}>
+                        Cancelar
+                      </Button>
+                      <Button onClick={handleSaveBank}>
+                        {editingBank ? 'Guardar Cambios' : 'Agregar Banco'}
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {banks && banks.length > 0 ? (
+                banks.map(bank => (
+                  <div key={bank.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Landmark className="h-4 w-4 text-gray-500" />
+                      <div>
+                        <p className="font-medium">{bank.name}</p>
+                        <Badge variant={bank.isActive ? 'default' : 'secondary'} className="text-xs">
+                          {bank.isActive ? 'Activo' : 'Inactivo'}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleOpenBankDialog(bank)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Switch
+                        checked={bank.isActive}
+                        onCheckedChange={(checked) => {
+                          updateBank(bank.id, { isActive: checked });
+                          toast.success(checked ? `${bank.name} activado` : `${bank.name} desactivado`);
+                        }}
+                      />
+                      {bank.id !== 'efectivo' && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDeleteBank(bank.id)}
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-gray-500">No hay bancos configurados</p>
+              )}
+            </div>
+          </CardContent>
         </Card>
 
         {/* Configuraciones Generales */}

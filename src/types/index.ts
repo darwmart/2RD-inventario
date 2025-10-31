@@ -162,7 +162,8 @@ export type Purchase = {
   paymentMethod: PaymentMethod;
   paymentDetails?: {
     // Para crédito
-    creditDays?: number;
+    creditDays?: number; // Deprecated: usar dueDate en su lugar
+    dueDate?: string; // Fecha de vencimiento del crédito
     // Para transferencia
     bankId?: string;
     bankName?: string;
@@ -171,4 +172,11 @@ export type Purchase = {
   };
   notes?: string;
   createdAt: Date;
+};
+
+export type Bank = {
+  id: string;
+  name: string;
+  icon?: string;
+  isActive: boolean;
 };

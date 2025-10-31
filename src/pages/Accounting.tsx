@@ -13,12 +13,14 @@ import { toast } from 'sonner'; // Librería para mostrar notificaciones.
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useSales } from '@/hooks/useSales';
 import { useSettings } from '@/hooks/useSettings';
+import { useExpenses } from '@/hooks/useExpenses';
 
 
 export default function Accounting() {
 const [records, setRecords] = useLocalStorage<AccountingRecord[]>("accountingRecords",[]);
   const { sales } = useSales();
-  const { cardSettings } = useSettings();
+  const { cardSettings, banks } = useSettings();
+  const { expenses } = useExpenses();
   const [isCreating, setIsCreating] = useState(false);
 
   // campos del formulario
@@ -83,15 +85,22 @@ const [records, setRecords] = useLocalStorage<AccountingRecord[]>("accountingRec
       .filter((r) => r.banco === "efectivo" && (r.tipo === "egreso" || r.tipo === "compra"))
       .reduce((acc, r) => acc + r.monto, 0);
 
-    return ingresos - egresos;
-  }, [records]);
+    // Restar todos los expenses (gastos y préstamos) del efectivo
+    const egresosFromExpenses = expenses.reduce((acc, exp) => acc + exp.amount, 0);
 
-   // Gastos totales
+    return ingresos - egresos - egresosFromExpenses;
+  }, [records, expenses]);
+
+   // Gastos totales (incluye registros de tipo egreso + expenses)
   const totalGastos = useMemo(() => {
-    return records
+    const egresosFromRecords = records
       .filter((r) => r.tipo === "egreso")
       .reduce((acc, r) => acc + r.monto, 0);
-  }, [records]);
+
+    const egresosFromExpenses = expenses.reduce((acc, exp) => acc + exp.amount, 0);
+
+    return egresosFromRecords + egresosFromExpenses;
+  }, [records, expenses]);
 
   // Compras totales
   const totalCompras = useMemo(() => {
@@ -117,6 +126,24 @@ const [records, setRecords] = useLocalStorage<AccountingRecord[]>("accountingRec
       );
     });
   }, [records, fechaInicio, fechaFin]);
+
+  // Combinar registros con expenses para mostrar en la tabla
+  const allRecords = useMemo(() => {
+    // Convertir expenses a formato de AccountingRecord
+    const expensesAsRecords: AccountingRecord[] = expenses.map(exp => ({
+      id: parseInt(exp.id.replace(/\D/g, '').slice(0, 10)) || Date.now(),
+      tipo: 'egreso' as RecordType,
+      descripcion: `${exp.type === 'gasto' ? 'Gasto' : 'Préstamo'}: ${exp.description} (${exp.advisor})`,
+      monto: exp.amount,
+      banco: 'efectivo',
+      fecha: exp.createdAt
+    }));
+
+    // Combinar y ordenar por fecha (más recientes primero)
+    return [...filteredRecords, ...expensesAsRecords].sort((a, b) =>
+      new Date(b.fecha).getTime() - new Date(a.fecha).getTime()
+    );
+  }, [filteredRecords, expenses]);
 
   // Función para calcular el siguiente día hábil
   const getNextBusinessDay = (date: Date): Date => {
@@ -144,14 +171,20 @@ const [records, setRecords] = useLocalStorage<AccountingRecord[]>("accountingRec
   // Mapeo de métodos de pago a bancos
   const mapPaymentMethodToBank = (paymentMethodName: string): string => {
     const name = paymentMethodName.toLowerCase();
-    if (name.includes('nequi')) return 'nequi';
-    if (name.includes('daviplata')) return 'daviplata';
-    if (name.includes('colpatria')) return 'colpatria';
-    if (name.includes('bbva')) return 'bbva';
-    if (name.includes('efectivo')) return 'efectivo';
+
+    // Buscar si el nombre del método de pago contiene alguno de los bancos
+    const matchedBank = banks.find(bank =>
+      bank.isActive && name.includes(bank.name.toLowerCase())
+    );
+
+    if (matchedBank) return matchedBank.id;
+
+    // Si incluye transferencia, débito, crédito o transfiya, buscar el primer banco que no sea efectivo
     if (name.includes('transferencia') || name.includes('débito') || name.includes('crédito') || name.includes('transfiya')) {
-      return 'colpatria'; // Por defecto las transferencias/tarjetas van a Colpatria
+      const defaultBank = banks.find(bank => bank.isActive && bank.id !== 'efectivo');
+      return defaultBank?.id || 'efectivo';
     }
+
     return 'efectivo'; // Por defecto va a efectivo
   };
 
@@ -183,13 +216,11 @@ const [records, setRecords] = useLocalStorage<AccountingRecord[]>("accountingRec
 
   // Calcular totales por banco desde las ventas y abonos
   const bankTotals = useMemo(() => {
-    const totals: { [bank: string]: { total: number; count: number } } = {
-      colpatria: { total: 0, count: 0 },
-      bbva: { total: 0, count: 0 },
-      nequi: { total: 0, count: 0 },
-      daviplata: { total: 0, count: 0 },
-      efectivo: { total: 0, count: 0 }
-    };
+    // Inicializar totales dinámicamente desde los bancos activos
+    const totals: { [bank: string]: { total: number; count: number } } = {};
+    banks.filter(bank => bank.isActive).forEach(bank => {
+      totals[bank.id] = { total: 0, count: 0 };
+    });
 
     // Filtrar por rango de fechas si aplica
     const filterByDate = (date: Date) => {
@@ -269,7 +300,7 @@ const [records, setRecords] = useLocalStorage<AccountingRecord[]>("accountingRec
       });
 
     return totals;
-  }, [sales, fechaInicio, fechaFin, cardSettings]);
+  }, [sales, fechaInicio, fechaFin, cardSettings, banks]);
 
   return (
     <ScrollArea className="h-[51rem] p-6">
@@ -310,11 +341,13 @@ const [records, setRecords] = useLocalStorage<AccountingRecord[]>("accountingRec
                     <SelectValue placeholder="Selecciona banco" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="efectivo">Efectivo</SelectItem>
-                    <SelectItem value="colpatria">Colpatria</SelectItem>
-                    <SelectItem value="bbva">BBVA</SelectItem>
-                    <SelectItem value="nequi">Nequi</SelectItem>
-                    <SelectItem value="daviplata">Daviplata</SelectItem>
+                    {banks
+                      .filter((bank) => bank.isActive)
+                      .map((bank) => (
+                        <SelectItem key={bank.id} value={bank.id}>
+                          {bank.name}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -414,73 +447,33 @@ const [records, setRecords] = useLocalStorage<AccountingRecord[]>("accountingRec
         </CardContent>
       </Card>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              COLPATRIA
-            </CardTitle>
-            <Calculator className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              ${bankTotals.colpatria.total.toLocaleString('es-CO')}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {bankTotals.colpatria.count} transacciones
-            </p>
-          </CardContent>
-        </Card>
+        {banks
+          .filter(bank => bank.isActive && bank.id !== 'efectivo')
+          .map((bank, index) => {
+            const colors = ['text-gray-900', 'text-green-600', 'text-blue-600', 'text-orange-600'];
+            const color = colors[index % colors.length];
+            const total = bankTotals[bank.id]?.total || 0;
+            const count = bankTotals[bank.id]?.count || 0;
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              BBVA
-            </CardTitle>
-            <Banknote className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              ${bankTotals.bbva.total.toLocaleString('es-CO')}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {bankTotals.bbva.count} transacciones
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              NEQUI
-            </CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
-              ${bankTotals.nequi.total.toLocaleString('es-CO')}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {bankTotals.nequi.count} transacciones
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              DAVIPLATA
-            </CardTitle>
-            <Smartphone className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
-              ${bankTotals.daviplata.total.toLocaleString('es-CO')}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {bankTotals.daviplata.count} transacciones
-            </p>
-          </CardContent>
-        </Card>
+            return (
+              <Card key={bank.id}>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    {bank.name.toUpperCase()}
+                  </CardTitle>
+                  <Banknote className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className={`text-2xl font-bold ${color}`}>
+                    ${total.toLocaleString('es-CO')}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {count} transacciones
+                  </p>
+                </CardContent>
+              </Card>
+            );
+          })}
       </div>
              {/* filtros de fecha */}
       <div className="flex gap-4 mb-4">
@@ -508,11 +501,11 @@ const [records, setRecords] = useLocalStorage<AccountingRecord[]>("accountingRec
         <CardHeader>
           <CardTitle className="flex items-center">
             <FileText className="h-5 w-5 mr-2" />
-            Registros ({filteredRecords.length})
+            Registros ({allRecords.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {filteredRecords.length === 0 ? (
+          {allRecords.length === 0 ? (
             <p className="text-gray-500 text-center py-4">
               No hay registros aún
             </p>
@@ -530,7 +523,7 @@ const [records, setRecords] = useLocalStorage<AccountingRecord[]>("accountingRec
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredRecords.map((r) => (
+                {allRecords.map((r) => (
                   <TableRow key={r.id}>
                     <TableCell>{new Date(r.fecha).toLocaleDateString('es-CO')}</TableCell>
                     <TableCell>

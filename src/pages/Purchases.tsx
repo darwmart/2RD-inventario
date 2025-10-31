@@ -3,6 +3,7 @@ import { useInventory } from '@/hooks/useInventory';
 import { usePurchases } from '@/hooks/usePurchases';
 import { useSales } from '@/hooks/useSales';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { useSettings } from '@/hooks/useSettings';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,15 +12,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Switch } from '@/components/ui/switch';
 import { Plus, Search, Minus, Trash2, FileText, Package, Calendar } from 'lucide-react';
 import { Product, PurchaseItem, AccountingRecord } from '@/types';
 import { toast } from 'sonner';
 import { Textarea } from '@/components/ui/textarea';
 
 export default function Purchases() {
-  const { products, suppliers, updateStock } = useInventory();
+  const { products, suppliers, categories, updateStock, addProduct } = useInventory();
   const { purchases, addPurchase } = usePurchases();
-  const { paymentMethods } = useSales();
+  const { banks, taxSettings } = useSettings();
   const [accountingRecords, setAccountingRecords] = useLocalStorage<AccountingRecord[]>('accountingRecords', []);
 
   const [isCreatingPurchase, setIsCreatingPurchase] = useState(false);
@@ -27,23 +29,63 @@ export default function Purchases() {
   const [selectedSupplier, setSelectedSupplier] = useState('');
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
-  const [tax, setTax] = useState(0);
   const [notes, setNotes] = useState('');
   const [cart, setCart] = useState<PurchaseItem[]>([]);
 
   // Campos adicionales para métodos de pago
-  const [creditDays, setCreditDays] = useState(0);
-  const [selectedBankId, setSelectedBankId] = useState('');
+  const [dueDate, setDueDate] = useState('');
   const [searchPurchase, setSearchPurchase] = useState('');
 
-  // Lista de bancos disponibles (debe coincidir con los nombres en Accounting)
-  const banks = [
-    { id: 'bancolombia', name: 'Bancolombia' },
-    { id: 'colpatria', name: 'Colpatria' },
-    { id: 'davivienda', name: 'Davivienda' },
-    { id: 'nequi', name: 'Nequi' },
-    { id: 'daviplata', name: 'Daviplata' }
-  ];
+  // Estado para crear producto rápido
+  const [isCreatingProduct, setIsCreatingProduct] = useState(false);
+  const [newProductForm, setNewProductForm] = useState({
+    name: '',
+    barcode: '',
+    reference: '',
+    description: '',
+    cost: 0,
+    currentPrice: 0,
+    stock: 0,
+    minStock: 1,
+    categoryId: '',
+    supplierId: '',
+    hasIva: false
+  });
+
+  // Generar métodos de pago dinámicamente desde bancos
+  const purchasePaymentMethods = useMemo(() => {
+    const methods = [];
+
+    // Agregar bancos activos (excepto efectivo) como transferencias
+    banks
+      .filter(bank => bank.isActive && bank.id !== 'efectivo')
+      .forEach(bank => {
+        methods.push({
+          id: `transfer-${bank.id}`,
+          name: bank.name,
+          type: 'transfer' as const,
+          bankId: bank.id
+        });
+      });
+
+    // Agregar Consignación (efectivo)
+    methods.push({
+      id: 'consignacion',
+      name: 'Consignación',
+      type: 'cash' as const,
+      bankId: 'efectivo'
+    });
+
+    // Agregar Crédito
+    methods.push({
+      id: 'credito',
+      name: 'Crédito',
+      type: 'credit' as const,
+      bankId: null
+    });
+
+    return methods;
+  }, [banks]);
   const [selectedDate, setSelectedDate] = useState(() => {
     const d = new Date();
     const y = d.getFullYear();
@@ -118,6 +160,10 @@ export default function Purchases() {
   };
 
   const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
+
+  // Calcular IVA automáticamente basado en la configuración
+  const tax = taxSettings.ivaEnabled ? (subtotal * taxSettings.ivaPercentage / 100) : 0;
+
   const total = subtotal + tax;
 
   const completePurchase = () => {
@@ -131,9 +177,9 @@ export default function Purchases() {
     }
 
     const supplier = suppliers.find(s => s.id === selectedSupplier);
-    const paymentMethod = paymentMethods.find(pm => pm.id === selectedPaymentMethod);
+    const selectedMethod = purchasePaymentMethods.find(pm => pm.id === selectedPaymentMethod);
 
-    if (!supplier || !paymentMethod) {
+    if (!supplier || !selectedMethod) {
       toast.error('Proveedor o método de pago inválido');
       return;
     }
@@ -141,25 +187,35 @@ export default function Purchases() {
     // Determinar tipo de pago y construir paymentDetails
     let paymentDetails: any = {};
     let bankName = '';
+    let isCredit = false;
 
-    if (paymentMethod.name.toLowerCase().includes('crédito') || paymentMethod.name.toLowerCase().includes('credito')) {
-      if (creditDays <= 0) {
-        toast.error('Ingresa el plazo del crédito');
+    if (selectedMethod.type === 'credit') {
+      // Crédito
+      if (!dueDate) {
+        toast.error('Ingresa la fecha de vencimiento del crédito');
         return;
       }
-      paymentDetails.creditDays = creditDays;
-    } else if (paymentMethod.name.toLowerCase().includes('transferencia')) {
-      if (!selectedBankId) {
-        toast.error('Selecciona el banco de transferencia');
-        return;
-      }
-      const bank = banks.find(b => b.id === selectedBankId);
-      paymentDetails.bankId = selectedBankId;
+      paymentDetails.dueDate = dueDate;
+      isCredit = true;
+    } else if (selectedMethod.type === 'transfer') {
+      // Transferencia bancaria
+      const bank = banks.find(b => b.id === selectedMethod.bankId);
+      paymentDetails.bankId = selectedMethod.bankId;
       paymentDetails.bankName = bank?.name || '';
       bankName = bank?.name || '';
-    } else if (paymentMethod.name.toLowerCase().includes('consignación') || paymentMethod.name.toLowerCase().includes('consignacion')) {
+    } else if (selectedMethod.type === 'cash') {
+      // Consignación (efectivo)
       paymentDetails.isCashPayment = true;
+      bankName = 'Efectivo';
     }
+
+    // Crear objeto de método de pago compatible
+    const paymentMethod = {
+      id: selectedMethod.id,
+      name: selectedMethod.name,
+      type: 'electronic' as const,
+      isActive: true
+    };
 
     // Crear la compra
     const purchase = addPurchase({
@@ -183,7 +239,7 @@ export default function Purchases() {
     });
 
     // Registrar en contabilidad solo si NO es crédito
-    if (!paymentDetails.creditDays) {
+    if (!isCredit) {
       const newRecord: AccountingRecord = {
         id: Date.now(),
         tipo: 'compra',
@@ -191,7 +247,7 @@ export default function Purchases() {
         proveedor: supplier.name,
         factura: invoiceNumber,
         monto: total,
-        banco: paymentDetails.isCashPayment ? 'Efectivo' : (bankName || paymentMethod.name),
+        banco: selectedMethod.bankId || 'efectivo',
         fecha: new Date().toISOString()
       };
 
@@ -205,11 +261,62 @@ export default function Purchases() {
     setSelectedSupplier('');
     setSelectedPaymentMethod('');
     setInvoiceNumber('');
-    setTax(0);
     setNotes('');
-    setCreditDays(0);
-    setSelectedBankId('');
+    setDueDate('');
     setIsCreatingPurchase(false);
+  };
+
+  const handleCreateProduct = () => {
+    if (!newProductForm.name.trim() || !newProductForm.reference.trim()) {
+      toast.error('El nombre y la referencia son requeridos');
+      return;
+    }
+
+    if (!newProductForm.categoryId || !newProductForm.supplierId) {
+      toast.error('Selecciona una categoría y un proveedor');
+      return;
+    }
+
+    // Crear el producto con todos los campos necesarios
+    const newProduct = addProduct({
+      name: newProductForm.name.trim(),
+      barcode: newProductForm.barcode.trim(),
+      reference: newProductForm.reference.trim(),
+      description: newProductForm.description.trim(),
+      image: '',
+      cost: newProductForm.cost,
+      suggestedPrice: newProductForm.currentPrice,
+      discountPrice: 0,
+      wholesalePrice: 0,
+      currentPrice: newProductForm.currentPrice,
+      stock: newProductForm.stock,
+      minStock: newProductForm.minStock,
+      categoryId: newProductForm.categoryId,
+      supplierId: newProductForm.supplierId,
+      hasIva: newProductForm.hasIva
+    });
+
+    toast.success('Producto creado exitosamente');
+
+    // Agregar automáticamente al carrito
+    addToCart(newProduct, newProductForm.stock || 1);
+
+    // Resetear formulario
+    setNewProductForm({
+      name: '',
+      barcode: '',
+      reference: '',
+      description: '',
+      cost: 0,
+      currentPrice: 0,
+      stock: 0,
+      minStock: 1,
+      categoryId: '',
+      supplierId: '',
+      hasIva: false
+    });
+
+    setIsCreatingProduct(false);
   };
 
   const availableProducts = products.filter(product =>
@@ -279,7 +386,146 @@ export default function Purchases() {
                   </div>
 
                   <div>
-                    <Label>Buscar Productos</Label>
+                    <div className="flex justify-between items-center mb-2">
+                      <Label>Buscar Productos</Label>
+                      <Dialog open={isCreatingProduct} onOpenChange={setIsCreatingProduct}>
+                        <DialogTrigger asChild>
+                          <Button size="sm" variant="outline">
+                            <Plus className="h-3 w-3 mr-1" />
+                            Crear Producto
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Crear Nuevo Producto</DialogTitle>
+                          </DialogHeader>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label>Nombre *</Label>
+                              <Input
+                                value={newProductForm.name}
+                                onChange={(e) => setNewProductForm({...newProductForm, name: e.target.value})}
+                                placeholder="Nombre del producto"
+                              />
+                            </div>
+                            <div>
+                              <Label>Referencia *</Label>
+                              <Input
+                                value={newProductForm.reference}
+                                onChange={(e) => setNewProductForm({...newProductForm, reference: e.target.value})}
+                                placeholder="REF-001"
+                              />
+                            </div>
+                            <div>
+                              <Label>Código de Barras</Label>
+                              <Input
+                                value={newProductForm.barcode}
+                                onChange={(e) => setNewProductForm({...newProductForm, barcode: e.target.value})}
+                                placeholder="123456789"
+                              />
+                            </div>
+                            <div>
+                              <Label>Categoría *</Label>
+                              <Select
+                                value={newProductForm.categoryId}
+                                onValueChange={(value) => setNewProductForm({...newProductForm, categoryId: value})}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Seleccionar categoría" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {categories.map(cat => (
+                                    <SelectItem key={cat.id} value={cat.id}>
+                                      {cat.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label>Proveedor *</Label>
+                              <Select
+                                value={newProductForm.supplierId}
+                                onValueChange={(value) => setNewProductForm({...newProductForm, supplierId: value})}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Seleccionar proveedor" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {suppliers.map(sup => (
+                                    <SelectItem key={sup.id} value={sup.id}>
+                                      {sup.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label>Costo</Label>
+                              <Input
+                                type="number"
+                                value={newProductForm.cost || ''}
+                                onChange={(e) => setNewProductForm({...newProductForm, cost: parseFloat(e.target.value) || 0})}
+                                placeholder="0"
+                              />
+                            </div>
+                            <div>
+                              <Label>Precio de Venta</Label>
+                              <Input
+                                type="number"
+                                value={newProductForm.currentPrice || ''}
+                                onChange={(e) => setNewProductForm({...newProductForm, currentPrice: parseFloat(e.target.value) || 0})}
+                                placeholder="0"
+                              />
+                            </div>
+                            <div>
+                              <Label>Stock Inicial</Label>
+                              <Input
+                                type="number"
+                                value={newProductForm.stock || ''}
+                                onChange={(e) => setNewProductForm({...newProductForm, stock: parseInt(e.target.value) || 0})}
+                                placeholder="0"
+                              />
+                            </div>
+                            <div>
+                              <Label>Stock Mínimo</Label>
+                              <Input
+                                type="number"
+                                value={newProductForm.minStock || ''}
+                                onChange={(e) => setNewProductForm({...newProductForm, minStock: parseInt(e.target.value) || 1})}
+                                placeholder="1"
+                              />
+                            </div>
+                            <div className="col-span-2">
+                              <Label>Descripción</Label>
+                              <Textarea
+                                value={newProductForm.description}
+                                onChange={(e) => setNewProductForm({...newProductForm, description: e.target.value})}
+                                placeholder="Descripción del producto"
+                                rows={2}
+                              />
+                            </div>
+                            <div className="col-span-2">
+                              <div className="flex items-center gap-2">
+                                <Switch
+                                  checked={newProductForm.hasIva}
+                                  onCheckedChange={(checked) => setNewProductForm({...newProductForm, hasIva: checked})}
+                                />
+                                <Label>El precio incluye IVA</Label>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex justify-end gap-2 mt-4">
+                            <Button variant="outline" onClick={() => setIsCreatingProduct(false)}>
+                              Cancelar
+                            </Button>
+                            <Button onClick={handleCreateProduct}>
+                              Crear y Agregar al Carrito
+                            </Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                       <Input
@@ -398,7 +644,7 @@ export default function Purchases() {
                             <SelectValue placeholder="Método de pago" />
                           </SelectTrigger>
                           <SelectContent>
-                            {paymentMethods.map(method => (
+                            {purchasePaymentMethods.map(method => (
                               <SelectItem key={method.id} value={method.id}>
                                 {method.name}
                               </SelectItem>
@@ -407,46 +653,17 @@ export default function Purchases() {
                         </Select>
                       </div>
 
-                      {/* Campos condicionales según método de pago */}
-                      {selectedPaymentMethod && paymentMethods.find(pm => pm.id === selectedPaymentMethod)?.name.toLowerCase().includes('crédito') && (
+                      {/* Campo de fecha de vencimiento para Crédito */}
+                      {selectedPaymentMethod === 'credito' && (
                         <div>
-                          <Label>Plazo del Crédito (días)</Label>
+                          <Label>Fecha de Vencimiento</Label>
                           <Input
-                            type="number"
-                            value={creditDays}
-                            onChange={(e) => setCreditDays(parseInt(e.target.value) || 0)}
-                            placeholder="30"
+                            type="date"
+                            value={dueDate}
+                            onChange={(e) => setDueDate(e.target.value)}
                           />
                         </div>
                       )}
-
-                      {selectedPaymentMethod && paymentMethods.find(pm => pm.id === selectedPaymentMethod)?.name.toLowerCase().includes('transferencia') && (
-                        <div>
-                          <Label>Banco de Transferencia</Label>
-                          <Select value={selectedBankId} onValueChange={setSelectedBankId}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Seleccionar banco" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {banks.map(bank => (
-                                <SelectItem key={bank.id} value={bank.id}>
-                                  {bank.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-
-                      <div>
-                        <Label>IVA / Impuestos</Label>
-                        <Input
-                          type="number"
-                          value={tax}
-                          onChange={(e) => setTax(parseFloat(e.target.value) || 0)}
-                          placeholder="0"
-                        />
-                      </div>
                       <div>
                         <Label>Notas</Label>
                         <Textarea
@@ -461,10 +678,12 @@ export default function Purchases() {
                           <span>Subtotal:</span>
                           <span>${subtotal.toLocaleString('es-CO')}</span>
                         </div>
-                        <div className="flex justify-between">
-                          <span>IVA/Impuestos:</span>
-                          <span>${tax.toLocaleString('es-CO')}</span>
-                        </div>
+                        {taxSettings.ivaEnabled && (
+                          <div className="flex justify-between text-gray-600">
+                            <span>IVA ({taxSettings.ivaPercentage}%):</span>
+                            <span>${tax.toLocaleString('es-CO')}</span>
+                          </div>
+                        )}
                         <div className="flex justify-between font-bold text-lg">
                           <span>Total:</span>
                           <span>${total.toLocaleString('es-CO')}</span>
@@ -554,12 +773,21 @@ export default function Purchases() {
                     </div>
                   )}
 
-                  <div className="border-t mt-3 pt-3 flex justify-between text-sm">
-                    <span className="text-gray-600">Método de pago: {purchase.paymentMethod.name}</span>
-                    <span className="text-gray-600">
-                      Subtotal: ${purchase.subtotal.toLocaleString('es-CO')}
-                      {purchase.tax && purchase.tax > 0 && ` + IVA: $${purchase.tax.toLocaleString('es-CO')}`}
-                    </span>
+                  <div className="border-t mt-3 pt-3">
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className="text-gray-600">
+                        Método de pago: <span className="font-medium">{purchase.paymentMethod.name}</span>
+                        {purchase.paymentDetails?.dueDate && (
+                          <span className="ml-2 text-orange-600">
+                            (Vence: {new Date(purchase.paymentDetails.dueDate).toLocaleDateString('es-CO')})
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-gray-600">
+                        Subtotal: ${purchase.subtotal.toLocaleString('es-CO')}
+                        {purchase.tax && purchase.tax > 0 && ` + IVA: $${purchase.tax.toLocaleString('es-CO')}`}
+                      </span>
+                    </div>
                   </div>
                 </div>
               ))
