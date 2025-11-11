@@ -84,9 +84,22 @@ export function useSales() {
 
   const getSalesByDate = useCallback((date: string) => {
     return sales.filter(sale => {
-      const saleDate = new Date(sale.createdAt).toDateString();
-      const targetDate = new Date(date).toDateString();
-      return saleDate === targetDate;
+      const saleDate = new Date(sale.createdAt);
+      const y = saleDate.getFullYear();
+      const m = String(saleDate.getMonth() + 1).padStart(2, '0');
+      const d = String(saleDate.getDate()).padStart(2, '0');
+      const saleDateKey = `${y}-${m}-${d}`;
+
+      // Si date ya está en formato YYYY-MM-DD, usarlo directamente
+      const targetDateKey = /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : (() => {
+        const td = new Date(date);
+        const ty = td.getFullYear();
+        const tm = String(td.getMonth() + 1).padStart(2, '0');
+        const tdd = String(td.getDate()).padStart(2, '0');
+        return `${ty}-${tm}-${tdd}`;
+      })();
+
+      return saleDateKey === targetDateKey;
     });
   }, [sales]);
 

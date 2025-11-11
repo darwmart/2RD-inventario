@@ -75,7 +75,7 @@ const [records, setRecords] = useLocalStorage<AccountingRecord[]>("accountingRec
     setMonto(0);
     setBanco('');
   };
-   // Calcular efectivo disponible en caja
+   // Calcular efectivo disponible en caja (sin filtro de fechas - total acumulado)
   const efectivoEnCaja = useMemo(() => {
     const ingresos = records
       .filter((r) => r.banco === "efectivo" && r.tipo === "ingreso")
@@ -86,37 +86,37 @@ const [records, setRecords] = useLocalStorage<AccountingRecord[]>("accountingRec
       .reduce((acc, r) => acc + r.monto, 0);
 
     // Restar todos los expenses (gastos y préstamos) del efectivo
-    const egresosFromExpenses = expenses.reduce((acc, exp) => acc + exp.amount, 0);
+    const egresosFromExpenses = (expenses || []).reduce((acc, exp) => acc + (exp.amount || 0), 0);
 
     return ingresos - egresos - egresosFromExpenses;
   }, [records, expenses]);
 
-   // Gastos totales (incluye registros de tipo egreso + expenses)
+   // Gastos totales (sin filtro de fechas - total acumulado, incluye registros de tipo egreso + expenses)
   const totalGastos = useMemo(() => {
     const egresosFromRecords = records
       .filter((r) => r.tipo === "egreso")
       .reduce((acc, r) => acc + r.monto, 0);
 
-    const egresosFromExpenses = expenses.reduce((acc, exp) => acc + exp.amount, 0);
+    const egresosFromExpenses = (expenses || []).reduce((acc, exp) => acc + (exp.amount || 0), 0);
 
     return egresosFromRecords + egresosFromExpenses;
   }, [records, expenses]);
 
-  // Compras totales
+  // Compras totales (sin filtro de fechas - total acumulado)
   const totalCompras = useMemo(() => {
     return records
       .filter((r) => r.tipo === "compra")
       .reduce((acc, r) => acc + r.monto, 0);
   }, [records]);
 
-  // Créditos / abonos
+  // Créditos / abonos (sin filtro de fechas - total acumulado)
   const totalCreditos = useMemo(() => {
     return records
       .filter((r) => r.tipo === "credito")
       .reduce((acc, r) => acc + r.monto, 0);
   }, [records]);
 
-     // Filtrar por rango de fechas
+  // Filtrar records por rango de fechas
   const filteredRecords = useMemo(() => {
     return records.filter((r) => {
       const fecha = new Date(r.fecha);
@@ -126,24 +126,6 @@ const [records, setRecords] = useLocalStorage<AccountingRecord[]>("accountingRec
       );
     });
   }, [records, fechaInicio, fechaFin]);
-
-  // Combinar registros con expenses para mostrar en la tabla
-  const allRecords = useMemo(() => {
-    // Convertir expenses a formato de AccountingRecord
-    const expensesAsRecords: AccountingRecord[] = expenses.map(exp => ({
-      id: parseInt(exp.id.replace(/\D/g, '').slice(0, 10)) || Date.now(),
-      tipo: 'egreso' as RecordType,
-      descripcion: `${exp.type === 'gasto' ? 'Gasto' : 'Préstamo'}: ${exp.description} (${exp.advisor})`,
-      monto: exp.amount,
-      banco: 'efectivo',
-      fecha: exp.createdAt
-    }));
-
-    // Combinar y ordenar por fecha (más recientes primero)
-    return [...filteredRecords, ...expensesAsRecords].sort((a, b) =>
-      new Date(b.fecha).getTime() - new Date(a.fecha).getTime()
-    );
-  }, [filteredRecords, expenses]);
 
   // Función para calcular el siguiente día hábil
   const getNextBusinessDay = (date: Date): Date => {
@@ -501,11 +483,11 @@ const [records, setRecords] = useLocalStorage<AccountingRecord[]>("accountingRec
         <CardHeader>
           <CardTitle className="flex items-center">
             <FileText className="h-5 w-5 mr-2" />
-            Registros ({allRecords.length})
+            Registros ({filteredRecords.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {allRecords.length === 0 ? (
+          {filteredRecords.length === 0 ? (
             <p className="text-gray-500 text-center py-4">
               No hay registros aún
             </p>
@@ -523,7 +505,7 @@ const [records, setRecords] = useLocalStorage<AccountingRecord[]>("accountingRec
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {allRecords.map((r) => (
+                {filteredRecords.map((r) => (
                   <TableRow key={r.id}>
                     <TableCell>{new Date(r.fecha).toLocaleDateString('es-CO')}</TableCell>
                     <TableCell>

@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 import { Bank } from '@/types';
 
 export default function Settings() {
-  const { paymentMethods, addPaymentMethod } = useSales();
+  const { paymentMethods, addPaymentMethod, updatePaymentMethod, deletePaymentMethod } = useSales();
   const { cardSettings, updateCardSettings, companyInfo, updateCompanyInfo, taxSettings, updateTaxSettings, banks, addBank, updateBank, deleteBank } = useSettings();
   
   const [isAddingPaymentMethod, setIsAddingPaymentMethod] = useState(false);
@@ -113,6 +113,13 @@ export default function Settings() {
     }
   };
 
+  const handleDeletePaymentMethod = (methodId: string, methodName: string) => {
+    if (confirm(`¿Estás seguro de que deseas eliminar el método de pago "${methodName}"?`)) {
+      deletePaymentMethod(methodId);
+      toast.success('Método de pago eliminado exitosamente');
+    }
+  };
+
   return (
     <ScrollArea className="h-[51rem]">
       <div className="p-6">
@@ -193,7 +200,7 @@ export default function Settings() {
             <CreditCard className="h-4 w-4 text-gray-500" />
             <div>
               <p className="font-medium">{method.name}</p>
-              <Badge 
+              <Badge
                 variant={getPaymentTypeBadgeColor(method.type)}
                 className="text-xs"
               >
@@ -201,10 +208,22 @@ export default function Settings() {
               </Badge>
             </div>
           </div>
-          <Switch 
-            checked={method.isActive}
-            onCheckedChange={() => toast.info('Funcionalidad disponible próximamente')}
-          />
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={method.isActive}
+              onCheckedChange={(checked) => {
+                updatePaymentMethod(method.id, { isActive: checked });
+                toast.success(checked ? `${method.name} activado` : `${method.name} desactivado`);
+              }}
+            />
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => handleDeletePaymentMethod(method.id, method.name)}
+            >
+              <Trash2 className="h-4 w-4 text-red-500" />
+            </Button>
+          </div>
         </div>
       ))
     ) : (

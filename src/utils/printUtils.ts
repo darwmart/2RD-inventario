@@ -245,21 +245,21 @@ function generatePOSHTML(sale: Sale, companyInfo: CompanyInfo): string {
         </div>
 
         ${sale.ivaTotal && sale.ivaTotal > 0 ? `
-          <div class="row" style="font-size: 11px; color: #666;">
-            <span>IVA incluido:</span>
+          <div class="row" style="font-size: 11px; color: #333;">
+            <span>IVA:</span>
             <span>$${sale.ivaTotal.toLocaleString('es-CO')}</span>
           </div>
         ` : ''}
 
         ${sale.discount && sale.discount > 0 ? `
-          <div class="row">
+          <div class="row" style="color: #cc0000;">
             <span>Descuento:</span>
             <span>-$${sale.discount.toLocaleString('es-CO')}</span>
           </div>
         ` : ''}
 
         <div class="total-row">
-          <span>TOTAL:</span>
+          <span>TOTAL A PAGAR:</span>
           <span>$${sale.total.toLocaleString('es-CO')}</span>
         </div>
       </div>

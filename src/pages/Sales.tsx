@@ -260,9 +260,9 @@ export default function Sales() {
     } else toast.error('Producto no encontrado');
   };
 
-  const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
-  const totalIVA = cart.reduce((sum, item) => sum + (item.ivaAmount || 0), 0);
-  const total = subtotal - discount;
+  const subtotal = Math.round(cart.reduce((sum, item) => sum + item.total, 0));
+  const totalIVA = Math.round(cart.reduce((sum, item) => sum + (item.ivaAmount || 0), 0));
+  const total = Math.round(subtotal - discount);
 
   const completeSale = () => {
     if (cart.length === 0) { toast.error('El carrito está vacío'); return; }
@@ -510,14 +510,16 @@ export default function Sales() {
                       </div>
                       {totalIVA > 0 && taxSettings.ivaEnabled && (
                         <div className="flex justify-between text-gray-600">
-                          <span>IVA ({taxSettings.ivaPercentage}% incluido):</span>
+                          <span>IVA ({taxSettings.ivaPercentage}%):</span>
                           <span>${totalIVA.toLocaleString('es-CO')}</span>
                         </div>
                       )}
-                      <div className="flex justify-between">
-                        <span>Descuento:</span>
-                        <span>-${discount.toLocaleString('es-CO')}</span>
-                      </div>
+                      {discount > 0 && (
+                        <div className="flex justify-between text-red-600">
+                          <span>Descuento:</span>
+                          <span>-${discount.toLocaleString('es-CO')}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between font-bold text-lg">
                         <span>Total:</span>
                         <span>${total.toLocaleString('es-CO')}</span>
@@ -554,22 +556,23 @@ export default function Sales() {
                   <TableHead className="sticky top-0 bg-white z-10">Utilidad</TableHead>
                   <TableHead className="sticky top-0 bg-white z-10">Estado</TableHead>
                   <TableHead className="sticky top-0 bg-white z-10">Método</TableHead>
-
+                  <TableHead className="sticky top-0 bg-white z-10">Acciones</TableHead>
                 </TableRow>
-                
+
               </TableHeader>
 
                 <TableBody>
                   {/*  Filas para abonos realizados hoy (agrupados por sale + método) */}
                   {depositsGroupedForDay.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={11} className="text-center text-gray-500">
+                      <TableCell colSpan={10} className="text-center text-gray-500">
                         No hay abonos en la fecha seleccionada
                       </TableCell>
                     </TableRow>
                   ) : (
                     depositsGroupedForDay.map(entry => {
                       const isCompleted = (entry.totalPaidAllTime ?? 0) >= (entry.saleTotal ?? 0);
+                      const fullSale = sales.find(s => s.id === entry.saleId);
 
                       return (
                         <TableRow key={entry.key}>
@@ -578,7 +581,7 @@ export default function Sales() {
                           <TableCell>{`Abono - ${entry.description}`}</TableCell>
                           <TableCell>{/* Costo (si lo quieres aquí) */}</TableCell>
 
-                          {/* Valor venta (total del separado) 
+                          {/* Valor venta (total del separado)
                           <TableCell>${(entry.saleTotal ?? 0).toLocaleString('es-CO')}</TableCell>*/}
                           <TableCell>-</TableCell>
 
@@ -588,7 +591,7 @@ export default function Sales() {
                           {/* Total abonado hasta ahora (historico) */}
                           {/*<TableCell className="font-medium">${(entry.totalPaidAllTime ?? 0).toLocaleString('es-CO')}</TableCell>*/}
 
-                          {/* Saldo restante 
+                          {/* Saldo restante
                           <TableCell className="text-red-600 font-bold">${remaining.toLocaleString('es-CO')}</TableCell>*/}
                           <TableCell></TableCell>
                           {/* Estado / Tipo */}
@@ -596,6 +599,20 @@ export default function Sales() {
 
                           {/* Método de pago */}
                           <TableCell>{entry.paymentMethodName}</TableCell>
+
+                          {/* Acciones - Botón de imprimir */}
+                          <TableCell>
+                            {fullSale && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => printPOSInvoice(fullSale, companyInfo)}
+                                title="Reimprimir factura"
+                              >
+                                <Printer className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </TableCell>
                         </TableRow>
                       );
                     })
@@ -605,8 +622,9 @@ export default function Sales() {
                   {sales
                     .filter(s => toKey(s.createdAt) === selectedDate && s.type === 'sale')
                     .flatMap(sale =>
-                      sale.items.map(item => {
+                      sale.items.map((item, index) => {
                         const rent = (item.total ?? 0) - ((item.cost ?? 0) * (item.quantity ?? 0));
+                        const isFirstItem = index === 0;
                         return (
                           <TableRow key={`${sale.id}-${item.productId}`}>
                             <TableCell>{toKey(sale.createdAt)}</TableCell>
@@ -619,6 +637,18 @@ export default function Sales() {
                               ${rent.toLocaleString('es-CO')}
                             </TableCell>
                             <TableCell>{sale.paymentMethod?.name ?? '-'}</TableCell>
+                            <TableCell>
+                              {isFirstItem && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => printPOSInvoice(sale, companyInfo)}
+                                  title="Reimprimir factura"
+                                >
+                                  <Printer className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </TableCell>
                           </TableRow>
                         );
                       })

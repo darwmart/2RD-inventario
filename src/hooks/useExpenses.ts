@@ -52,6 +52,11 @@ export function useExpenses() {
 
 // Utilidad de fechas (crear en Paso 6)
 export const formatDateToKey = (date: Date | string): string => {
+  // Si ya es un string en formato YYYY-MM-DD, retornarlo directamente
+  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return date;
+  }
+  // Si no, convertir la fecha
   const d = new Date(date);
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
