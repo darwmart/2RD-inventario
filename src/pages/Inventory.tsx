@@ -4,14 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Plus, Search, Package, Edit, Trash2, AlertTriangle } from 'lucide-react';
 import { Product } from '@/types';
+import { ProductFormDialog } from '@/components/ProductFormDialog';
 
 
 export default function Inventory() {
@@ -32,14 +29,6 @@ export default function Inventory() {
   const [selectedSupplier, setSelectedSupplier] = useState('all');
   const [isAddingProduct, setIsAddingProduct] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [newCategory, setNewCategory] = useState('');
-  const [newSupplier, setNewSupplier] = useState({
-    name: '',
-    contact: '',
-    phone: '',
-    email: '',
-    address: ''
-  });
 
   const [productForm, setProductForm] = useState({
     name: '',
@@ -140,24 +129,12 @@ export default function Inventory() {
     });
   };
 
-  const handleAddCategory = () => {
-    if (newCategory.trim()) {
-      addCategory(newCategory.trim(), '');
-      setNewCategory('');
-    }
+  const handleAddCategory = (categoryName: string) => {
+    addCategory(categoryName, '');
   };
 
-  const handleAddSupplier = () => {
-    if (newSupplier.name.trim()) {
-      addSupplier(newSupplier);
-      setNewSupplier({
-        name: '',
-        contact: '',
-        phone: '',
-        email: '',
-        address: ''
-      });
-    }
+  const handleAddSupplier = (supplierData: { name: string; contact: string; phone: string; email: string; address: string }) => {
+    addSupplier(supplierData);
   };
 
   return (
@@ -169,397 +146,43 @@ export default function Inventory() {
             Gestiona tus productos, categorías y proveedores
           </p>
         </div>
-        <Dialog open={isAddingProduct} onOpenChange={setIsAddingProduct}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Agregar Producto
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Agregar Nuevo Producto</DialogTitle>
-            </DialogHeader>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="name">Nombre del Producto</Label>
-                <Input
-                  id="name"
-                  value={productForm.name}
-                  onChange={(e) => setProductForm({...productForm, name: e.target.value})}
-                />
-              </div>
-              <div>
-                <Label htmlFor="reference">Referencia</Label>
-                <Input
-                  id="reference"
-                  value={productForm.reference}
-                  onChange={(e) => setProductForm({...productForm, reference: e.target.value})}
-                />
-              </div>
-              <div>
-                <Label htmlFor="barcode">Código de Barras</Label>
-                <Input
-                  id="barcode"
-                  value={productForm.barcode}
-                  onChange={(e) => setProductForm({...productForm, barcode: e.target.value})}
-                />
-              </div>
-              <div className="col-span-2">
-                <Label htmlFor="description">Descripción</Label>
-                <Textarea
-                  id="description"
-                  value={productForm.description}
-                  onChange={(e) => setProductForm({...productForm, description: e.target.value})}
-                />
-              </div>
-              <div>
-                <Label htmlFor="category">Categoría</Label>
-                <div className="flex gap-2">
-                  <Select value={productForm.categoryId} onValueChange={(value) => setProductForm({...productForm, categoryId: value})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar categoría" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map(category => (
-                        <SelectItem key={category.id} value={category.id}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" size="sm">+</Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Nueva Categoría</DialogTitle>
-                      </DialogHeader>
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Nombre de la categoría"
-                          value={newCategory}
-                          onChange={(e) => setNewCategory(e.target.value)}
-                        />
-                        <Button onClick={handleAddCategory}>Agregar</Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="supplier">Proveedor</Label>
-                <div className="flex gap-2">
-                  <Select value={productForm.supplierId} onValueChange={(value) => setProductForm({...productForm, supplierId: value})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar proveedor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {suppliers.map(supplier => (
-                        <SelectItem key={supplier.id} value={supplier.id}>
-                          {supplier.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" size="sm">+</Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Nuevo Proveedor</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <Input
-                          placeholder="Nombre del proveedor"
-                          value={newSupplier.name}
-                          onChange={(e) => setNewSupplier({...newSupplier, name: e.target.value})}
-                        />
-                        <Input
-                          placeholder="Contacto"
-                          value={newSupplier.contact}
-                          onChange={(e) => setNewSupplier({...newSupplier, contact: e.target.value})}
-                        />
-                        <Input
-                          placeholder="Teléfono"
-                          value={newSupplier.phone}
-                          onChange={(e) => setNewSupplier({...newSupplier, phone: e.target.value})}
-                        />
-                        <Input
-                          placeholder="Email"
-                          value={newSupplier.email}
-                          onChange={(e) => setNewSupplier({...newSupplier, email: e.target.value})}
-                        />
-                        <Textarea
-                          placeholder="Dirección"
-                          value={newSupplier.address}
-                          onChange={(e) => setNewSupplier({...newSupplier, address: e.target.value})}
-                        />
-                        <Button onClick={handleAddSupplier}>Agregar Proveedor</Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="cost">Costo</Label>
-                <Input
-                  id="cost"
-                  type="number"
-                  value={productForm.cost}
-                  onChange={(e) => setProductForm({...productForm, cost: parseFloat(e.target.value) || 0})}
-                />
-              </div>
-              <div>
-                <Label htmlFor="suggestedPrice">Precio Sugerido</Label>
-                <Input
-                  id="suggestedPrice"
-                  type="number"
-                  value={productForm.suggestedPrice}
-                  onChange={(e) => setProductForm({...productForm, suggestedPrice: parseFloat(e.target.value) || 0})}
-                />
-              </div>
-              <div>
-                <Label htmlFor="discountPrice">Precio con Descuento</Label>
-                <Input
-                  id="discountPrice"
-                  type="number"
-                  value={productForm.discountPrice}
-                  onChange={(e) => setProductForm({...productForm, discountPrice: parseFloat(e.target.value) || 0})}
-                />
-              </div>
-              <div>
-                <Label htmlFor="wholesalePrice">Precio por Mayor</Label>
-                <Input
-                  id="wholesalePrice"
-                  type="number"
-                  value={productForm.wholesalePrice}
-                  onChange={(e) => setProductForm({...productForm, wholesalePrice: parseFloat(e.target.value) || 0})}
-                />
-              </div>
-              <div>
-                <Label htmlFor="currentPrice">Precio Actual</Label>
-                <Input
-                  id="currentPrice"
-                  type="number"
-                  value={productForm.currentPrice}
-                  onChange={(e) => setProductForm({...productForm, currentPrice: parseFloat(e.target.value) || 0})}
-                />
-              </div>
-              <div className="col-span-2">
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div>
-                    <Label className="font-medium text-sm">Precio incluye IVA</Label>
-                    <p className="text-xs text-gray-600">El precio ya tiene el IVA incluido</p>
-                  </div>
-                  <Switch
-                    checked={productForm.hasIva || false}
-                    onCheckedChange={(checked) => setProductForm({...productForm, hasIva: checked})}
-                  />
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="stock">Stock Actual</Label>
-                <Input
-                  id="stock"
-                  type="number"
-                  value={productForm.stock}
-                  onChange={(e) => setProductForm({...productForm, stock: parseInt(e.target.value) || 0})}
-                />
-              </div>
-              <div>
-                <Label htmlFor="minStock">Stock Mínimo</Label>
-                <Input
-                  id="minStock"
-                  type="number"
-                  value={productForm.minStock}
-                  onChange={(e) => setProductForm({...productForm, minStock: parseInt(e.target.value) || 1})}
-                />
-              </div>
-              <div>
-                <Label htmlFor="image">URL de Imagen</Label>
-                <Input
-                  id="image"
-                  value={productForm.image}
-                  onChange={(e) => setProductForm({...productForm, image: e.target.value})}
-                  placeholder="https://..."
-                />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 mt-4">
-              <Button variant="outline" onClick={() => setIsAddingProduct(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleAddProduct}>Agregar Producto</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={() => setIsAddingProduct(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Agregar Producto
+        </Button>
+        <ProductFormDialog
+          open={isAddingProduct}
+          onOpenChange={setIsAddingProduct}
+          formData={productForm}
+          onFormChange={setProductForm}
+          onSubmit={handleAddProduct}
+          categories={categories}
+          suppliers={suppliers}
+          title="Agregar Nuevo Producto"
+          submitLabel="Agregar Producto"
+          onAddCategory={handleAddCategory}
+          onAddSupplier={handleAddSupplier}
+          showCategoryCreate={true}
+          showSupplierCreate={true}
+        />
       </div>
 
       {/* Edit Product Dialog */}
-      <Dialog open={!!editingProduct} onOpenChange={(open) => !open && setEditingProduct(null)}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Editar Producto</DialogTitle>
-          </DialogHeader>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="edit-name">Nombre del Producto</Label>
-              <Input
-                id="edit-name"
-                value={productForm.name}
-                onChange={(e) => setProductForm({...productForm, name: e.target.value})}
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-reference">Referencia</Label>
-              <Input
-                id="edit-reference"
-                value={productForm.reference}
-                onChange={(e) => setProductForm({...productForm, reference: e.target.value})}
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-barcode">Código de Barras</Label>
-              <Input
-                id="edit-barcode"
-                value={productForm.barcode}
-                onChange={(e) => setProductForm({...productForm, barcode: e.target.value})}
-              />
-            </div>
-            <div className="col-span-2">
-              <Label htmlFor="edit-description">Descripción</Label>
-              <Textarea
-                id="edit-description"
-                value={productForm.description}
-                onChange={(e) => setProductForm({...productForm, description: e.target.value})}
-              />
-            </div>
-            <div>
-              <Label>Categoría</Label>
-              <Select value={productForm.categoryId} onValueChange={(value) => setProductForm({...productForm, categoryId: value})}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar categoría" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map(category => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Proveedor</Label>
-              <Select value={productForm.supplierId} onValueChange={(value) => setProductForm({...productForm, supplierId: value})}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar proveedor" />
-                </SelectTrigger>
-                <SelectContent>
-                  {suppliers.map(supplier => (
-                    <SelectItem key={supplier.id} value={supplier.id}>
-                      {supplier.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="edit-cost">Costo</Label>
-              <Input
-                id="edit-cost"
-                type="number"
-                value={productForm.cost}
-                onChange={(e) => setProductForm({...productForm, cost: parseFloat(e.target.value) || 0})}
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-suggestedPrice">Precio Sugerido</Label>
-              <Input
-                id="edit-suggestedPrice"
-                type="number"
-                value={productForm.suggestedPrice}
-                onChange={(e) => setProductForm({...productForm, suggestedPrice: parseFloat(e.target.value) || 0})}
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-discountPrice">Precio con Descuento</Label>
-              <Input
-                id="edit-discountPrice"
-                type="number"
-                value={productForm.discountPrice}
-                onChange={(e) => setProductForm({...productForm, discountPrice: parseFloat(e.target.value) || 0})}
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-wholesalePrice">Precio por Mayor</Label>
-              <Input
-                id="edit-wholesalePrice"
-                type="number"
-                value={productForm.wholesalePrice}
-                onChange={(e) => setProductForm({...productForm, wholesalePrice: parseFloat(e.target.value) || 0})}
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-currentPrice">Precio Actual</Label>
-              <Input
-                id="edit-currentPrice"
-                type="number"
-                value={productForm.currentPrice}
-                onChange={(e) => setProductForm({...productForm, currentPrice: parseFloat(e.target.value) || 0})}
-              />
-            </div>
-            <div className="col-span-2">
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div>
-                  <Label className="font-medium text-sm">Precio incluye IVA</Label>
-                  <p className="text-xs text-gray-600">El precio ya tiene el IVA incluido</p>
-                </div>
-                <Switch
-                  checked={productForm.hasIva || false}
-                  onCheckedChange={(checked) => setProductForm({...productForm, hasIva: checked})}
-                />
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="edit-stock">Stock Actual</Label>
-              <Input
-                id="edit-stock"
-                type="number"
-                value={productForm.stock}
-                onChange={(e) => setProductForm({...productForm, stock: parseInt(e.target.value) || 0})}
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-minStock">Stock Mínimo</Label>
-              <Input
-                id="edit-minStock"
-                type="number"
-                value={productForm.minStock}
-                onChange={(e) => setProductForm({...productForm, minStock: parseInt(e.target.value) || 1})}
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-image">URL de Imagen</Label>
-              <Input
-                id="edit-image"
-                value={productForm.image}
-                onChange={(e) => setProductForm({...productForm, image: e.target.value})}
-                placeholder="https://..."
-              />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setEditingProduct(null)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleEditProduct}>Guardar Cambios</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ProductFormDialog
+        open={!!editingProduct}
+        onOpenChange={(open) => !open && setEditingProduct(null)}
+        formData={productForm}
+        onFormChange={setProductForm}
+        onSubmit={handleEditProduct}
+        categories={categories}
+        suppliers={suppliers}
+        title="Editar Producto"
+        submitLabel="Guardar Cambios"
+        onAddCategory={handleAddCategory}
+        onAddSupplier={handleAddSupplier}
+        showCategoryCreate={true}
+        showSupplierCreate={true}
+      />
 
       {/* Filters */}
       <Card className="mb-6">

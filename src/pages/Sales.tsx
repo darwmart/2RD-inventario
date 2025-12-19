@@ -19,7 +19,7 @@ import { printPOSInvoice } from '@/utils/printUtils';
 export default function Sales() {
   const { products, findProductByBarcode, updateStock } = useInventory();
   const { sales, addSale, advisors, paymentMethods, updateSale } = useSales();
-  const { companyInfo, taxSettings } = useSettings();
+  const { companyInfo, taxSettings, updateBankBalance, banks } = useSettings();
   
   const [isCreatingSale, setIsCreatingSale] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -28,6 +28,12 @@ export default function Sales() {
   const [discount, setDiscount] = useState(0);
   const [cart, setCart] = useState<SaleItem[]>([]);
   const [customPrice, setCustomPrice] = useState<{[key: string]: number}>({});
+
+  // Información del cliente
+  const [customerName, setCustomerName] = useState('');
+  const [customerDocument, setCustomerDocument] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
 
   // helper: convierte Date -> 'YYYY-MM-DD'
   const toKey = (d: Date | string) => {
@@ -279,18 +285,52 @@ export default function Sales() {
       paymentMethod,
       discount,
       type: 'sale',
-      ivaTotal: totalIVA
+      ivaTotal: totalIVA,
+      customerName: customerName.trim() || undefined,
+      customerDocument: customerDocument.trim() || undefined,
+      customerPhone: customerPhone.trim() || undefined
     });
     cart.forEach(item => {
       const product = products.find(p => p.id === item.productId);
       if (product) updateStock(item.productId, product.stock - item.quantity);
     });
+
+    // Actualizar el banco correspondiente al método de pago
+    if (paymentMethod) {
+      // Mapeo de métodos de pago a bancos
+      const paymentToBankMap: { [key: string]: string } = {
+        '1': 'efectivo',           // Efectivo
+        '2': 'colpatria',          // Tarjeta Débito -> Colpatria
+        '3': 'colpatria',          // Tarjeta Crédito -> Colpatria
+        '4': 'bbva',               // Transferencia -> BBVA
+        '5': 'nequi',              // Nequi
+        '6': 'daviplata',          // Daviplata
+        '7': 'bbva',               // Transfiya -> BBVA
+        // Créditos externos no afectan bancos
+        '8': null,                 // Sistecredito
+        '9': null,                 // Addi
+        '10': null                 // Esmiopcion
+      };
+
+      const mappedBankId = paymentToBankMap[paymentMethod.id];
+
+      // Solo actualizar si no es crédito externo
+      if (mappedBankId !== null && mappedBankId !== undefined) {
+        const bankExists = banks.find(b => b.id === mappedBankId);
+        if (bankExists) {
+          updateBankBalance(mappedBankId, total);
+        }
+      }
+    }
+
     toast.success(`Venta ${sale.saleNumber} completada exitosamente`);
 
     // Imprimir factura automáticamente
     printPOSInvoice(sale, companyInfo);
 
-    setCart([]); setCustomPrice({}); setSelectedAdvisor(''); setSelectedPaymentMethod(''); setDiscount(0); setIsCreatingSale(false);
+    setCart([]); setCustomPrice({}); setSelectedAdvisor(''); setSelectedPaymentMethod(''); setDiscount(0);
+    setCustomerName(''); setCustomerDocument(''); setCustomerPhone(''); setCustomerEmail('');
+    setIsCreatingSale(false);
   };
 
   const availableProducts = products.filter(product =>
@@ -494,6 +534,47 @@ export default function Sales() {
                       </Select>
                       </div>
                     </div>
+
+                    {/* Información del Cliente */}
+                    <div className="border-t pt-4 space-y-3">
+                      <Label className="text-sm font-medium">Información del Cliente (Opcional)</Label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label className="text-xs">Nombre</Label>
+                          <Input
+                            value={customerName}
+                            onChange={(e) => setCustomerName(e.target.value)}
+                            placeholder="Nombre del cliente"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Cédula/NIT</Label>
+                          <Input
+                            value={customerDocument}
+                            onChange={(e) => setCustomerDocument(e.target.value)}
+                            placeholder="Documento"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Teléfono</Label>
+                          <Input
+                            value={customerPhone}
+                            onChange={(e) => setCustomerPhone(e.target.value)}
+                            placeholder="Teléfono"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Email</Label>
+                          <Input
+                            type="email"
+                            value={customerEmail}
+                            onChange={(e) => setCustomerEmail(e.target.value)}
+                            placeholder="Email"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
                     <div>
                         <Label>Descuento</Label>
                       <Input

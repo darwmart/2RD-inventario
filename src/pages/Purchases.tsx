@@ -12,19 +12,20 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Switch } from '@/components/ui/switch';
-import { Plus, Search, Minus, Trash2, FileText, Package, Calendar } from 'lucide-react';
-import { Product, PurchaseItem, AccountingRecord } from '@/types';
+import { Plus, Search, Minus, Trash2, FileText, Package, Calendar, Edit } from 'lucide-react';
+import { Product, Purchase, PurchaseItem, AccountingRecord } from '@/types';
 import { toast } from 'sonner';
 import { Textarea } from '@/components/ui/textarea';
+import { ProductFormDialog } from '@/components/ProductFormDialog';
 
 export default function Purchases() {
-  const { products, suppliers, categories, updateStock, addProduct } = useInventory();
-  const { purchases, addPurchase } = usePurchases();
-  const { banks, taxSettings } = useSettings();
+  const { products, suppliers, categories, updateStock, addProduct, addCategory, addSupplier } = useInventory();
+  const { purchases, addPurchase, updatePurchase, deletePurchase } = usePurchases();
+  const { banks, taxSettings, updateBankBalance } = useSettings();
   const [accountingRecords, setAccountingRecords] = useLocalStorage<AccountingRecord[]>('accountingRecords', []);
 
   const [isCreatingPurchase, setIsCreatingPurchase] = useState(false);
+  const [editingPurchase, setEditingPurchase] = useState<Purchase | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSupplier, setSelectedSupplier] = useState('');
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('');
@@ -43,7 +44,11 @@ export default function Purchases() {
     barcode: '',
     reference: '',
     description: '',
+    image: '',
     cost: 0,
+    suggestedPrice: 0,
+    discountPrice: 0,
+    wholesalePrice: 0,
     currentPrice: 0,
     stock: 0,
     minStock: 1,
@@ -234,11 +239,11 @@ export default function Purchases() {
       const product = products.find(p => p.id === item.productId);
       if (product) {
         const newStock = product.stock + item.quantity;
-        updateStock(item.productId, newStock, product.reservedStock);
+        updateStock(item.productId, newStock, product.reservedStock ?? 0);
       }
     });
 
-    // Registrar en contabilidad solo si NO es crédito
+    // Registrar en contabilidad y descontar del banco solo si NO es crédito
     if (!isCredit) {
       const newRecord: AccountingRecord = {
         id: Date.now(),
@@ -252,6 +257,10 @@ export default function Purchases() {
       };
 
       setAccountingRecords(prev => [...prev, newRecord]);
+
+      // Descontar del banco seleccionado
+      const bankId = selectedMethod.bankId || 'efectivo';
+      updateBankBalance(bankId, -total);
     }
 
     toast.success(`Compra ${purchase.invoiceNumber} registrada exitosamente`);
@@ -264,6 +273,171 @@ export default function Purchases() {
     setNotes('');
     setDueDate('');
     setIsCreatingPurchase(false);
+  };
+
+  const openEditPurchase = (purchase: Purchase) => {
+    setEditingPurchase(purchase);
+    setInvoiceNumber(purchase.invoiceNumber);
+    setSelectedSupplier(purchase.supplierId);
+    setCart(purchase.items);
+    setNotes(purchase.notes || '');
+
+    // Configurar método de pago
+    setSelectedPaymentMethod(purchase.paymentMethod.id);
+
+    // Si hay fecha de vencimiento (crédito)
+    if (purchase.paymentDetails?.dueDate) {
+      setDueDate(purchase.paymentDetails.dueDate);
+    }
+  };
+
+  const updatePurchaseHandler = () => {
+    if (cart.length === 0) {
+      toast.error('El carrito está vacío');
+      return;
+    }
+    if (!selectedSupplier || !selectedPaymentMethod || !invoiceNumber) {
+      toast.error('Completa todos los campos requeridos');
+      return;
+    }
+    if (!editingPurchase) {
+      return;
+    }
+
+    const supplier = suppliers.find(s => s.id === selectedSupplier);
+    const selectedMethod = purchasePaymentMethods.find(pm => pm.id === selectedPaymentMethod);
+
+    if (!supplier || !selectedMethod) {
+      toast.error('Proveedor o método de pago inválido');
+      return;
+    }
+
+    // Determinar tipo de pago y construir paymentDetails
+    let paymentDetails: any = {};
+    let isCredit = false;
+
+    if (selectedMethod.type === 'credit') {
+      if (!dueDate) {
+        toast.error('Ingresa la fecha de vencimiento del crédito');
+        return;
+      }
+      paymentDetails.dueDate = dueDate;
+      isCredit = true;
+    } else if (selectedMethod.type === 'transfer') {
+      const bank = banks.find(b => b.id === selectedMethod.bankId);
+      paymentDetails.bankId = selectedMethod.bankId;
+      paymentDetails.bankName = bank?.name || '';
+    } else if (selectedMethod.type === 'cash') {
+      paymentDetails.isCashPayment = true;
+    }
+
+    // Crear objeto de método de pago compatible
+    const paymentMethod = {
+      id: selectedMethod.id,
+      name: selectedMethod.name,
+      type: 'electronic' as const,
+      isActive: true
+    };
+
+    // Calcular diferencia de stock
+    const oldItems = editingPurchase.items;
+    const newItems = cart;
+
+    // Revertir stock de items antiguos
+    oldItems.forEach(oldItem => {
+      const product = products.find(p => p.id === oldItem.productId);
+      if (product) {
+        const revertedStock = product.stock - oldItem.quantity;
+        updateStock(oldItem.productId, revertedStock, product.reservedStock ?? 0);
+      }
+    });
+
+    // Aplicar stock de items nuevos
+    newItems.forEach(newItem => {
+      const product = products.find(p => p.id === newItem.productId);
+      if (product) {
+        const newStock = product.stock + newItem.quantity;
+        updateStock(newItem.productId, newStock, product.reservedStock ?? 0);
+      }
+    });
+
+    // Ajustar balances de bancos
+    const oldPaymentWasCredit = editingPurchase.paymentMethod.id === 'credito';
+    const newPaymentIsCredit = isCredit;
+    const oldTotal = editingPurchase.total;
+    const newTotal = subtotal + (tax || 0);
+
+    // Si la compra original NO era a crédito, devolver el dinero al banco original
+    if (!oldPaymentWasCredit && editingPurchase.paymentDetails?.bankId) {
+      updateBankBalance(editingPurchase.paymentDetails.bankId, oldTotal);
+    } else if (!oldPaymentWasCredit && editingPurchase.paymentDetails?.isCashPayment) {
+      updateBankBalance('efectivo', oldTotal);
+    }
+
+    // Si la nueva compra NO es a crédito, descontar del nuevo banco
+    if (!newPaymentIsCredit) {
+      const bankId = selectedMethod.bankId || 'efectivo';
+      updateBankBalance(bankId, -newTotal);
+    }
+
+    // Actualizar la compra
+    updatePurchase(editingPurchase.id, {
+      invoiceNumber,
+      supplierId: supplier.id,
+      supplierName: supplier.name,
+      items: cart,
+      paymentMethod,
+      paymentDetails,
+      tax,
+      notes
+    });
+
+    toast.success(`Compra ${invoiceNumber} actualizada exitosamente`);
+
+    // Limpiar formulario
+    setCart([]);
+    setSelectedSupplier('');
+    setSelectedPaymentMethod('');
+    setInvoiceNumber('');
+    setNotes('');
+    setDueDate('');
+    setEditingPurchase(null);
+  };
+
+  const cancelEdit = () => {
+    setEditingPurchase(null);
+    setCart([]);
+    setSelectedSupplier('');
+    setSelectedPaymentMethod('');
+    setInvoiceNumber('');
+    setNotes('');
+    setDueDate('');
+  };
+
+  const handleDeletePurchase = (purchaseId: string) => {
+    if (confirm('¿Estás seguro de que deseas eliminar esta compra?')) {
+      const purchase = purchases.find(p => p.id === purchaseId);
+      if (purchase) {
+        // Revertir stock
+        purchase.items.forEach(item => {
+          const product = products.find(p => p.id === item.productId);
+          if (product) {
+            const revertedStock = product.stock - item.quantity;
+            updateStock(item.productId, revertedStock, product.reservedStock ?? 0);
+          }
+        });
+
+        // Devolver dinero al banco si NO era crédito
+        const wasCredit = purchase.paymentMethod.id === 'credito';
+        if (!wasCredit) {
+          const bankId = purchase.paymentDetails?.bankId || 'efectivo';
+          updateBankBalance(bankId, purchase.total);
+        }
+
+        deletePurchase(purchaseId);
+        toast.success('Compra eliminada exitosamente');
+      }
+    }
   };
 
   const handleCreateProduct = () => {
@@ -307,7 +481,11 @@ export default function Purchases() {
       barcode: '',
       reference: '',
       description: '',
+      image: '',
       cost: 0,
+      suggestedPrice: 0,
+      discountPrice: 0,
+      wholesalePrice: 0,
       currentPrice: 0,
       stock: 0,
       minStock: 1,
@@ -317,6 +495,16 @@ export default function Purchases() {
     });
 
     setIsCreatingProduct(false);
+  };
+
+  const handleAddCategory = (categoryName: string) => {
+    addCategory(categoryName, '');
+    toast.success('Categoría creada exitosamente');
+  };
+
+  const handleAddSupplier = (supplierData: { name: string; contact: string; phone: string; email: string; address: string }) => {
+    addSupplier(supplierData);
+    toast.success('Proveedor creado exitosamente');
   };
 
   const availableProducts = products.filter(product =>
@@ -344,17 +532,27 @@ export default function Purchases() {
               className="w-auto"
             />
           </div>
-          <Dialog open={isCreatingPurchase} onOpenChange={setIsCreatingPurchase}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Nueva Compra
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Registrar Factura de Compra</DialogTitle>
-              </DialogHeader>
+          <Button onClick={() => setIsCreatingPurchase(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nueva Compra
+          </Button>
+        </div>
+      </div>
+
+      {/* Modal de Crear/Editar Compra */}
+      <Dialog open={isCreatingPurchase || !!editingPurchase} onOpenChange={(open) => {
+        if (!open) {
+          if (editingPurchase) {
+            cancelEdit();
+          } else {
+            setIsCreatingPurchase(false);
+          }
+        }
+      }}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingPurchase ? 'Editar Compra' : 'Registrar Factura de Compra'}</DialogTitle>
+          </DialogHeader>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Panel izquierdo - Búsqueda y productos */}
@@ -388,144 +586,26 @@ export default function Purchases() {
                   <div>
                     <div className="flex justify-between items-center mb-2">
                       <Label>Buscar Productos</Label>
-                      <Dialog open={isCreatingProduct} onOpenChange={setIsCreatingProduct}>
-                        <DialogTrigger asChild>
-                          <Button size="sm" variant="outline">
-                            <Plus className="h-3 w-3 mr-1" />
-                            Crear Producto
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                          <DialogHeader>
-                            <DialogTitle>Crear Nuevo Producto</DialogTitle>
-                          </DialogHeader>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <Label>Nombre *</Label>
-                              <Input
-                                value={newProductForm.name}
-                                onChange={(e) => setNewProductForm({...newProductForm, name: e.target.value})}
-                                placeholder="Nombre del producto"
-                              />
-                            </div>
-                            <div>
-                              <Label>Referencia *</Label>
-                              <Input
-                                value={newProductForm.reference}
-                                onChange={(e) => setNewProductForm({...newProductForm, reference: e.target.value})}
-                                placeholder="REF-001"
-                              />
-                            </div>
-                            <div>
-                              <Label>Código de Barras</Label>
-                              <Input
-                                value={newProductForm.barcode}
-                                onChange={(e) => setNewProductForm({...newProductForm, barcode: e.target.value})}
-                                placeholder="123456789"
-                              />
-                            </div>
-                            <div>
-                              <Label>Categoría *</Label>
-                              <Select
-                                value={newProductForm.categoryId}
-                                onValueChange={(value) => setNewProductForm({...newProductForm, categoryId: value})}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Seleccionar categoría" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {categories.map(cat => (
-                                    <SelectItem key={cat.id} value={cat.id}>
-                                      {cat.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div>
-                              <Label>Proveedor *</Label>
-                              <Select
-                                value={newProductForm.supplierId}
-                                onValueChange={(value) => setNewProductForm({...newProductForm, supplierId: value})}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Seleccionar proveedor" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {suppliers.map(sup => (
-                                    <SelectItem key={sup.id} value={sup.id}>
-                                      {sup.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div>
-                              <Label>Costo</Label>
-                              <Input
-                                type="number"
-                                value={newProductForm.cost || ''}
-                                onChange={(e) => setNewProductForm({...newProductForm, cost: parseFloat(e.target.value) || 0})}
-                                placeholder="0"
-                              />
-                            </div>
-                            <div>
-                              <Label>Precio de Venta</Label>
-                              <Input
-                                type="number"
-                                value={newProductForm.currentPrice || ''}
-                                onChange={(e) => setNewProductForm({...newProductForm, currentPrice: parseFloat(e.target.value) || 0})}
-                                placeholder="0"
-                              />
-                            </div>
-                            <div>
-                              <Label>Stock Inicial</Label>
-                              <Input
-                                type="number"
-                                value={newProductForm.stock || ''}
-                                onChange={(e) => setNewProductForm({...newProductForm, stock: parseInt(e.target.value) || 0})}
-                                placeholder="0"
-                              />
-                            </div>
-                            <div>
-                              <Label>Stock Mínimo</Label>
-                              <Input
-                                type="number"
-                                value={newProductForm.minStock || ''}
-                                onChange={(e) => setNewProductForm({...newProductForm, minStock: parseInt(e.target.value) || 1})}
-                                placeholder="1"
-                              />
-                            </div>
-                            <div className="col-span-2">
-                              <Label>Descripción</Label>
-                              <Textarea
-                                value={newProductForm.description}
-                                onChange={(e) => setNewProductForm({...newProductForm, description: e.target.value})}
-                                placeholder="Descripción del producto"
-                                rows={2}
-                              />
-                            </div>
-                            <div className="col-span-2">
-                              <div className="flex items-center gap-2">
-                                <Switch
-                                  checked={newProductForm.hasIva}
-                                  onCheckedChange={(checked) => setNewProductForm({...newProductForm, hasIva: checked})}
-                                />
-                                <Label>El precio incluye IVA</Label>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex justify-end gap-2 mt-4">
-                            <Button variant="outline" onClick={() => setIsCreatingProduct(false)}>
-                              Cancelar
-                            </Button>
-                            <Button onClick={handleCreateProduct}>
-                              Crear y Agregar al Carrito
-                            </Button>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
+                      <Button size="sm" variant="outline" onClick={() => setIsCreatingProduct(true)}>
+                        <Plus className="h-3 w-3 mr-1" />
+                        Crear Producto
+                      </Button>
                     </div>
+
+                    <ProductFormDialog
+                      open={isCreatingProduct}
+                      onOpenChange={setIsCreatingProduct}
+                      formData={newProductForm}
+                      onFormChange={setNewProductForm}
+                      onSubmit={handleCreateProduct}
+                      categories={categories}
+                      suppliers={suppliers}
+                      submitLabel="Crear y Agregar al Carrito"
+                      onAddCategory={handleAddCategory}
+                      onAddSupplier={handleAddSupplier}
+                      showCategoryCreate={true}
+                      showSupplierCreate={true}
+                    />
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                       <Input
@@ -692,20 +772,18 @@ export default function Purchases() {
 
                       <Button
                         className="w-full"
-                        onClick={completePurchase}
+                        onClick={editingPurchase ? updatePurchaseHandler : completePurchase}
                         disabled={cart.length === 0}
                       >
                         <FileText className="h-4 w-4 mr-2" />
-                        Registrar Compra
+                        {editingPurchase ? 'Actualizar Compra' : 'Registrar Compra'}
                       </Button>
                     </CardContent>
                   </Card>
                 </div>
               </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Lista de compras */}
       <Card>
@@ -745,6 +823,24 @@ export default function Purchases() {
                       </p>
                     </div>
                     <div className="text-right">
+                      <div className="flex gap-2 mb-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openEditPurchase(purchase)}
+                        >
+                          <Edit className="h-4 w-4 mr-1" />
+                          Editar
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-red-600 hover:text-red-700"
+                          onClick={() => handleDeletePurchase(purchase.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                       <p className="text-sm text-gray-600">Total</p>
                       <p className="text-2xl font-bold text-green-600">
                         ${purchase.total.toLocaleString('es-CO')}

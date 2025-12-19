@@ -7,7 +7,7 @@ import Dashboard from './pages/Dashboard';
 import Inventory from './pages/Inventory';
 import Sales from './pages/Sales';
 import Quotes from './pages/Quotes';
-import Purchases from './pages/Purchases';
+import PurchasesFactuSOL from './pages/PurchasesFactuSOL';
 import CashRegister from './pages/CashRegister';
 import Advisors from './pages/Advisors';
 import Alerts from './pages/Alerts';
@@ -29,7 +29,7 @@ const App = () => (
             <Route path="/inventory" element={<Inventory />} />
             <Route path="/sales" element={<Sales />} />
             <Route path="/quotes" element={<Quotes />} />
-            <Route path="/purchases" element={<Purchases />} />
+            <Route path="/purchases" element={<PurchasesFactuSOL />} />
             <Route path="/cash-register" element={<CashRegister />} />
             <Route path="/accounting" element={<Accounting />} />
             <Route path="/advisors" element={<Advisors />} />

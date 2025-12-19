@@ -142,6 +142,11 @@ export type TaxSettings = {
   ivaPercentage: number;
 };
 
+// Estados de documentos estilo FactuSOL
+export type DocumentStatus = 'pending' | 'partial' | 'completed' | 'invoiced' | 'cancelled';
+
+export type DocumentType = 'delivery' | 'invoice';
+
 export type PurchaseItem = {
   productId: string;
   productName: string;
@@ -150,33 +155,45 @@ export type PurchaseItem = {
   total: number;
 };
 
-export type Purchase = {
+// Documento base de compra (común para Pedidos, Albaranes y Facturas)
+export type PurchaseDocument = {
   id: string;
-  invoiceNumber: string;
+  documentType: DocumentType; // 'order' | 'delivery' | 'invoice'
+  documentNumber: string; // P-2025-0001, A-2025-0001, F-2025-0001
+  supplierInvoiceNumber?: string; // Número de factura del proveedor
+  status: DocumentStatus;
   supplierId: string;
   supplierName: string;
   items: PurchaseItem[];
   subtotal: number;
   tax?: number;
   total: number;
-  paymentMethod: PaymentMethod;
-  paymentDetails?: {
-    // Para crédito
-    creditDays?: number; // Deprecated: usar dueDate en su lugar
-    dueDate?: string; // Fecha de vencimiento del crédito
-    // Para transferencia
-    bankId?: string;
-    bankName?: string;
-    // Para consignación (se resta del efectivo)
-    isCashPayment?: boolean;
-  };
   notes?: string;
   createdAt: Date;
+  updatedAt?: Date;
+
+  // Solo para facturas
+  paymentMethod?: PaymentMethod;
+  paymentDetails?: {
+    dueDate?: string;
+    bankId?: string;
+    bankName?: string;
+    isCashPayment?: boolean;
+  };
+
+  // Referencias a documentos relacionados
+  orderRef?: string; // Referencia al pedido origen
+  deliveryRef?: string; // Referencia al albarán origen
+  invoiceRef?: string; // Referencia a la factura generada
 };
+
+// Tipo legacy para compatibilidad
+export type Purchase = PurchaseDocument;
 
 export type Bank = {
   id: string;
   name: string;
   icon?: string;
   isActive: boolean;
+  balance?: number;
 };

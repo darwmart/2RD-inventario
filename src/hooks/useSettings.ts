@@ -25,11 +25,11 @@ const defaultTaxSettings: TaxSettings = {
 };
 
 const defaultBanks: Bank[] = [
-  { id: 'efectivo', name: 'Efectivo', isActive: true },
-  { id: 'colpatria', name: 'Colpatria', isActive: true },
-  { id: 'bbva', name: 'BBVA', isActive: true },
-  { id: 'nequi', name: 'Nequi', isActive: true },
-  { id: 'daviplata', name: 'Daviplata', isActive: true },
+  { id: 'efectivo', name: 'Efectivo', isActive: true, balance: 0 },
+  { id: 'colpatria', name: 'Colpatria', isActive: true, balance: 0 },
+  { id: 'bbva', name: 'BBVA', isActive: true, balance: 0 },
+  { id: 'nequi', name: 'Nequi', isActive: true, balance: 0 },
+  { id: 'daviplata', name: 'Daviplata', isActive: true, balance: 0 },
 ];
 
 export function useSettings() {
@@ -97,6 +97,19 @@ export function useSettings() {
     [setBanks]
   );
 
+  const updateBankBalance = useCallback(
+    (bankId: string, amount: number) => {
+      setBanks((prev) =>
+        prev.map((bank) =>
+          bank.id === bankId
+            ? { ...bank, balance: (bank.balance || 0) + amount }
+            : bank
+        )
+      );
+    },
+    [setBanks]
+  );
+
   return {
     cardSettings,
     updateCardSettings,
@@ -108,5 +121,6 @@ export function useSettings() {
     addBank,
     updateBank,
     deleteBank,
+    updateBankBalance,
   };
 }

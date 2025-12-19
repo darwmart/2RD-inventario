@@ -19,7 +19,7 @@ import { printPOSInvoice } from '@/utils/printUtils'; // Utilidad de impresión
 export default function Quotes() {
   const { products, updateStock } = useInventory(); // Obtiene los productos del inventario.
   const { addSale, advisors, sales, updateSale, paymentMethods, addSaleDeposit } = useSales(); // Obtiene funciones y datos relacionados con ventas.
-  const { companyInfo, taxSettings } = useSettings(); // Obtiene la información de la empresa y configuración de impuestos
+  const { companyInfo, taxSettings, updateBankBalance, banks } = useSettings(); // Obtiene la información de la empresa, configuración de impuestos y función para actualizar bancos
 
   // Estados locales para manejar la lógica de la página.
   const [isCreatingQuote, setIsCreatingQuote] = useState(false); // Controla si el diálogo de creación está abierto.
@@ -228,6 +228,38 @@ export default function Quotes() {
         updateStock(item.productId, product.stock, (product.reservedStock ?? 0) + item.quantity);
       }
     });
+
+    // Si hay un depósito inicial, descontar del banco correspondiente
+    if (deposit > 0 && selectedPaymentMethodId) {
+      const paymentMethod = paymentMethods.find(pm => pm.id === selectedPaymentMethodId);
+
+      if (paymentMethod) {
+        // Mapeo de métodos de pago a bancos
+        const paymentToBankMap: { [key: string]: string } = {
+          '1': 'efectivo',           // Efectivo
+          '2': 'colpatria',          // Tarjeta Débito -> Colpatria
+          '3': 'colpatria',          // Tarjeta Crédito -> Colpatria
+          '4': 'bbva',               // Transferencia -> BBVA
+          '5': 'nequi',              // Nequi
+          '6': 'daviplata',          // Daviplata
+          '7': 'bbva',               // Transfiya -> BBVA
+          // Créditos externos no afectan bancos
+          '8': null,                 // Sistecredito
+          '9': null,                 // Addi
+          '10': null                 // Esmiopcion
+        };
+
+        const mappedBankId = paymentToBankMap[paymentMethod.id];
+
+        // Solo descontar si no es crédito externo
+        if (mappedBankId !== null && mappedBankId !== undefined) {
+          const bankExists = banks.find(b => b.id === mappedBankId);
+          if (bankExists) {
+            updateBankBalance(mappedBankId, deposit);
+          }
+        }
+      }
+    }
   }
 
   toast.success(`${quoteType === 'quote' ? 'Cotización' : 'Separado'} ${sale.saleNumber} creada exitosamente`);
@@ -277,8 +309,46 @@ export default function Quotes() {
     }
 
     try {
+      // Registrar el abono en la venta
       addSaleDeposit(depositSaleId, depositAmountNew, depositPaymentMethodIdNew);
-      toast.success('Abono registrado');
+
+      // Obtener el método de pago para determinar el banco
+      const paymentMethod = paymentMethods.find(pm => pm.id === depositPaymentMethodIdNew);
+
+      // Mapear el método de pago a un banco
+      let bankId = 'efectivo'; // Por defecto
+
+      if (paymentMethod) {
+        // Mapeo de métodos de pago a bancos
+        const paymentToBankMap: { [key: string]: string } = {
+          '1': 'efectivo',           // Efectivo
+          '2': 'colpatria',          // Tarjeta Débito -> Colpatria (puedes ajustar según tu negocio)
+          '3': 'colpatria',          // Tarjeta Crédito -> Colpatria
+          '4': 'bbva',               // Transferencia -> BBVA (ajustar según tu banco)
+          '5': 'nequi',              // Nequi
+          '6': 'daviplata',          // Daviplata
+          '7': 'bbva',               // Transfiya -> BBVA
+          // Créditos externos no afectan bancos inmediatamente
+          '8': null,                 // Sistecredito
+          '9': null,                 // Addi
+          '10': null                 // Esmiopcion
+        };
+
+        const mappedBankId = paymentToBankMap[paymentMethod.id];
+
+        // Solo descontar si no es crédito externo (null)
+        if (mappedBankId !== null && mappedBankId !== undefined) {
+          bankId = mappedBankId;
+
+          // Verificar que el banco existe antes de actualizar
+          const bankExists = banks.find(b => b.id === bankId);
+          if (bankExists) {
+            updateBankBalance(bankId, depositAmountNew);
+          }
+        }
+      }
+
+      toast.success('Abono registrado y saldo actualizado');
       setDepositDialogOpen(false);
       setDepositSaleId('');
       setDepositAmountNew(0);
