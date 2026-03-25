@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useInventory } from '@/hooks/useInventory';
 import { usePurchases } from '@/hooks/usePurchases';
 import { useSettings } from '@/hooks/useSettings';
@@ -24,13 +24,18 @@ import {
   CheckCircle,
   Clock,
   XCircle,
-  Search
+  Search,
+  Building2
 } from 'lucide-react';
-import { PurchaseDocument, DocumentType, DocumentStatus, AccountingRecord } from '@/types';
+import { PurchaseDocument, DocumentType, DocumentStatus, AccountingRecord, Supplier, Product } from '@/types';
 import { toast } from 'sonner';
+import SupplierFormDialog from '@/components/SupplierFormDialog';
+import SupplierSearchDialog from '@/components/SupplierSearchDialog';
+import ProductSearchDialog from '@/components/ProductSearchDialog';
+import ProductFormDialog from '@/components/ProductFormDialog';
 
 export default function PurchasesFactuSOL() {
-  const { products, suppliers, updateStock } = useInventory();
+  const { products, suppliers, categories, updateStock, addSupplier, updateSupplier, addProduct, addCategory } = useInventory();
   const {
     purchases,
     createDocument,
@@ -48,6 +53,7 @@ export default function PurchasesFactuSOL() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedDocument, setSelectedDocument] = useState<PurchaseDocument | null>(null);
+  const [bottomTab, setBottomTab] = useState<'lines' | 'totals'>('lines');
 
   // Estados para modal de creación/edición
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -59,9 +65,24 @@ export default function PurchasesFactuSOL() {
   const [payingInvoice, setPayingInvoice] = useState<PurchaseDocument | null>(null);
   const [selectedBank, setSelectedBank] = useState('');
 
+  // Estados para modal de proveedor
+  const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
+  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+
+  // Estados para búsqueda de proveedor
+  const [isSupplierSearchOpen, setIsSupplierSearchOpen] = useState(false);
+  const [supplierCode, setSupplierCode] = useState('');
+  const [supplierName, setSupplierName] = useState('');
+
+  // Estados para búsqueda y creación de productos
+  const [isProductSearchOpen, setIsProductSearchOpen] = useState(false);
+  const [isProductFormOpen, setIsProductFormOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+
   // Estados del formulario
-  const [supplierId, setSupplierId] = useState('');
+  const [supplierId, setSupplierId] = useState(''); // ID interno
   const [supplierInvoiceNumber, setSupplierInvoiceNumber] = useState('');
+  const [warehouse, setWarehouse] = useState('[01] HELMETS BOUTIQUE'); // Almacén por defecto
   const [items, setItems] = useState<any[]>([]);
   const [notes, setNotes] = useState('');
   const [searchProduct, setSearchProduct] = useState('');
@@ -212,7 +233,10 @@ export default function PurchasesFactuSOL() {
   const handleNew = () => {
     setEditingDocument(null);
     setSupplierId('');
+    setSupplierCode('');
+    setSupplierName('');
     setSupplierInvoiceNumber('');
+    setWarehouse('[01] HELMETS BOUTIQUE');
     setItems([]);
     setNotes('');
     setModalTab('general');
@@ -224,7 +248,16 @@ export default function PurchasesFactuSOL() {
     if (!selectedDocument) return;
     setEditingDocument(selectedDocument);
     setSupplierId(selectedDocument.supplierId);
+
+    // Cargar datos del proveedor
+    const supplier = suppliers.find(s => s.id === selectedDocument.supplierId);
+    if (supplier) {
+      setSupplierCode(supplier.code || '');
+      setSupplierName(supplier.commercialName || supplier.fiscalName);
+    }
+
     setSupplierInvoiceNumber(selectedDocument.supplierInvoiceNumber || '');
+    setWarehouse(selectedDocument.warehouse || '[01] HELMETS BOUTIQUE');
     setItems(selectedDocument.items);
     setNotes(selectedDocument.notes || '');
     setModalTab('general');
@@ -275,6 +308,7 @@ export default function PurchasesFactuSOL() {
         documentType: activeTab,
         supplierId: supplier.id,
         supplierName: supplier.name,
+        warehouse,
         items,
         tax,
         notes,
@@ -308,7 +342,10 @@ export default function PurchasesFactuSOL() {
 
     setIsModalOpen(false);
     setSupplierId('');
+    setSupplierCode('');
+    setSupplierName('');
     setSupplierInvoiceNumber('');
+    setWarehouse('[01] HELMETS BOUTIQUE');
     setItems([]);
     setNotes('');
   };
@@ -400,6 +437,90 @@ export default function PurchasesFactuSOL() {
     }
   };
 
+  // Manejar guardar proveedor desde modal
+  const handleSaveSupplier = (supplierData: Omit<Supplier, 'id' | 'createdAt'>) => {
+    if (editingSupplier) {
+      updateSupplier(editingSupplier.id, supplierData);
+      toast.success('Proveedor actualizado correctamente');
+    } else {
+      const newSupplier = addSupplier(supplierData);
+      toast.success('Proveedor creado correctamente');
+      // Auto-seleccionar el nuevo proveedor en el formulario de compra si el modal de compras está abierto
+      if (isModalOpen) {
+        setSupplierId(newSupplier.id);
+        setSupplierCode(newSupplier.code || '');
+        setSupplierName(newSupplier.commercialName || newSupplier.fiscalName);
+      }
+    }
+  };
+
+  // Buscar proveedor por código
+  const handleSupplierCodeChange = (code: string) => {
+    setSupplierCode(code);
+
+    if (code.trim() === '') {
+      setSupplierId('');
+      setSupplierName('');
+      return;
+    }
+
+    // Buscar proveedor por código
+    const supplier = suppliers.find(s => s.code === code.trim());
+    if (supplier) {
+      setSupplierId(supplier.id);
+      setSupplierName(supplier.commercialName || supplier.fiscalName);
+    } else {
+      setSupplierId('');
+      setSupplierName('');
+    }
+  };
+
+  // Seleccionar proveedor desde modal de búsqueda
+  const handleSelectSupplier = (supplier: Supplier) => {
+    setSupplierId(supplier.id);
+    setSupplierCode(supplier.code || '');
+    setSupplierName(supplier.commercialName || supplier.fiscalName);
+  };
+
+  // Manejar tecla F1 para abrir búsqueda de proveedor
+  const handleSupplierKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'F1') {
+      e.preventDefault();
+      setIsSupplierSearchOpen(true);
+    }
+  };
+
+  // Seleccionar producto desde modal de búsqueda
+  const handleSelectProduct = (product: Product) => {
+    handleAddProduct(product.id);
+    setSearchProduct('');
+  };
+
+  // Guardar producto desde modal de formulario
+  const handleSaveProduct = (productData: Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'reservedStock'>) => {
+    const newProduct = addProduct(productData);
+    toast.success('Artículo creado correctamente');
+    // Auto-agregar el nuevo producto al documento de compra
+    if (isModalOpen) {
+      handleAddProduct(newProduct.id);
+    }
+  };
+
+  // Manejar tecla F1 para abrir búsqueda de productos cuando el modal de compra está abierto
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F1' && isModalOpen && !isProductSearchOpen && !isSupplierSearchOpen) {
+        e.preventDefault();
+        setIsProductSearchOpen(true);
+      }
+    };
+
+    if (isModalOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isModalOpen, isProductSearchOpen, isSupplierSearchOpen]);
+
   return (
     <ScrollArea className="h-screen">
       <div className="p-6 max-w-[1400px] mx-auto">
@@ -482,6 +603,18 @@ export default function PurchasesFactuSOL() {
               >
                 <Trash2 className="h-4 w-4 mr-1" />
                 Borrar
+              </Button>
+              <div className="h-6 w-px bg-gray-300 mx-2" />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setEditingSupplier(null);
+                  setIsSupplierModalOpen(true);
+                }}
+              >
+                <Building2 className="h-4 w-4 mr-1" />
+                Ver proveedor
               </Button>
               <div className="h-6 w-px bg-gray-300 mx-2" />
               {selectedDocument && selectedDocument.documentType === 'delivery' && selectedDocument.status !== 'invoiced' && (
@@ -616,6 +749,98 @@ export default function PurchasesFactuSOL() {
                   </div>
                 </div>
               </div>
+
+              {/* Tabs Inferiores - Detalles del documento seleccionado */}
+              {selectedDocument && (
+                <div className="border-t">
+                  <Tabs value={bottomTab} onValueChange={(v) => setBottomTab(v as 'lines' | 'totals')}>
+                    <div className="border-b bg-gray-50 px-4">
+                      <TabsList className="h-9">
+                        <TabsTrigger value="lines" className="text-xs">
+                          Ver detalles de línea
+                        </TabsTrigger>
+                        <TabsTrigger value="totals" className="text-xs">
+                          Ver totales de documento
+                        </TabsTrigger>
+                      </TabsList>
+                    </div>
+
+                    <TabsContent value="lines" className="m-0 p-4">
+                      <div className="space-y-2">
+                        <h4 className="font-semibold text-sm text-gray-700 mb-3">
+                          Artículos del documento {selectedDocument.documentNumber}
+                        </h4>
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-gray-50">
+                              <TableHead className="text-xs">Artículo</TableHead>
+                              <TableHead className="text-xs text-right">Cantidad</TableHead>
+                              <TableHead className="text-xs text-right">P. Unitario</TableHead>
+                              <TableHead className="text-xs text-right">Total</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {selectedDocument.items.map((item, idx) => (
+                              <TableRow key={idx}>
+                                <TableCell className="text-sm">{item.productName}</TableCell>
+                                <TableCell className="text-right font-mono text-sm">{item.quantity}</TableCell>
+                                <TableCell className="text-right font-mono text-sm">
+                                  ${item.unitCost.toLocaleString('es-CO')}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-sm font-medium">
+                                  ${item.total.toLocaleString('es-CO')}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </TabsContent>
+
+                    <TabsContent value="totals" className="m-0 p-4">
+                      <div className="max-w-md">
+                        <h4 className="font-semibold text-sm text-gray-700 mb-3">
+                          Resumen del documento {selectedDocument.documentNumber}
+                        </h4>
+                        <div className="space-y-2 bg-gray-50 p-4 rounded">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Unidades:</span>
+                            <span className="font-mono">
+                              {selectedDocument.items.reduce((sum, item) => sum + item.quantity, 0)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Art. diferentes:</span>
+                            <span className="font-mono">{selectedDocument.items.length}</span>
+                          </div>
+                          <div className="border-t pt-2 mt-2"></div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Subtotal:</span>
+                            <span className="font-mono">${selectedDocument.subtotal.toLocaleString('es-CO')}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">IVA:</span>
+                            <span className="font-mono">${(selectedDocument.tax || 0).toLocaleString('es-CO')}</span>
+                          </div>
+                          <div className="flex justify-between text-base font-bold border-t pt-2 mt-2">
+                            <span>TOTAL:</span>
+                            <span className="font-mono text-blue-600">${selectedDocument.total.toLocaleString('es-CO')}</span>
+                          </div>
+                          {selectedDocument.notes && (
+                            <>
+                              <div className="border-t pt-2 mt-2"></div>
+                              <div className="text-sm">
+                                <span className="text-gray-600 font-medium">Notas:</span>
+                                <p className="text-gray-700 mt-1">{selectedDocument.notes}</p>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </TabsContent>
+                  </Tabs>
+                </div>
+              )}
             </Card>
           </TabsContent>
         </Tabs>
@@ -633,83 +858,82 @@ export default function PurchasesFactuSOL() {
             </DialogHeader>
 
             <div className="flex h-[calc(95vh-120px)]">
-              {/* Panel Izquierdo - Listado de Productos */}
+              {/* Panel Izquierdo - Búsqueda de Artículos */}
               <div className="w-[350px] border-r bg-gray-50 flex flex-col">
-                <div className="p-3 border-b bg-white">
-                  <Label className="text-xs font-medium mb-1 block">BUSCAR ARTÍCULO</Label>
-                  <div className="relative">
-                    <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
-                    <Input
-                      placeholder="Código, nombre, referencia..."
-                      className="pl-7 h-8 text-sm"
-                      value={searchProduct}
-                      onChange={(e) => setSearchProduct(e.target.value)}
-                    />
-                  </div>
+                <div className="p-4 bg-white border-b">
+                  <h3 className="text-sm font-semibold mb-3 text-gray-700">Agregar artículos</h3>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-2"
+                    onClick={() => setIsProductSearchOpen(true)}
+                  >
+                    <Search className="h-4 w-4" />
+                    Buscar artículos (F1)
+                  </Button>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Haz clic para buscar y agregar artículos al documento
+                  </p>
                 </div>
 
-                <ScrollArea className="flex-1">
-                  <div className="p-2 space-y-1">
-                    {availableProducts.map(product => (
-                      <div
-                        key={product.id}
-                        className="p-2 bg-white border rounded cursor-pointer hover:bg-blue-50 hover:border-blue-300 transition-colors"
-                        onDoubleClick={() => {
-                          handleAddProduct(product.id);
-                          setSearchProduct('');
-                        }}
-                        onClick={() => {
-                          handleAddProduct(product.id);
-                          setSearchProduct('');
-                        }}
-                      >
-                        <div className="font-medium text-sm">{product.name}</div>
-                        <div className="text-xs text-gray-600 flex justify-between">
-                          <span>Ref: {product.reference}</span>
-                          <span className="font-mono font-medium">${product.cost.toLocaleString('es-CO')}</span>
-                        </div>
-                        <div className="text-xs text-gray-500">Stock: {product.stock}</div>
-                      </div>
-                    ))}
+                <div className="flex-1 p-4 flex items-center justify-center">
+                  <div className="text-center text-gray-400">
+                    <Package className="h-16 w-16 mx-auto mb-3 opacity-30" />
+                    <p className="text-sm">
+                      Usa el botón de arriba<br />
+                      para buscar artículos
+                    </p>
                   </div>
-                </ScrollArea>
+                </div>
               </div>
 
               {/* Panel Derecho - Datos del Documento */}
               <div className="flex-1 flex flex-col">
-                <div className="p-4 border-b bg-white">
-                  <div className="grid grid-cols-4 gap-3">
+                <div className="p-4 border-b bg-white space-y-3">
+                  <div className="grid grid-cols-5 gap-3">
                     <div>
-                      <Label className="text-xs font-medium mb-1 block">PROVEEDOR *</Label>
-                      <Select value={supplierId} onValueChange={setSupplierId}>
-                        <SelectTrigger className="h-8">
-                          <SelectValue placeholder="Seleccionar..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {suppliers.map(supplier => (
-                            <SelectItem key={supplier.id} value={supplier.id}>
-                              {supplier.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Label className="text-xs font-medium mb-1 block">ALMACÉN</Label>
+                      <Input
+                        value={warehouse}
+                        onChange={(e) => setWarehouse(e.target.value)}
+                        className="h-8 text-sm"
+                      />
                     </div>
-                    <div>
+                    <div className="col-span-2">
+                      <Label className="text-xs font-medium mb-1 block">PROVEEDOR *</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          value={supplierCode}
+                          onChange={(e) => handleSupplierCodeChange(e.target.value)}
+                          onKeyDown={handleSupplierKeyDown}
+                          placeholder="Código"
+                          className="h-8 text-sm w-24 font-mono"
+                          title="Presiona F1 para buscar"
+                        />
+                        <Input
+                          value={supplierName}
+                          readOnly
+                          placeholder="Nombre comercial"
+                          className="h-8 text-sm flex-1 bg-gray-50"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 px-2"
+                          onClick={() => setIsSupplierSearchOpen(true)}
+                          title="Buscar proveedor (F1)"
+                        >
+                          <Search className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="col-span-2">
                       <Label className="text-xs font-medium mb-1 block">Nº FACTURA PROVEEDOR</Label>
                       <Input
                         value={supplierInvoiceNumber}
                         onChange={(e) => setSupplierInvoiceNumber(e.target.value)}
                         placeholder="Ej: F-12345"
                         className="h-8 font-mono text-sm"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs font-medium mb-1 block">FECHA</Label>
-                      <Input
-                        type="date"
-                        value={new Date().toISOString().split('T')[0]}
-                        className="h-8"
-                        disabled
                       />
                     </div>
                     <div>
@@ -908,6 +1132,54 @@ export default function PurchasesFactuSOL() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Modal de Proveedor */}
+        <SupplierFormDialog
+          open={isSupplierModalOpen}
+          onOpenChange={setIsSupplierModalOpen}
+          supplier={editingSupplier}
+          onSave={handleSaveSupplier}
+        />
+
+        {/* Modal de Búsqueda de Proveedor */}
+        <SupplierSearchDialog
+          open={isSupplierSearchOpen}
+          onOpenChange={setIsSupplierSearchOpen}
+          suppliers={suppliers}
+          onSelect={handleSelectSupplier}
+          onNewSupplier={() => {
+            setIsSupplierSearchOpen(false);
+            setEditingSupplier(null);
+            setIsSupplierModalOpen(true);
+          }}
+        />
+
+        {/* Modal de Búsqueda de Productos */}
+        <ProductSearchDialog
+          open={isProductSearchOpen}
+          onOpenChange={setIsProductSearchOpen}
+          products={products}
+          categories={categories}
+          onSelect={handleSelectProduct}
+          onNewProduct={() => {
+            setIsProductSearchOpen(false);
+            setEditingProduct(null);
+            setIsProductFormOpen(true);
+          }}
+        />
+
+        {/* Modal de Formulario de Producto */}
+        <ProductFormDialog
+          open={isProductFormOpen}
+          onOpenChange={setIsProductFormOpen}
+          product={editingProduct}
+          categories={categories}
+          suppliers={suppliers}
+          onSave={handleSaveProduct}
+          onAddCategory={(name, description) => {
+            addCategory(name, description);
+          }}
+        />
       </div>
     </ScrollArea>
   );

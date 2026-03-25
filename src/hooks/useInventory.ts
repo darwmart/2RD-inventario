@@ -79,13 +79,33 @@ export function useInventory() {
   }, [setCategories]);
 
   const addSupplier = useCallback((supplierData: Omit<Supplier, 'id' | 'createdAt'>) => {
+    // Generar código consecutivo numérico
+    const maxCode = suppliers.reduce((max, s) => {
+      const code = parseInt(s.code || '0');
+      return code > max ? code : max;
+    }, 0);
+    const nextCode = (maxCode + 1).toString();
+
     const newSupplier: Supplier = {
       ...supplierData,
+      code: nextCode,
       id: uuidv4(),
       createdAt: new Date()
     };
     setSuppliers(prev => [...prev, newSupplier]);
     return newSupplier;
+  }, [setSuppliers, suppliers]);
+
+  const updateSupplier = useCallback((id: string, updates: Partial<Supplier>) => {
+    setSuppliers(prev => prev.map(supplier =>
+      supplier.id === id
+        ? { ...supplier, ...updates }
+        : supplier
+    ));
+  }, [setSuppliers]);
+
+  const deleteSupplier = useCallback((id: string) => {
+    setSuppliers(prev => prev.filter(supplier => supplier.id !== id));
   }, [setSuppliers]);
 
   return {
@@ -102,6 +122,8 @@ export function useInventory() {
     getProductsByCategory,
     getProductsBySupplier,
     addCategory,
-    addSupplier
+    addSupplier,
+    updateSupplier,
+    deleteSupplier
   };
 }

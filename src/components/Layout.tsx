@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   Package,
   ShoppingCart,
@@ -11,28 +12,38 @@ import {
   FileText,
   AlertCircle,
   Banknote,
-  ShoppingBag
+  ShoppingBag,
+  Building2,
+  LogOut,
+  ShieldCheck,
+  User
 } from 'lucide-react';
 
 interface LayoutProps {
   children: ReactNode;
 }
 
-const navigation = [
-  { name: 'Dashboard', href: '/', icon: BarChart3 },
-  { name: 'Contabilidad', href: '/accounting', icon: Banknote },
-  { name: 'Inventario', href: '/inventory', icon: Package },
-  { name: 'Ventas', href: '/sales', icon: ShoppingCart },
-  { name: 'Cotizaciones', href: '/quotes', icon: FileText },
-  { name: 'Compras', href: '/purchases', icon: ShoppingBag },
-  { name: 'Arqueo de Caja', href: '/cash-register', icon: Calculator },
-  { name: 'Asesores', href: '/advisors', icon: Users },
-  { name: 'Alertas', href: '/alerts', icon: AlertCircle },
-  { name: 'Configuración', href: '/settings', icon: Settings },
+const allNavigation = [
+  { name: 'Dashboard', href: '/', icon: BarChart3, adminOnly: false },
+  { name: 'Contabilidad', href: '/accounting', icon: Banknote, adminOnly: true },
+  { name: 'Inventario', href: '/inventory', icon: Package, adminOnly: false },
+  { name: 'Ventas', href: '/sales', icon: ShoppingCart, adminOnly: false },
+  { name: 'Cotizaciones', href: '/quotes', icon: FileText, adminOnly: false },
+  { name: 'Compras', href: '/purchases', icon: ShoppingBag, adminOnly: true },
+  { name: 'Proveedores', href: '/suppliers', icon: Building2, adminOnly: false },
+  { name: 'Arqueo de Caja', href: '/cash-register', icon: Calculator, adminOnly: false },
+  { name: 'Asesores', href: '/advisors', icon: Users, adminOnly: false },
+  { name: 'Alertas', href: '/alerts', icon: AlertCircle, adminOnly: false },
+  { name: 'Configuración', href: '/settings', icon: Settings, adminOnly: true },
 ];
 
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
+  const { user, logout, isAdmin } = useAuth();
+
+  const navigation = allNavigation.filter(
+    (item) => !item.adminOnly || isAdmin()
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -43,9 +54,10 @@ export default function Layout({ children }: LayoutProps) {
             <div className="flex items-center flex-shrink-0 px-4">
               <Package className="h-8 w-8 text-blue-600" />
               <span className="ml-2 text-xl font-bold text-gray-900">
-                "2Ruedas Shop"
+                2Ruedas Shop
               </span>
             </div>
+
             <div className="mt-8 flex-grow flex flex-col">
               <nav className="flex-1 px-2 space-y-1">
                 {navigation.map((item) => {
@@ -69,10 +81,37 @@ export default function Layout({ children }: LayoutProps) {
                         )}
                       />
                       {item.name}
+                      {item.adminOnly && (
+                        <ShieldCheck className="ml-auto h-3.5 w-3.5 text-blue-400 opacity-70" />
+                      )}
                     </Link>
                   );
                 })}
               </nav>
+            </div>
+
+            {/* User info + logout */}
+            <div className="flex-shrink-0 border-t border-gray-200 p-4">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="flex-shrink-0 h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                  {isAdmin() ? (
+                    <ShieldCheck className="h-4 w-4 text-blue-600" />
+                  ) : (
+                    <User className="h-4 w-4 text-gray-500" />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-gray-900 truncate">{user?.name}</p>
+                  <p className="text-xs text-gray-500 capitalize">{user?.role === 'admin' ? 'Administrador' : 'Usuario'}</p>
+                </div>
+              </div>
+              <button
+                onClick={logout}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-red-50 hover:text-red-600 rounded-md transition-colors"
+              >
+                <LogOut className="h-4 w-4" />
+                Cerrar sesión
+              </button>
             </div>
           </div>
         </div>

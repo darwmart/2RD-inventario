@@ -16,7 +16,7 @@ import { Plus, Search, Minus, Trash2, FileText, Package, Calendar, Edit } from '
 import { Product, Purchase, PurchaseItem, AccountingRecord } from '@/types';
 import { toast } from 'sonner';
 import { Textarea } from '@/components/ui/textarea';
-import { ProductFormDialog } from '@/components/ProductFormDialog';
+import ProductFormDialog from '@/components/ProductFormDialog';
 
 export default function Purchases() {
   const { products, suppliers, categories, updateStock, addProduct, addCategory, addSupplier } = useInventory();
@@ -497,8 +497,8 @@ export default function Purchases() {
     setIsCreatingProduct(false);
   };
 
-  const handleAddCategory = (categoryName: string) => {
-    addCategory(categoryName, '');
+  const handleAddCategory = (categoryName: string, description: string = '') => {
+    addCategory(categoryName, description);
     toast.success('Categoría creada exitosamente');
   };
 

@@ -10,15 +10,15 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Search, Minus, Trash2, Calculator, Calendar, Printer } from 'lucide-react';
-import { Product, SaleItem} from '@/types';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
+import { Plus, Search, Minus, Trash2, Calculator, Calendar, Printer, Edit2 } from 'lucide-react';
+import { Product, SaleItem, Sale} from '@/types';
 import { toast } from 'sonner';
 import { printPOSInvoice } from '@/utils/printUtils';
 
 export default function Sales() {
   const { products, findProductByBarcode, updateStock } = useInventory();
-  const { sales, addSale, advisors, paymentMethods, updateSale } = useSales();
+  const { sales, addSale, advisors, paymentMethods, updateSale, deleteSale } = useSales();
   const { companyInfo, taxSettings, updateBankBalance, banks } = useSettings();
   
   const [isCreatingSale, setIsCreatingSale] = useState(false);
@@ -34,6 +34,10 @@ export default function Sales() {
   const [customerDocument, setCustomerDocument] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
+
+  // Estados para editar venta
+  const [isEditingSale, setIsEditingSale] = useState(false);
+  const [editingSaleId, setEditingSaleId] = useState<string | null>(null);
 
   // helper: convierte Date -> 'YYYY-MM-DD'
   const toKey = (d: Date | string) => {
@@ -333,6 +337,138 @@ export default function Sales() {
     setIsCreatingSale(false);
   };
 
+  const handleEditSale = (sale: Sale) => {
+    setEditingSaleId(sale.id);
+    setCart(sale.items);
+    setSelectedAdvisor(sale.advisorId);
+    setSelectedPaymentMethod(sale.paymentMethod.id);
+    setDiscount(sale.discount || 0);
+    setCustomerName(sale.customerName || '');
+    setCustomerDocument(sale.customerDocument || '');
+    setCustomerPhone(sale.customerPhone || '');
+    setIsEditingSale(true);
+    setIsCreatingSale(true);
+  };
+
+  const handleUpdateSale = () => {
+    if (!editingSaleId) return;
+    if (cart.length === 0) { toast.error('El carrito está vacío'); return; }
+    if (!selectedAdvisor || !selectedPaymentMethod) { toast.error('Selecciona un asesor y método de pago'); return; }
+
+    const paymentMethod = paymentMethods.find(pm => pm.id === selectedPaymentMethod);
+    if (!paymentMethod) { toast.error('Método de pago no válido'); return; }
+
+    // Obtener la venta original
+    const originalSale = sales.find(s => s.id === editingSaleId);
+    if (!originalSale) { toast.error('Venta no encontrada'); return; }
+
+    // Revertir stock de la venta original
+    originalSale.items.forEach(item => {
+      const product = products.find(p => p.id === item.productId);
+      if (product) updateStock(item.productId, product.stock + item.quantity);
+    });
+
+    // Verificar stock para los nuevos items
+    for (const item of cart) {
+      const product = products.find(p => p.id === item.productId);
+      if (!product || product.stock < item.quantity) {
+        toast.error(`Stock insuficiente para ${item.productName}`);
+        // Revertir el stock que ya habíamos devuelto
+        originalSale.items.forEach(item => {
+          const product = products.find(p => p.id === item.productId);
+          if (product) updateStock(item.productId, product.stock - item.quantity);
+        });
+        return;
+      }
+    }
+
+    // Aplicar nuevo stock
+    cart.forEach(item => {
+      const product = products.find(p => p.id === item.productId);
+      if (product) updateStock(item.productId, product.stock - item.quantity);
+    });
+
+    // Actualizar la venta
+    updateSale(editingSaleId, {
+      advisorId: selectedAdvisor,
+      advisorName: advisors.find(a => a.id === selectedAdvisor)?.name || '',
+      items: cart,
+      paymentMethod,
+      discount,
+      subtotal: subtotal,
+      total: total,
+      ivaTotal: totalIVA,
+      customerName: customerName.trim() || undefined,
+      customerDocument: customerDocument.trim() || undefined,
+      customerPhone: customerPhone.trim() || undefined
+    });
+
+    toast.success('Venta actualizada exitosamente');
+
+    setCart([]); setCustomPrice({}); setSelectedAdvisor(''); setSelectedPaymentMethod(''); setDiscount(0);
+    setCustomerName(''); setCustomerDocument(''); setCustomerPhone(''); setCustomerEmail('');
+    setIsCreatingSale(false);
+    setIsEditingSale(false);
+    setEditingSaleId(null);
+  };
+
+  const handleDeleteSale = (sale: Sale) => {
+    if (!confirm(`¿Estás seguro de eliminar la venta ${sale.saleNumber}? Esta acción no se puede deshacer.`)) {
+      return;
+    }
+
+    // Revertir el stock
+    sale.items.forEach(item => {
+      const product = products.find(p => p.id === item.productId);
+      if (product) {
+        updateStock(item.productId, product.stock + item.quantity);
+      }
+    });
+
+    // Revertir el saldo del banco si corresponde
+    const paymentToBankMap: { [key: string]: string } = {
+      '1': 'efectivo',
+      '2': 'colpatria',
+      '3': 'colpatria',
+      '4': 'bbva',
+      '5': 'nequi',
+      '6': 'daviplata',
+      '7': 'bbva',
+      '8': null,
+      '9': null,
+      '10': null
+    };
+
+    const mappedBankId = paymentToBankMap[sale.paymentMethod.id];
+    if (mappedBankId !== null && mappedBankId !== undefined) {
+      const bankExists = banks.find(b => b.id === mappedBankId);
+      if (bankExists) {
+        updateBankBalance(mappedBankId, -sale.total); // Restar el monto
+      }
+    }
+
+    deleteSale(sale.id);
+    toast.success('Venta eliminada exitosamente');
+  };
+
+  const handleCloseDialog = (open: boolean) => {
+    setIsCreatingSale(open);
+    if (!open) {
+      // Resetear estados de edición al cerrar
+      setIsEditingSale(false);
+      setEditingSaleId(null);
+      setCart([]);
+      setCustomPrice({});
+      setSelectedAdvisor('');
+      setSelectedPaymentMethod('');
+      setDiscount(0);
+      setCustomerName('');
+      setCustomerDocument('');
+      setCustomerPhone('');
+      setCustomerEmail('');
+    }
+  };
+
   const availableProducts = products.filter(product =>
     product.stock > 0 && (
       product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -341,7 +477,37 @@ export default function Sales() {
     )
   ).slice(0, 6);
 
+  // Calcular totales del día seleccionado
+  const dailyTotals = useMemo(() => {
+    // Ventas normales del día
+    const salesOfDay = sales.filter(s => toKey(s.createdAt) === selectedDate && s.type === 'sale');
 
+    // Sumar ventas y costos de las ventas normales
+    const salesTotal = salesOfDay.reduce((sum, sale) =>
+      sum + sale.items.reduce((itemSum, item) => itemSum + (item.total ?? 0), 0), 0
+    );
+
+    const costsTotal = salesOfDay.reduce((sum, sale) =>
+      sum + sale.items.reduce((itemSum, item) => itemSum + ((item.cost ?? 0) * (item.quantity ?? 0)), 0), 0
+    );
+
+    // Sumar abonos del día
+    const depositsTotal = depositsGroupedForDay.reduce((sum, entry) =>
+      sum + (entry.dayDepositSum ?? 0), 0
+    );
+
+    // Total general de ventas (ventas normales + abonos)
+    const totalVentas = salesTotal + depositsTotal;
+
+    // Utilidad (ventas - costos)
+    const utilidad = totalVentas - costsTotal;
+
+    return {
+      totalVentas,
+      totalCostos: costsTotal,
+      utilidad
+    };
+  }, [sales, selectedDate, depositsGroupedForDay]);
 
   return (
     <div className="p-6">
@@ -363,7 +529,7 @@ export default function Sales() {
         </div>
       </div>
          
-        <Dialog open={isCreatingSale} onOpenChange={setIsCreatingSale}>
+        <Dialog open={isCreatingSale} onOpenChange={handleCloseDialog}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="h-4 w-4 mr-2" />
@@ -372,7 +538,7 @@ export default function Sales() {
           </DialogTrigger>
           <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Nueva Venta</DialogTitle>
+              <DialogTitle>{isEditingSale ? 'Editar Venta' : 'Nueva Venta'}</DialogTitle>
             </DialogHeader>
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -607,12 +773,12 @@ export default function Sales() {
                       </div>
                     </div>
 
-                    <Button 
-                      className="w-full" 
-                      onClick={completeSale}
+                    <Button
+                      className="w-full"
+                      onClick={isEditingSale ? handleUpdateSale : completeSale}
                       disabled={cart.length === 0}>
                       <Calculator className="h-4 w-4 mr-2" />
-                      Completar Venta
+                      {isEditingSale ? 'Actualizar Venta' : 'Completar Venta'}
                     </Button>
                   </CardContent>
                 </Card>
@@ -720,14 +886,32 @@ export default function Sales() {
                             <TableCell>{sale.paymentMethod?.name ?? '-'}</TableCell>
                             <TableCell>
                               {isFirstItem && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => printPOSInvoice(sale, companyInfo)}
-                                  title="Reimprimir factura"
-                                >
-                                  <Printer className="h-4 w-4" />
-                                </Button>
+                                <div className="flex gap-1">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => printPOSInvoice(sale, companyInfo)}
+                                    title="Reimprimir factura"
+                                  >
+                                    <Printer className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleEditSale(sale)}
+                                    title="Editar venta"
+                                  >
+                                    <Edit2 className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleDeleteSale(sale)}
+                                    title="Eliminar venta"
+                                  >
+                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                  </Button>
+                                </div>
                               )}
                             </TableCell>
                           </TableRow>
@@ -735,6 +919,21 @@ export default function Sales() {
                       })
                     )}
                 </TableBody>
+                <TableFooter>
+                  <TableRow className="bg-gray-100 font-bold">
+                    <TableCell colSpan={4} className="text-right">TOTALES DEL DÍA:</TableCell>
+                    <TableCell className="text-blue-600">
+                      ${dailyTotals.totalCostos.toLocaleString('es-CO')}
+                    </TableCell>
+                    <TableCell className="text-green-600">
+                      ${dailyTotals.totalVentas.toLocaleString('es-CO')}
+                    </TableCell>
+                    <TableCell colSpan={2} className="text-purple-600">
+                      ${dailyTotals.utilidad.toLocaleString('es-CO')}
+                    </TableCell>
+                    <TableCell colSpan={2}></TableCell>
+                  </TableRow>
+                </TableFooter>
             </Table>
           </CardContent>
         </ScrollArea>

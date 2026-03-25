@@ -55,13 +55,44 @@ export type Category = {
   createdAt: Date;
 };
 
+// Tipo de proveedor expandido - basado en estructura similar a sistema de gestión comercial
 export type Supplier = {
   id: string;
-  name: string;
-  contact: string;
+  code?: string; // Código del proveedor
+  accountingCode?: string; // Código contabilidad
+
+  // Identificación fiscal
+  taxIdType: string; // N.I.T., C.C., etc.
+  taxId: string; // Número de identificación
+  fiscalName: string; // Nombre fiscal (legal)
+  commercialName?: string; // Nombre comercial
+
+  // Domicilio
+  address: string; // Calle/dirección
+  postalCode?: string;
+  city?: string; // Población
+  province?: string;
+  country?: string;
+
+  // Contacto
   phone: string;
+  mobile?: string;
+  fax?: string;
+  contactPerson?: string; // Persona de contacto
   email: string;
-  address: string;
+  twitter?: string; // Perfil de Twitter
+  facebook?: string; // Página de Facebook
+
+  // Datos bancarios
+  iban?: string;
+  ccc?: string; // Código cuenta cliente
+  bankName?: string;
+
+  // Otros
+  observations?: string; // Observaciones/notas
+  isProvider?: boolean; // Es proveedor
+  isCreditor?: boolean; // Es acreedor
+
   createdAt: Date;
 };
 
@@ -102,7 +133,7 @@ export type Sale = {
   createdAt: Date;
 };
 
-export type RecordType = 'ingreso' | 'egreso' | 'compra' | 'credito';
+export type RecordType = 'ingreso' | 'egreso' | 'compra' | 'credito' | 'traspaso';
 
 export type AccountingRecord = {
   id: number;
@@ -113,6 +144,18 @@ export type AccountingRecord = {
   monto: number;
   banco: string;
   fecha: string;
+};
+
+export type CashRegisterSession = {
+  id: string;
+  date: string; // YYYY-MM-DD
+  openingAmount: number; // Monto con el que se abre la caja
+  openingTime: string; // ISO timestamp
+  closingAmount?: number; // Monto contado al cerrar
+  closingTime?: string; // ISO timestamp
+  status: 'open' | 'closed';
+  difference?: number; // Diferencia entre lo esperado y lo contado
+  notes?: string;
 };
 
 export type CardSettings = {
@@ -161,6 +204,7 @@ export type PurchaseDocument = {
   documentType: DocumentType; // 'order' | 'delivery' | 'invoice'
   documentNumber: string; // P-2025-0001, A-2025-0001, F-2025-0001
   supplierInvoiceNumber?: string; // Número de factura del proveedor
+  warehouse?: string; // Almacén
   status: DocumentStatus;
   supplierId: string;
   supplierName: string;
@@ -196,4 +240,32 @@ export type Bank = {
   icon?: string;
   isActive: boolean;
   balance?: number;
+};
+
+export type Printer = {
+  id: string;
+  name: string;
+  type: 'thermal' | 'laser' | 'inkjet' | 'network';
+  isActive: boolean;
+  isDefault: boolean;
+  paperSize?: string; // A4, Letter, 80mm, etc.
+  createdAt: Date;
+};
+
+export type LabelDesign = {
+  id: string;
+  code: string; // Código del modelo (ej: 10002, 10003, 2)
+  name: string; // Nombre del modelo (ej: "Copia de Cód. Barras")
+  description?: string;
+  documentType: string; // Tipo de documento (ej: "Etiquetas de artículos")
+  printerName: string;
+  labelWidth: string; // mm
+  labelHeight: string; // mm
+  labelsPerRow: string;
+  labelsPerColumn: string;
+  topMargin: string; // mm
+  leftMargin: string; // mm
+  horizontalSpacing: string; // mm
+  verticalSpacing: string; // mm
+  createdAt: Date;
 };

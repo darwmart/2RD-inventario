@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from '@/components/ui/label'; // Componente para etiquetas de formularios.
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Componentes para menús desplegables.
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'; // Componentes para tablas.
-import { Plus, FileText, Minus, Banknote, ShoppingBag, CreditCard, Smartphone, Calculator } from 'lucide-react'; // Iconos de la librería Lucide.
+import { Plus, FileText, Minus, Banknote, ShoppingBag, CreditCard, Smartphone, Calculator, ArrowRightLeft } from 'lucide-react'; // Iconos de la librería Lucide.
 import { AccountingRecord, RecordType } from '@/types'; // Tipos personalizados para productos, elementos de venta y métodos de pago.
 import { toast } from 'sonner'; // Librería para mostrar notificaciones.
 import { useLocalStorage } from '@/hooks/useLocalStorage';
@@ -85,10 +85,14 @@ const [records, setRecords] = useLocalStorage<AccountingRecord[]>("accountingRec
       .filter((r) => r.banco === "efectivo" && (r.tipo === "egreso" || r.tipo === "compra"))
       .reduce((acc, r) => acc + r.monto, 0);
 
+    const traspasos = records
+      .filter((r) => r.banco === "efectivo" && r.tipo === "traspaso")
+      .reduce((acc, r) => acc + r.monto, 0);
+
     // Restar todos los expenses (gastos y préstamos) del efectivo
     const egresosFromExpenses = (expenses || []).reduce((acc, exp) => acc + (exp.amount || 0), 0);
 
-    return ingresos - egresos - egresosFromExpenses;
+    return ingresos - egresos - traspasos - egresosFromExpenses;
   }, [records, expenses]);
 
    // Gastos totales (sin filtro de fechas - total acumulado, incluye registros de tipo egreso + expenses)
@@ -513,6 +517,7 @@ const [records, setRecords] = useLocalStorage<AccountingRecord[]>("accountingRec
                       {r.tipo === 'egreso' && <Minus className="inline h-4 w-4 text-red-600 mr-1" />}
                       {r.tipo === 'compra' && <ShoppingBag className="inline h-4 w-4 text-blue-600 mr-1" />}
                       {r.tipo === 'credito' && <FileText className="inline h-4 w-4 text-purple-600 mr-1" />}
+                      {r.tipo === 'traspaso' && <ArrowRightLeft className="inline h-4 w-4 text-orange-600 mr-1" />}
                       {r.tipo}
                     </TableCell>
                     <TableCell>{r.descripcion}</TableCell>

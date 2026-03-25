@@ -805,6 +805,7 @@ export default function Quotes() {
                         size="sm"
                         onClick={() => convertToSale(reservation.id)}
                         className="flex-1"
+                        disabled={(reservation.deposit ?? 0) < reservation.total}
                       >
                         <ShoppingCart className="h-4 w-4 mr-1" />
                         Convertir a Venta

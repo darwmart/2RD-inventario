@@ -82,6 +82,10 @@ export function useSales() {
     ));
   }, [setSales]);
 
+  const deleteSale = useCallback((id: string) => {
+    setSales(prev => prev.filter(sale => sale.id !== id));
+  }, [setSales]);
+
   const getSalesByDate = useCallback((date: string) => {
     return sales.filter(sale => {
       const saleDate = new Date(sale.createdAt);
@@ -169,6 +173,7 @@ return {
   advisors,
   addSale,
   updateSale,
+  deleteSale,
   getSalesByDate,
   getSalesByAdvisor,
   addPaymentMethod,

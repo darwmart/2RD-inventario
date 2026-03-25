@@ -1,18 +1,24 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSales } from '@/hooks/useSales';
 import { useExpenses } from '@/hooks/useExpenses';
+import { useSettings } from '@/hooks/useSettings';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Calendar, Calculator, CreditCard, Banknote, Smartphone } from 'lucide-react';
-import { PaymentMethod, Sale } from '@/types';
+import { Badge } from '@/components/ui/badge';
+import { Calendar, Calculator, CreditCard, Banknote, Smartphone, DoorOpen, DoorClosed, ArrowRightLeft } from 'lucide-react';
+import { PaymentMethod, Sale, CashRegisterSession, AccountingRecord } from '@/types';
+import { toast } from 'sonner';
 
 export default function CashRegister() {
   const { sales, paymentMethods, getSalesByDate, advisors } = useSales();
   const { addExpense, getExpensesByDate } = useExpenses();
+  const { banks, updateBankBalance } = useSettings();
   const [advisorInput, setAdvisorInput] = useState('');
   const [expenseType, setExpenseType] = useState<'gasto' | 'prestamo'>('gasto');
   const [expenseAmount, setExpenseAmount] = useState<string>('');
@@ -25,6 +31,26 @@ export default function CashRegister() {
     const dd = String(d.getDate()).padStart(2, '0');
     return `${y}-${m}-${dd}`;
   });
+
+  // Estados para apertura/cierre de caja
+  const [cashSessions, setCashSessions] = useLocalStorage<CashRegisterSession[]>('cashSessions', []);
+  const [accountingRecords, setAccountingRecords] = useLocalStorage<AccountingRecord[]>("accountingRecords",[]);
+  const [openingAmount, setOpeningAmount] = useState<string>('');
+  const [closingAmount, setClosingAmount] = useState<string>('');
+  const [closingNotes, setClosingNotes] = useState<string>('');
+  const [isOpeningDialog, setIsOpeningDialog] = useState(false);
+  const [isClosingDialog, setIsClosingDialog] = useState(false);
+
+  // Estados para traspaso de efectivo
+  const [isTransferDialog, setIsTransferDialog] = useState(false);
+  const [transferAmount, setTransferAmount] = useState<string>('');
+  const [transferDescription, setTransferDescription] = useState<string>('');
+
+  // Base del día por fecha (persistencia en localStorage)
+  const [dailyBaseMap, setDailyBaseMap] = useLocalStorage<Record<string, { amount: number; updatedAt: string }>>('dailyBaseMap', {});
+
+  // Obtener la sesión de caja del día seleccionado
+  const currentSession = cashSessions.find(s => s.date === selectedDate);
 
   const dailyExpenses = getExpensesByDate(selectedDate);
   const totalExpenses = dailyExpenses.reduce((sum, e) => sum + e.amount, 0);
@@ -41,14 +67,140 @@ export default function CashRegister() {
     setExpenseDesc('');
   };
 
+  // Función para abrir caja
+  const handleOpenCashRegister = () => {
+    const amount = Number(openingAmount);
+    if (isNaN(amount) || amount < 0) {
+      toast.error('Ingresa un monto válido');
+      return;
+    }
+
+    const newSession: CashRegisterSession = {
+      id: crypto.randomUUID(),
+      date: selectedDate,
+      openingAmount: amount,
+      openingTime: new Date().toISOString(),
+      status: 'open'
+    };
+
+    setCashSessions([...cashSessions, newSession]);
+
+    // Sincronizar base del día con el monto de apertura
+    setDailyBaseMap(prev => ({
+      ...prev,
+      [selectedDate]: { amount, updatedAt: new Date().toISOString() }
+    }));
+
+    // Registrar en contabilidad como ingreso
+    const newRecord: AccountingRecord = {
+      id: Date.now(),
+      tipo: 'ingreso',
+      descripcion: `Apertura de caja - ${selectedDate}`,
+      monto: amount,
+      banco: 'efectivo',
+      fecha: new Date().toISOString(),
+    };
+    setAccountingRecords([...accountingRecords, newRecord]);
+
+    toast.success(`Caja abierta con $${amount.toLocaleString('es-CO')}`);
+    setOpeningAmount('');
+    setIsOpeningDialog(false);
+  };
+
+  // Función para cerrar caja
+  const handleCloseCashRegister = () => {
+    if (!currentSession || currentSession.status === 'closed') {
+      toast.error('No hay una caja abierta para cerrar');
+      return;
+    }
+
+    const amount = Number(closingAmount);
+    if (isNaN(amount) || amount < 0) {
+      toast.error('Ingresa un monto válido');
+      return;
+    }
+
+    // Calcular lo esperado en efectivo
+    const expectedCash = calculateExpectedCash();
+    const difference = amount - expectedCash;
+
+    const updatedSession: CashRegisterSession = {
+      ...currentSession,
+      closingAmount: amount,
+      closingTime: new Date().toISOString(),
+      status: 'closed',
+      difference: difference,
+      notes: closingNotes
+    };
+
+    setCashSessions(cashSessions.map(s => s.id === currentSession.id ? updatedSession : s));
+
+    toast.success(
+      difference === 0
+        ? 'Caja cerrada correctamente. Cuadre exacto.'
+        : `Caja cerrada. Diferencia: $${Math.abs(difference).toLocaleString('es-CO')} ${difference > 0 ? 'a favor' : 'en contra'}`
+    );
+
+    setClosingAmount('');
+    setClosingNotes('');
+    setIsClosingDialog(false);
+  };
+
+  // Función para traspaso de efectivo a caja principal
+  const handleTransferCash = () => {
+    if (!currentSession || currentSession.status === 'closed') {
+      toast.error('Debe haber una caja abierta para hacer traspasos');
+      return;
+    }
+
+    const amount = Number(transferAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast.error('Ingresa un monto válido');
+      return;
+    }
+
+    // Registrar en contabilidad como traspaso
+    const newRecord: AccountingRecord = {
+      id: Date.now(),
+      tipo: 'traspaso',
+      descripcion: transferDescription || `Traspaso de efectivo a Caja Principal`,
+      monto: amount,
+      banco: 'efectivo', // Sale del efectivo
+      fecha: new Date().toISOString(),
+    };
+    setAccountingRecords([...accountingRecords, newRecord]);
+
+    // Actualizar balance de caja principal
+    updateBankBalance('caja-principal', amount);
+
+    toast.success(`Traspaso de $${amount.toLocaleString('es-CO')} a Caja Principal realizado exitosamente`);
+    setTransferAmount('');
+    setTransferDescription('');
+    setIsTransferDialog(false);
+  };
+
+  // Calcular efectivo esperado en caja
+  const calculateExpectedCash = () => {
+    // Efectivo inicial (apertura)
+    const initial = currentSession?.openingAmount || 0;
+
+    // Ventas en efectivo del día
+    const cashSales = dailySales
+      .filter(sale => sale.paymentMethod.id === '1') // ID 1 = Efectivo
+      .reduce((sum, sale) => sum + sale.total, 0);
+
+    // Gastos del día
+    const expenses = totalExpenses;
+
+    return initial + cashSales - expenses;
+  };
+
   // --- Ventas del día (todas las completadas del mismo día) ---
   const dailySales: Sale[] = useMemo(() => {
     return getSalesByDate(selectedDate).filter(sale => sale.status === 'completed');
   }, [selectedDate, getSalesByDate]);
 
 
-  // Base del día por fecha (persistencia en localStorage)
-  const [dailyBaseMap, setDailyBaseMap] = useLocalStorage<Record<string, { amount: number; updatedAt: string }>>('dailyBaseMap', {});
   const baseAmount = dailyBaseMap[selectedDate]?.amount ?? 0;
 
   // Control del input editable
@@ -261,6 +413,176 @@ const depositRecordsOfDay = useMemo(() => {
           />
         </div>
       </div>
+
+      {/* Estado de Caja */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span>Estado de Caja</span>
+            {currentSession && (
+              <Badge variant={currentSession.status === 'open' ? 'default' : 'secondary'}>
+                {currentSession.status === 'open' ? 'Abierta' : 'Cerrada'}
+              </Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!currentSession ? (
+            <div className="text-center py-6">
+              <DoorClosed className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+              <p className="text-gray-600 mb-4">No hay caja abierta para este día</p>
+              <Dialog open={isOpeningDialog} onOpenChange={setIsOpeningDialog}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <DoorOpen className="h-4 w-4 mr-2" />
+                    Abrir Caja
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Apertura de Caja - {selectedDate}</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div>
+                      <Label>Monto inicial en efectivo</Label>
+                      <Input
+                        type="number"
+                        value={openingAmount}
+                        onChange={(e) => setOpeningAmount(e.target.value)}
+                        placeholder="0"
+                      />
+                    </div>
+                    <Button onClick={handleOpenCashRegister} className="w-full">
+                      Confirmar Apertura
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <p className="text-xs text-gray-600">Apertura</p>
+                  <p className="font-semibold">${currentSession.openingAmount.toLocaleString('es-CO')}</p>
+                  <p className="text-xs text-gray-500">
+                    {new Date(currentSession.openingTime).toLocaleTimeString('es-CO')}
+                  </p>
+                </div>
+                {currentSession.status === 'closed' && (
+                  <>
+                    <div>
+                      <p className="text-xs text-gray-600">Cierre</p>
+                      <p className="font-semibold">${currentSession.closingAmount?.toLocaleString('es-CO')}</p>
+                      <p className="text-xs text-gray-500">
+                        {currentSession.closingTime && new Date(currentSession.closingTime).toLocaleTimeString('es-CO')}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-600">Esperado</p>
+                      <p className="font-semibold">${calculateExpectedCash().toLocaleString('es-CO')}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-600">Diferencia</p>
+                      <p className={`font-semibold ${currentSession.difference === 0 ? 'text-green-600' : currentSession.difference! > 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                        ${Math.abs(currentSession.difference || 0).toLocaleString('es-CO')}
+                        {currentSession.difference !== 0 && (currentSession.difference! > 0 ? ' a favor' : ' en contra')}
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {currentSession.status === 'open' && (
+                <div className="flex gap-2">
+                  <Dialog open={isClosingDialog} onOpenChange={setIsClosingDialog}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline">
+                        <DoorClosed className="h-4 w-4 mr-2" />
+                        Cerrar Caja
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Cierre de Caja - {selectedDate}</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="p-4 bg-blue-50 rounded-lg">
+                          <p className="text-sm font-medium">Efectivo esperado</p>
+                          <p className="text-2xl font-bold text-blue-700">
+                            ${calculateExpectedCash().toLocaleString('es-CO')}
+                          </p>
+                        </div>
+                        <div>
+                          <Label>Efectivo contado en caja</Label>
+                          <Input
+                            type="number"
+                            value={closingAmount}
+                            onChange={(e) => setClosingAmount(e.target.value)}
+                            placeholder="0"
+                          />
+                        </div>
+                        <div>
+                          <Label>Notas (opcional)</Label>
+                          <Input
+                            value={closingNotes}
+                            onChange={(e) => setClosingNotes(e.target.value)}
+                            placeholder="Observaciones sobre el cierre"
+                          />
+                        </div>
+                        <Button onClick={handleCloseCashRegister} className="w-full">
+                          Confirmar Cierre
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+
+                  <Dialog open={isTransferDialog} onOpenChange={setIsTransferDialog}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline">
+                        <ArrowRightLeft className="h-4 w-4 mr-2" />
+                        Traspaso de Efectivo
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Traspaso de Efectivo a Caja Principal</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="p-4 bg-blue-50 rounded-lg">
+                          <p className="text-sm text-blue-800">
+                            El efectivo se traspasará a <strong>Caja Principal</strong> y se registrará automáticamente en contabilidad.
+                          </p>
+                        </div>
+                        <div>
+                          <Label>Monto a traspasar</Label>
+                          <Input
+                            type="number"
+                            value={transferAmount}
+                            onChange={(e) => setTransferAmount(e.target.value)}
+                            placeholder="0"
+                          />
+                        </div>
+                        <div>
+                          <Label>Descripción (opcional)</Label>
+                          <Input
+                            value={transferDescription}
+                            onChange={(e) => setTransferDescription(e.target.value)}
+                            placeholder="Descripción del traspaso"
+                          />
+                        </div>
+                        <Button onClick={handleTransferCash} className="w-full">
+                          Confirmar Traspaso
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Base del Día */}
       <Card className="mb-8">
