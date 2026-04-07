@@ -14,6 +14,7 @@ import {
   Banknote,
   ShoppingBag,
   Building2,
+  Warehouse,
   LogOut,
   ShieldCheck,
   User
@@ -31,6 +32,7 @@ const allNavigation = [
   { name: 'Cotizaciones', href: '/quotes', icon: FileText, adminOnly: false },
   { name: 'Compras', href: '/purchases', icon: ShoppingBag, adminOnly: true },
   { name: 'Proveedores', href: '/suppliers', icon: Building2, adminOnly: false },
+  { name: 'Bodegas Externas', href: '/warehouses', icon: Warehouse, adminOnly: false },
   { name: 'Arqueo de Caja', href: '/cash-register', icon: Calculator, adminOnly: false },
   { name: 'Asesores', href: '/advisors', icon: Users, adminOnly: false },
   { name: 'Alertas', href: '/alerts', icon: AlertCircle, adminOnly: false },

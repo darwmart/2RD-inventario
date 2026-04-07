@@ -15,8 +15,10 @@ import { Plus, Search, Minus, Trash2, Calculator, Calendar, Printer, Edit2 } fro
 import { Product, SaleItem, Sale} from '@/types';
 import { toast } from 'sonner';
 import { printPOSInvoice } from '@/utils/printUtils';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Sales() {
+  const { isAdmin } = useAuth();
   const { products, findProductByBarcode, updateStock } = useInventory();
   const { sales, addSale, advisors, paymentMethods, updateSale, deleteSale } = useSales();
   const { companyInfo, taxSettings, updateBankBalance, banks } = useSettings();
@@ -895,22 +897,26 @@ export default function Sales() {
                                   >
                                     <Printer className="h-4 w-4" />
                                   </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleEditSale(sale)}
-                                    title="Editar venta"
-                                  >
-                                    <Edit2 className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleDeleteSale(sale)}
-                                    title="Eliminar venta"
-                                  >
-                                    <Trash2 className="h-4 w-4 text-red-500" />
-                                  </Button>
+                                  {isAdmin() && (
+                                    <>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleEditSale(sale)}
+                                        title="Editar venta"
+                                      >
+                                        <Edit2 className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleDeleteSale(sale)}
+                                        title="Eliminar venta"
+                                      >
+                                        <Trash2 className="h-4 w-4 text-red-500" />
+                                      </Button>
+                                    </>
+                                  )}
                                 </div>
                               )}
                             </TableCell>

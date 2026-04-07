@@ -18,6 +18,7 @@ import Settings from './pages/Settings';
 import NotFound from './pages/NotFound';
 import Accounting from './pages/Accounting';
 import Suppliers from './pages/Suppliers';
+import Warehouses from './pages/Warehouses';
 
 const queryClient = new QueryClient();
 
@@ -119,6 +120,17 @@ function AppRoutes() {
           <ProtectedRoute>
             <Layout>
               <Alerts />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/warehouses"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Warehouses />
             </Layout>
           </ProtectedRoute>
         }

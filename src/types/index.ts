@@ -252,6 +252,39 @@ export type Printer = {
   createdAt: Date;
 };
 
+export type ExternalWarehouse = {
+  id: string;
+  code: string;
+  name: string;
+  location?: string;
+  contact?: string;
+  phone?: string;
+  description?: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type WarehouseTransactionType = 'loan' | 'return' | 'adjustment';
+
+export type WarehouseTransactionItem = {
+  productId: string;
+  productName: string;
+  barcode?: string;
+  reference?: string;
+  quantity: number;
+};
+
+export type WarehouseTransaction = {
+  id: string;
+  warehouseId: string;
+  warehouseName: string;
+  type: WarehouseTransactionType;
+  items: WarehouseTransactionItem[];
+  notes?: string;
+  createdAt: Date;
+  createdBy: string;
+};
+
 export type LabelDesign = {
   id: string;
   code: string; // Código del modelo (ej: 10002, 10003, 2)
