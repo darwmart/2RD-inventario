@@ -62,7 +62,8 @@ export default function CashRegister() {
   const handleAddExpense = () => {
     const amount = Number(expenseAmount);
     if (!advisorInput || isNaN(amount) || amount <= 0) return;
-    addExpense(advisorInput, expenseType, amount, expenseDesc);
+    const advisor = advisors.find(a => a.id === advisorInput);
+    addExpense(advisorInput, advisor?.name ?? advisorInput, expenseType, amount, expenseDesc);
     setExpenseAmount('');
     setExpenseDesc('');
   };
@@ -762,7 +763,7 @@ const depositRecordsOfDay = useMemo(() => {
     >
       <option value="">Seleccione...</option>
       {advisors.map(ad => (
-        <option key={ad.id} value={ad.name}>
+        <option key={ad.id} value={ad.id}>
           {ad.name}
         </option>
       ))}

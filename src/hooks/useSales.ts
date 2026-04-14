@@ -27,20 +27,19 @@ export function useSales() {
     paymentMethod: PaymentMethod;
     discount?: number;
     type: 'sale' | 'quote' | 'reserved';
-    // Datos del cliente (para separados)
     customerName?: string;
     customerDocument?: string;
     customerPhone?: string;
-    // Abono inicial (para separados)
     deposit?: number;
-    // IVA total de la venta
     ivaTotal?: number;
+    commission?: number;
+    commissionAmount?: number;
+    reteivaAmount?: number;
   }) => {
     const advisor = advisors.find(a => a.id === saleData.advisorId);
     const subtotal = saleData.items.reduce((sum, item) => sum + item.total, 0);
     const total = subtotal - (saleData.discount || 0);
 
-    // Preparar historial de abonos si aplica
     const deposits = (saleData.type === 'reserved' && (saleData.deposit || 0) > 0)
       ? [{
           id: uuidv4(),
@@ -60,13 +59,15 @@ export function useSales() {
       discount: saleData.discount || 0,
       total,
       ivaTotal: saleData.ivaTotal,
+      commission: saleData.commission,
+      commissionAmount: saleData.commissionAmount,
+      reteivaAmount: saleData.reteivaAmount,
       paymentMethod: saleData.paymentMethod,
-      // Información del cliente y abono (si aplica)
       customerName: saleData.customerName,
       customerDocument: saleData.customerDocument,
       customerPhone: saleData.customerPhone,
       deposit: saleData.deposit,
-      deposits: deposits,
+      deposits,
       status: saleData.type === 'sale' ? 'completed' : 'pending',
       type: saleData.type,
       createdAt: new Date()

@@ -11,17 +11,20 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Plus, Search, Minus, Trash2, Calculator, Calendar, Printer, Edit2 } from 'lucide-react';
+import { Plus, Search, Minus, Trash2, Calculator, Calendar, Printer, Edit2, RotateCcw } from 'lucide-react';
 import { Product, SaleItem, Sale} from '@/types';
 import { toast } from 'sonner';
 import { printPOSInvoice } from '@/utils/printUtils';
 import { useAuth } from '@/contexts/AuthContext';
+import { calculateItemIVA, calculateCardCommission } from '@/utils/ivaUtils';
+import { useReturns } from '@/hooks/useReturns';
 
 export default function Sales() {
   const { isAdmin } = useAuth();
   const { products, findProductByBarcode, updateStock } = useInventory();
   const { sales, addSale, advisors, paymentMethods, updateSale, deleteSale } = useSales();
-  const { companyInfo, taxSettings, updateBankBalance, banks } = useSettings();
+  const { companyInfo, taxSettings, cardSettings, updateBankBalance, banks } = useSettings();
+  const { addReturn } = useReturns();
   
   const [isCreatingSale, setIsCreatingSale] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -40,6 +43,13 @@ export default function Sales() {
   // Estados para editar venta
   const [isEditingSale, setIsEditingSale] = useState(false);
   const [editingSaleId, setEditingSaleId] = useState<string | null>(null);
+
+  // Estados para devolución
+  const [isReturnOpen, setIsReturnOpen] = useState(false);
+  const [returningSale, setReturningSale] = useState<Sale | null>(null);
+  const [returnItems, setReturnItems] = useState<{[productId: string]: number}>({});
+  const [returnReason, setReturnReason] = useState('');
+  const [returnPaymentMethodId, setReturnPaymentMethodId] = useState('');
 
   // helper: convierte Date -> 'YYYY-MM-DD'
   const toKey = (d: Date | string) => {
@@ -153,22 +163,6 @@ export default function Sales() {
   }, [depositsGroupedForDay]);
 
   // ----------------------- carrito / venta -----------------------
-  const calculateItemIVA = (product: Product, unitPrice: number, quantity: number) => {
-    if (!taxSettings.ivaEnabled) {
-      return { hasIva: false, ivaAmount: 0 };
-    }
-
-    // Si el producto tiene IVA incluido, calculamos el IVA del precio
-    if (product.hasIva) {
-      const ivaRate = taxSettings.ivaPercentage / 100;
-      const priceWithoutIva = unitPrice / (1 + ivaRate);
-      const ivaPerUnit = unitPrice - priceWithoutIva;
-      return { hasIva: true, ivaAmount: ivaPerUnit * quantity };
-    }
-
-    return { hasIva: false, ivaAmount: 0 };
-  };
-
   const addToCart = (product: Product, quantity: number = 1) => {
     if (product.stock < quantity) {
       toast.error(`Stock insuficiente. Solo hay ${product.stock} unidades disponibles.`);
@@ -176,7 +170,7 @@ export default function Sales() {
     }
     const existingItemIndex = cart.findIndex(item => item.productId === product.id);
     const currentPrice = customPrice[product.id] || product.currentPrice;
-    const { hasIva, ivaAmount } = calculateItemIVA(product, currentPrice, quantity);
+    const { hasIva, ivaAmount } = calculateItemIVA(product, currentPrice, quantity, taxSettings);
 
     if (existingItemIndex >= 0) {
       const existingItem = cart[existingItemIndex];
@@ -185,7 +179,7 @@ export default function Sales() {
         toast.error(`Stock insuficiente. Solo hay ${product.stock} unidades disponibles.`);
         return;
       }
-      const newIVA = calculateItemIVA(product, currentPrice, newQuantity);
+      const newIVA = calculateItemIVA(product, currentPrice, newQuantity, taxSettings);
       const updatedCart = [...cart];
       updatedCart[existingItemIndex] = {
         ...existingItem,
@@ -219,7 +213,7 @@ export default function Sales() {
 
     setCart(cart.map(item => {
       if (item.productId === productId) {
-        const { hasIva, ivaAmount } = calculateItemIVA(product, item.unitPrice, newQuantity);
+        const { hasIva, ivaAmount } = calculateItemIVA(product, item.unitPrice, newQuantity, taxSettings);
         return {
           ...item,
           quantity: newQuantity,
@@ -239,7 +233,7 @@ export default function Sales() {
     setCustomPrice({...customPrice, [productId]: newPrice});
     setCart(cart.map(item => {
       if (item.productId === productId) {
-        const { hasIva, ivaAmount } = calculateItemIVA(product, newPrice, item.quantity);
+        const { hasIva, ivaAmount } = calculateItemIVA(product, newPrice, item.quantity, taxSettings);
         return {
           ...item,
           unitPrice: newPrice,
@@ -285,6 +279,9 @@ export default function Sales() {
       const product = products.find(p => p.id === item.productId);
       if (!product || product.stock < item.quantity) { toast.error(`Stock insuficiente para ${item.productName}`); return; }
     }
+    const { commission, commissionAmount, reteivaAmount } = calculateCardCommission(
+      paymentMethod.name, paymentMethod.type, total, cardSettings
+    );
     const sale = addSale({
       advisorId: selectedAdvisor,
       items: cart,
@@ -292,6 +289,9 @@ export default function Sales() {
       discount,
       type: 'sale',
       ivaTotal: totalIVA,
+      commission: commission || undefined,
+      commissionAmount: commissionAmount || undefined,
+      reteivaAmount: reteivaAmount || undefined,
       customerName: customerName.trim() || undefined,
       customerDocument: customerDocument.trim() || undefined,
       customerPhone: customerPhone.trim() || undefined
@@ -451,6 +451,59 @@ export default function Sales() {
 
     deleteSale(sale.id);
     toast.success('Venta eliminada exitosamente');
+  };
+
+  const handleOpenReturn = (sale: Sale) => {
+    setReturningSale(sale);
+    const initial: {[key: string]: number} = {};
+    sale.items.forEach(item => { initial[item.productId] = 0; });
+    setReturnItems(initial);
+    setReturnReason('');
+    setReturnPaymentMethodId('');
+    setIsReturnOpen(true);
+  };
+
+  const handleConfirmReturn = () => {
+    if (!returningSale) return;
+    if (!returnReason.trim()) { toast.error('Indica el motivo de la devolución'); return; }
+    const itemsToReturn: SaleItem[] = returningSale.items
+      .filter(item => (returnItems[item.productId] || 0) > 0)
+      .map(item => ({
+        ...item,
+        quantity: returnItems[item.productId],
+        total: returnItems[item.productId] * item.unitPrice,
+      }));
+    if (itemsToReturn.length === 0) { toast.error('Selecciona al menos un artículo para devolver'); return; }
+
+    const returnPaymentMethod = returnPaymentMethodId
+      ? paymentMethods.find(pm => pm.id === returnPaymentMethodId)
+      : undefined;
+
+    addReturn({
+      saleId: returningSale.id,
+      saleNumber: returningSale.saleNumber,
+      advisorId: returningSale.advisorId,
+      advisorName: returningSale.advisorName,
+      items: itemsToReturn,
+      reason: returnReason,
+      paymentMethod: returnPaymentMethod,
+    });
+
+    // Regresar stock al inventario
+    itemsToReturn.forEach(item => {
+      const product = products.find(p => p.id === item.productId);
+      if (product) updateStock(item.productId, product.stock + item.quantity);
+    });
+
+    // Marcar venta como devuelta si todos los items fueron devueltos
+    const allReturned = returningSale.items.every(
+      item => (returnItems[item.productId] || 0) >= item.quantity
+    );
+    if (allReturned) updateSale(returningSale.id, { status: 'returned' });
+
+    toast.success('Devolución registrada exitosamente');
+    setIsReturnOpen(false);
+    setReturningSale(null);
   };
 
   const handleCloseDialog = (open: boolean) => {
@@ -897,6 +950,16 @@ export default function Sales() {
                                   >
                                     <Printer className="h-4 w-4" />
                                   </Button>
+                                  {sale.status !== 'returned' && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleOpenReturn(sale)}
+                                      title="Registrar devolución"
+                                    >
+                                      <RotateCcw className="h-4 w-4 text-orange-500" />
+                                    </Button>
+                                  )}
                                   {isAdmin() && (
                                     <>
                                       <Button
@@ -944,6 +1007,66 @@ export default function Sales() {
           </CardContent>
         </ScrollArea>
       </Card>
+
+      {/* Dialog Devolución */}
+      <Dialog open={isReturnOpen} onOpenChange={setIsReturnOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Devolución — {returningSale?.saleNumber}</DialogTitle>
+          </DialogHeader>
+          {returningSale && (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-500">Indica las cantidades a devolver por artículo:</p>
+              <div className="space-y-2">
+                {returningSale.items.map(item => (
+                  <div key={item.productId} className="flex items-center justify-between gap-3 p-2 border rounded">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{item.productName}</p>
+                      <p className="text-xs text-gray-500">Vendido: {item.quantity} u. · ${item.unitPrice.toLocaleString('es-CO')}</p>
+                    </div>
+                    <input
+                      type="number"
+                      min={0}
+                      max={item.quantity}
+                      value={returnItems[item.productId] || 0}
+                      onChange={e => setReturnItems(prev => ({ ...prev, [item.productId]: Math.min(Number(e.target.value), item.quantity) }))}
+                      className="w-16 border rounded p-1 text-center text-sm"
+                    />
+                  </div>
+                ))}
+              </div>
+              <div>
+                <label className="text-sm font-medium">Motivo *</label>
+                <Input
+                  value={returnReason}
+                  onChange={e => setReturnReason(e.target.value)}
+                  placeholder="Ej: Producto defectuoso, talla incorrecta..."
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Método de devolución del dinero</label>
+                <select
+                  value={returnPaymentMethodId}
+                  onChange={e => setReturnPaymentMethodId(e.target.value)}
+                  className="w-full border rounded p-2 text-sm mt-1"
+                >
+                  <option value="">Sin reembolso / Saldo a favor</option>
+                  {paymentMethods.filter(pm => pm.isActive).map(pm => (
+                    <option key={pm.id} value={pm.id}>{pm.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button className="px-4 py-2 border rounded text-sm" onClick={() => setIsReturnOpen(false)}>Cancelar</button>
+                <button className="px-4 py-2 bg-orange-500 text-white rounded text-sm hover:bg-orange-600" onClick={handleConfirmReturn}>
+                  Registrar devolución
+                </button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

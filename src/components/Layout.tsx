@@ -17,7 +17,10 @@ import {
   Warehouse,
   LogOut,
   ShieldCheck,
-  User
+  User,
+  UserCheck,
+  ClipboardList,
+  RotateCcw
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -34,7 +37,10 @@ const allNavigation = [
   { name: 'Proveedores', href: '/suppliers', icon: Building2, adminOnly: false },
   { name: 'Bodegas Externas', href: '/warehouses', icon: Warehouse, adminOnly: false },
   { name: 'Arqueo de Caja', href: '/cash-register', icon: Calculator, adminOnly: false },
+  { name: 'Clientes', href: '/customers', icon: UserCheck, adminOnly: false },
   { name: 'Asesores', href: '/advisors', icon: Users, adminOnly: false },
+  { name: 'Comisiones', href: '/advisor-commissions', icon: RotateCcw, adminOnly: true },
+  { name: 'Conciliación Stock', href: '/stock-conciliation', icon: ClipboardList, adminOnly: true },
   { name: 'Alertas', href: '/alerts', icon: AlertCircle, adminOnly: false },
   { name: 'Configuración', href: '/settings', icon: Settings, adminOnly: true },
 ];

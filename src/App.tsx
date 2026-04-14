@@ -19,6 +19,9 @@ import NotFound from './pages/NotFound';
 import Accounting from './pages/Accounting';
 import Suppliers from './pages/Suppliers';
 import Warehouses from './pages/Warehouses';
+import Customers from './pages/Customers';
+import StockConciliation from './pages/StockConciliation';
+import AdvisorCommissions from './pages/AdvisorCommissions';
 
 const queryClient = new QueryClient();
 
@@ -153,6 +156,37 @@ function AppRoutes() {
           <ProtectedRoute requireAdmin>
             <Layout>
               <Settings />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/customers"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Customers />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/stock-conciliation"
+        element={
+          <ProtectedRoute requireAdmin>
+            <Layout>
+              <StockConciliation />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/advisor-commissions"
+        element={
+          <ProtectedRoute requireAdmin>
+            <Layout>
+              <AdvisorCommissions />
             </Layout>
           </ProtectedRoute>
         }

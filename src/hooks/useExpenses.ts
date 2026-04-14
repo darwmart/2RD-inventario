@@ -11,14 +11,16 @@ export function useExpenses() {
   >('expensesMap', {});
 
   const addExpense = useCallback((
-    advisor: string,
+    advisorId: string,
+    advisorName: string,
     type: 'gasto' | 'prestamo',
     amount: number,
     description: string
   ) => {
     const newExpense: Expense = {
       id: uuidv4(),
-      advisor,
+      advisorId,
+      advisor: advisorName,
       type,
       amount,
       description,

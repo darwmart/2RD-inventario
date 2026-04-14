@@ -64,7 +64,8 @@ export function useWarehouses() {
     type: WarehouseTransactionType,
     items: WarehouseTransactionItem[],
     notes: string,
-    createdBy: string
+    createdBy: string,
+    evidenceImages?: string[]
   ): WarehouseTransaction => {
     const warehouse = warehouses.find(w => w.id === warehouseId);
     const transaction: WarehouseTransaction = {
@@ -74,6 +75,7 @@ export function useWarehouses() {
       type,
       items,
       notes,
+      evidenceImages,
       createdAt: new Date(),
       createdBy,
     };
@@ -101,9 +103,19 @@ export function useWarehouses() {
             };
           }
           if (t.type === 'loan') {
+            // Préstamo: el artículo sale del inventario y queda en la bodega
             stock[item.productId].quantity += item.quantity;
           } else if (t.type === 'return') {
+            // Devolución: el artículo regresa del inventario desde la bodega
             stock[item.productId].quantity -= item.quantity;
+          } else if (t.type === 'exchange') {
+            if (item.direction === 'in') {
+              // Artículo prestado que SALE de la bodega y regresa al inventario principal
+              // → se descuenta del stock de bodega (desaparece de la vista)
+              stock[item.productId].quantity -= item.quantity;
+            }
+            // direction 'out' = artículo de reemplazo que viene de afuera
+            // → va directo al inventario principal, NO se registra en el stock de la bodega
           } else {
             // adjustment: quantity can be positive or negative
             stock[item.productId].quantity += item.quantity;

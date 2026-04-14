@@ -15,6 +15,7 @@ import { Plus, FileText, Search, ShoppingCart, Clock, Minus, Trash2, Printer } f
 import { Product, SaleItem } from '@/types'; // Tipos personalizados para productos, elementos de venta y métodos de pago.
 import { toast } from 'sonner'; // Librería para mostrar notificaciones.
 import { printPOSInvoice } from '@/utils/printUtils'; // Utilidad de impresión
+import { calculateItemIVA } from '@/utils/ivaUtils';
 
 export default function Quotes() {
   const { products, updateStock } = useInventory(); // Obtiene los productos del inventario.
@@ -68,33 +69,16 @@ export default function Quotes() {
   const paidSelected = selectedSaleForDeposit ? (selectedSaleForDeposit.deposit ?? 0) : 0;
   const remainingSelected = selectedSaleForDeposit ? Math.max(0, selectedSaleForDeposit.total - paidSelected) : 0;
 
-  // Función para calcular IVA de un item
-  const calculateItemIVA = (product: Product, unitPrice: number, quantity: number) => {
-    if (!taxSettings.ivaEnabled) {
-      return { hasIva: false, ivaAmount: 0 };
-    }
-
-    // Si el producto tiene IVA incluido, calculamos el IVA del precio
-    if (product.hasIva) {
-      const ivaRate = taxSettings.ivaPercentage / 100;
-      const priceWithoutIva = unitPrice / (1 + ivaRate);
-      const ivaPerUnit = unitPrice - priceWithoutIva;
-      return { hasIva: true, ivaAmount: ivaPerUnit * quantity };
-    }
-
-    return { hasIva: false, ivaAmount: 0 };
-  };
-
   // Función para agregar productos al carrito.
   const addToCart = (product: Product, quantity: number = 1) => {
     const existingItemIndex = cart.findIndex(item => item.productId === product.id); // Busca si el producto ya está en el carrito.
-    const { hasIva, ivaAmount } = calculateItemIVA(product, product.currentPrice, quantity);
+    const { hasIva, ivaAmount } = calculateItemIVA(product, product.currentPrice, quantity, taxSettings);
 
     if (existingItemIndex >= 0) {
       // Si el producto ya está, actualiza la cantidad y el total.
       const existingItem = cart[existingItemIndex];
       const newQuantity = existingItem.quantity + quantity;
-      const newIVA = calculateItemIVA(product, existingItem.unitPrice, newQuantity);
+      const newIVA = calculateItemIVA(product, existingItem.unitPrice, newQuantity, taxSettings);
       const updatedCart = [...cart];
       updatedCart[existingItemIndex] = {
         ...existingItem,
@@ -132,7 +116,7 @@ export default function Quotes() {
 
     setCart(cart.map(item => {
       if (item.productId === productId) {
-        const { hasIva, ivaAmount } = calculateItemIVA(product, item.unitPrice, newQuantity);
+        const { hasIva, ivaAmount } = calculateItemIVA(product, item.unitPrice, newQuantity, taxSettings);
         return {
           ...item,
           quantity: newQuantity,
@@ -152,7 +136,7 @@ export default function Quotes() {
 
     setCart(cart.map(item => {
       if (item.productId === productId) {
-        const { hasIva, ivaAmount } = calculateItemIVA(product, newPrice, item.quantity);
+        const { hasIva, ivaAmount } = calculateItemIVA(product, newPrice, item.quantity, taxSettings);
         return {
           ...item,
           unitPrice: newPrice,

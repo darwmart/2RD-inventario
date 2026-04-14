@@ -98,7 +98,8 @@ export type Supplier = {
 
 export type Expense = {
   id: string;
-  advisor: string;
+  advisorId: string;   // ID del asesor (referencia a Advisor.id)
+  advisor: string;     // Nombre snapshot (para mostrar aunque el asesor se elimine)
   type: 'gasto' | 'prestamo';
   amount: number;
   description: string;
@@ -112,23 +113,89 @@ export type Deposit = {
   createdAt: Date;
 };
 
-export type Sale = {
+export type Customer = {
   id: string;
+  name: string;
+  document?: string;      // CC, NIT, etc.
+  documentType?: string;  // Tipo de documento
+  phone?: string;
+  email?: string;
+  address?: string;
+  city?: string;
+  creditLimit?: number;   // Cupo de crédito
+  balance?: number;       // Saldo a favor
+  notes?: string;
+  isActive: boolean;
+  createdAt: Date;
+};
+
+export type SaleReturn = {
+  id: string;
+  returnNumber: string;
+  saleId: string;
   saleNumber: string;
   advisorId: string;
   advisorName: string;
   items: SaleItem[];
   subtotal: number;
+  total: number;
+  reason: string;
+  paymentMethod?: PaymentMethod; // Método para devolver el dinero
+  createdAt: Date;
+};
+
+export type StockCount = {
+  id: string;
+  countNumber: string;
+  status: 'draft' | 'completed';
+  items: StockCountItem[];
+  notes?: string;
+  createdAt: Date;
+  completedAt?: Date;
+};
+
+export type StockCountItem = {
+  productId: string;
+  productName: string;
+  barcode?: string;
+  reference?: string;
+  systemStock: number;   // Stock en sistema al momento del conteo
+  countedStock: number;  // Unidades contadas físicamente
+  difference: number;    // countedStock - systemStock
+};
+
+export type AdvisorCommission = {
+  advisorId: string;
+  advisorName: string;
+  period: string;         // YYYY-MM o YYYY-MM-DD
+  salesCount: number;
+  totalSales: number;
+  commissionRate: number; // Porcentaje
+  commissionAmount: number;
+};
+
+export type Sale = {
+  id: string;
+  saleNumber: string;
+  advisorId: string;
+  advisorName: string;
+  customerId?: string;
+  items: SaleItem[];
+  subtotal: number;
   discount?: number;
   total: number;
-  ivaTotal?: number; // Total de IVA de la venta
+  ivaTotal?: number;
+  // Comisión bancaria (tarjetas)
+  commission?: number;        // Porcentaje aplicado (ej: 1.9)
+  commissionAmount?: number;  // Valor en pesos descontado por el banco
+  reteivaAmount?: number;     // Retención IVA sobre la comisión
   paymentMethod: PaymentMethod;
   customerName?: string;
   customerDocument?: string;
   customerPhone?: string;
   deposit?: number;
   deposits?: Deposit[];
-  status: 'pending' | 'completed' | 'cancelled';
+  status: 'pending' | 'completed' | 'cancelled' | 'returned';
   type: 'sale' | 'quote' | 'reserved';
   createdAt: Date;
 };
@@ -264,7 +331,7 @@ export type ExternalWarehouse = {
   updatedAt: Date;
 };
 
-export type WarehouseTransactionType = 'loan' | 'return' | 'adjustment';
+export type WarehouseTransactionType = 'loan' | 'return' | 'adjustment' | 'exchange';
 
 export type WarehouseTransactionItem = {
   productId: string;
@@ -272,6 +339,11 @@ export type WarehouseTransactionItem = {
   barcode?: string;
   reference?: string;
   quantity: number;
+  color?: string;
+  brand?: string;
+  size?: string;
+  // Para cambios: 'out' = sale del inventario, 'in' = regresa al inventario
+  direction?: 'out' | 'in';
 };
 
 export type WarehouseTransaction = {
@@ -281,6 +353,7 @@ export type WarehouseTransaction = {
   type: WarehouseTransactionType;
   items: WarehouseTransactionItem[];
   notes?: string;
+  evidenceImages?: string[]; // base64 data URLs
   createdAt: Date;
   createdBy: string;
 };
