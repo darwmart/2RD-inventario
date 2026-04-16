@@ -834,7 +834,11 @@ export default function Settings() {
                             min="0"
                             max="100"
                             value={taxSettings.ivaPercentage}
-                            onChange={(e) => updateTaxSettings({ ivaPercentage: parseFloat(e.target.value) || 0 })}
+                            onChange={(e) => {
+                              const v = parseFloat(e.target.value);
+                              if (isNaN(v) || v < 0 || v > 100) { toast.error('El IVA debe estar entre 0% y 100%'); return; }
+                              updateTaxSettings({ ivaPercentage: v });
+                            }}
                             placeholder="19"
                             disabled={!taxSettings.ivaEnabled}
                           />
@@ -977,7 +981,11 @@ export default function Settings() {
                             type="number"
                             step="0.1"
                             value={cardSettings.debitCommission}
-                            onChange={(e) => updateCardSettings({ debitCommission: parseFloat(e.target.value) || 0 })}
+                            onChange={(e) => {
+                              const v = parseFloat(e.target.value);
+                              if (isNaN(v) || v < 0 || v > 100) { toast.error('La comisión debe estar entre 0% y 100%'); return; }
+                              updateCardSettings({ debitCommission: v });
+                            }}
                             placeholder="1.9"
                             disabled={!cardSettings.commissionsEnabled}
                           />
@@ -991,7 +999,11 @@ export default function Settings() {
                             type="number"
                             step="0.1"
                             value={cardSettings.creditCommission}
-                            onChange={(e) => updateCardSettings({ creditCommission: parseFloat(e.target.value) || 0 })}
+                            onChange={(e) => {
+                              const v = parseFloat(e.target.value);
+                              if (isNaN(v) || v < 0 || v > 100) { toast.error('La comisión debe estar entre 0% y 100%'); return; }
+                              updateCardSettings({ creditCommission: v });
+                            }}
                             placeholder="2.9"
                             disabled={!cardSettings.commissionsEnabled}
                           />
@@ -1021,7 +1033,11 @@ export default function Settings() {
                           type="number"
                           step="0.1"
                           value={cardSettings.reteiva}
-                          onChange={(e) => updateCardSettings({ reteiva: parseFloat(e.target.value) || 0 })}
+                          onChange={(e) => {
+                            const v = parseFloat(e.target.value);
+                            if (isNaN(v) || v < 0 || v > 100) { toast.error('El reteiva debe estar entre 0% y 100%'); return; }
+                            updateCardSettings({ reteiva: v });
+                          }}
                           placeholder="0.4"
                           disabled={!cardSettings.reteivaEnabled}
                         />

@@ -16,6 +16,7 @@ type ProductFormDialogProps = {
   product?: Product | null;
   categories: Category[];
   suppliers: Supplier[];
+  existingProducts?: Product[];
   onSave: (product: Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'reservedStock'>) => void;
   onAddCategory?: (name: string, description: string) => void;
 };
@@ -27,6 +28,7 @@ export default function ProductFormDialog({
   product,
   categories,
   suppliers,
+  existingProducts = [],
   onSave,
   onAddCategory
 }: ProductFormDialogProps) {
@@ -239,6 +241,40 @@ export default function ProductFormDialog({
 
     if (!categoryId) {
       toast.error('La familia es obligatoria');
+      return;
+    }
+
+    // Referencia duplicada
+    const dupRef = existingProducts.find(p =>
+      p.reference.trim().toLowerCase() === reference.trim().toLowerCase() &&
+      p.id !== product?.id
+    );
+    if (dupRef) {
+      toast.error(`Ya existe un artículo con el código "${reference}" (${dupRef.name})`);
+      return;
+    }
+
+    // Código de barras duplicado (solo si se ingresó)
+    if (barcode.trim()) {
+      const dupBarcode = existingProducts.find(p =>
+        p.barcode?.trim() === barcode.trim() &&
+        p.id !== product?.id
+      );
+      if (dupBarcode) {
+        toast.error(`Ya existe un artículo con el código de barras "${barcode}" (${dupBarcode.name})`);
+        return;
+      }
+    }
+
+    // Precio de venta no puede ser menor al costo
+    if (cost > 0 && currentPrice > 0 && currentPrice < cost) {
+      toast.error('El precio de venta no puede ser menor al costo');
+      return;
+    }
+
+    // Stock no puede ser negativo
+    if (stock < 0) {
+      toast.error('El stock no puede ser negativo');
       return;
     }
 

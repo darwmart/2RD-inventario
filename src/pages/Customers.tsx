@@ -85,6 +85,29 @@ export default function Customers() {
 
   const handleSave = () => {
     if (!form.name.trim()) { toast.error('El nombre es obligatorio'); return; }
+
+    // Documento duplicado
+    if (form.document.trim()) {
+      const dup = customers.find(c =>
+        c.document === form.document.trim() &&
+        c.id !== editingCustomer?.id
+      );
+      if (dup) { toast.error(`Ya existe un cliente con el documento ${form.document}`); return; }
+    }
+
+    // Formato teléfono (solo dígitos, 7-15 caracteres)
+    if (form.phone.trim() && !/^\d{7,15}$/.test(form.phone.trim())) {
+      toast.error('El teléfono debe contener solo dígitos (7-15 caracteres)'); return;
+    }
+
+    // Formato email
+    if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      toast.error('El correo electrónico no tiene un formato válido'); return;
+    }
+
+    // Límite de crédito
+    if (form.creditLimit < 0) { toast.error('El límite de crédito no puede ser negativo'); return; }
+
     if (editingCustomer) {
       updateCustomer(editingCustomer.id, form);
       toast.success('Cliente actualizado');

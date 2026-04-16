@@ -61,7 +61,9 @@ export default function CashRegister() {
 
   const handleAddExpense = () => {
     const amount = Number(expenseAmount);
-    if (!advisorInput || isNaN(amount) || amount <= 0) return;
+    if (!advisorInput) { toast.error('Selecciona un asesor'); return; }
+    if (isNaN(amount) || amount <= 0) { toast.error('El monto debe ser mayor a $0'); return; }
+    if (!expenseDesc.trim()) { toast.error('La descripción del gasto es obligatoria'); return; }
     const advisor = advisors.find(a => a.id === advisorInput);
     addExpense(advisorInput, advisor?.name ?? advisorInput, expenseType, amount, expenseDesc);
     setExpenseAmount('');

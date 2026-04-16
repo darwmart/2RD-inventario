@@ -12,11 +12,12 @@ type SupplierFormDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   supplier?: Supplier | null;
+  existingSuppliers?: Supplier[];
   onSave: (supplier: Omit<Supplier, 'id' | 'createdAt'>) => void;
 };
 
 // Modal de formulario de proveedor - inspirado en interfaz de gestión comercial
-export default function SupplierFormDialog({ open, onOpenChange, supplier, onSave }: SupplierFormDialogProps) {
+export default function SupplierFormDialog({ open, onOpenChange, supplier, existingSuppliers = [], onSave }: SupplierFormDialogProps) {
   // Estado del formulario
   const [taxIdType, setTaxIdType] = useState('N.I.T.');
   const [taxId, setTaxId] = useState('');
@@ -90,8 +91,23 @@ export default function SupplierFormDialog({ open, onOpenChange, supplier, onSav
       return;
     }
 
+    // NIT duplicado
+    const dup = existingSuppliers.find(s =>
+      s.taxId === taxId.trim() && s.id !== supplier?.id
+    );
+    if (dup) {
+      toast.error(`Ya existe un proveedor con la identificación ${taxId.trim()} (${dup.fiscalName})`);
+      return;
+    }
+
     if (!phone.trim()) {
       toast.error('El teléfono es obligatorio');
+      return;
+    }
+
+    // Formato teléfono (solo dígitos, 7-15 caracteres)
+    if (!/^\d{7,15}$/.test(phone.trim())) {
+      toast.error('El teléfono debe contener solo dígitos (7-15 caracteres)');
       return;
     }
 

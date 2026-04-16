@@ -181,6 +181,24 @@ export default function Purchases() {
       return;
     }
 
+    // Costo por unidad > 0
+    const zeroItem = cart.find(i => i.unitCost <= 0);
+    if (zeroItem) {
+      toast.error(`El costo de "${zeroItem.productName}" debe ser mayor a $0`);
+      return;
+    }
+
+    // Factura duplicada para el mismo proveedor
+    const dupInvoice = purchases.find(p =>
+      p.supplierId === selectedSupplier &&
+      p.invoiceNumber.trim().toLowerCase() === invoiceNumber.trim().toLowerCase() &&
+      p.id !== editingPurchase?.id
+    );
+    if (dupInvoice) {
+      toast.error(`Ya existe la factura "${invoiceNumber}" para este proveedor`);
+      return;
+    }
+
     const supplier = suppliers.find(s => s.id === selectedSupplier);
     const selectedMethod = purchasePaymentMethods.find(pm => pm.id === selectedPaymentMethod);
 
@@ -198,6 +216,11 @@ export default function Purchases() {
       // Crédito
       if (!dueDate) {
         toast.error('Ingresa la fecha de vencimiento del crédito');
+        return;
+      }
+      // Fecha de vencimiento no puede ser en el pasado
+      if (new Date(dueDate) < new Date(new Date().toDateString())) {
+        toast.error('La fecha de vencimiento no puede ser en el pasado');
         return;
       }
       paymentDetails.dueDate = dueDate;
@@ -301,6 +324,24 @@ export default function Purchases() {
       return;
     }
     if (!editingPurchase) {
+      return;
+    }
+
+    // Costo por unidad > 0
+    const zeroItem = cart.find(i => i.unitCost <= 0);
+    if (zeroItem) {
+      toast.error(`El costo de "${zeroItem.productName}" debe ser mayor a $0`);
+      return;
+    }
+
+    // Factura duplicada para el mismo proveedor
+    const dupInvoice = purchases.find(p =>
+      p.supplierId === selectedSupplier &&
+      p.invoiceNumber.trim().toLowerCase() === invoiceNumber.trim().toLowerCase() &&
+      p.id !== editingPurchase?.id
+    );
+    if (dupInvoice) {
+      toast.error(`Ya existe la factura "${invoiceNumber}" para este proveedor`);
       return;
     }
 

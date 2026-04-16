@@ -273,6 +273,8 @@ export default function Sales() {
   const completeSale = () => {
     if (cart.length === 0) { toast.error('El carrito está vacío'); return; }
     if (!selectedAdvisor || !selectedPaymentMethod) { toast.error('Selecciona un asesor y método de pago'); return; }
+    if (discount < 0) { toast.error('El descuento no puede ser negativo'); return; }
+    if (discount > subtotal) { toast.error('El descuento no puede superar el subtotal'); return; }
     const paymentMethod = paymentMethods.find(pm => pm.id === selectedPaymentMethod);
     if (!paymentMethod) { toast.error('Método de pago no válido'); return; }
     for (const item of cart) {

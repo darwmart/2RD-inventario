@@ -207,6 +207,7 @@ export default function Suppliers() {
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
         supplier={editingSupplier}
+        existingSuppliers={suppliers}
         onSave={handleSave}
       />
     </div>

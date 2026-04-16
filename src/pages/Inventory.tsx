@@ -461,6 +461,7 @@ export default function Inventory() {
           product={null}
           categories={categories}
           suppliers={suppliers}
+          existingProducts={products}
           onSave={(productData) => {
             addProduct(productData);
             toast.success('Artículo creado correctamente');
@@ -476,6 +477,7 @@ export default function Inventory() {
           product={editingProduct}
           categories={categories}
           suppliers={suppliers}
+          existingProducts={products}
           onSave={(productData) => {
             if (editingProduct) {
               updateProduct(editingProduct.id, productData);
