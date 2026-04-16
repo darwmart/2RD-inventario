@@ -475,10 +475,10 @@ export default function ProductFormDialog({
                         })}
                       </td>
                       <td className="p-2 text-right font-mono text-xs">
-                        {marginSuggested.toFixed(3)}
+                        {marginSuggested.toFixed(2)}
                       </td>
                       <td className="p-2 text-right font-mono text-xs text-gray-600">
-                        {calculateRealMargin(cost, suggestedPrice, hasIva).toFixed(4)}
+                        {calculateRealMargin(cost, suggestedPrice, hasIva).toFixed(2)}
                       </td>
                       <td className="p-2 text-right font-mono text-xs font-medium">
                         ${suggestedPrice.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -498,10 +498,10 @@ export default function ProductFormDialog({
                         })}
                       </td>
                       <td className="p-2 text-right font-mono text-xs">
-                        {marginCurrent.toFixed(3)}
+                        {marginCurrent.toFixed(2)}
                       </td>
                       <td className="p-2 text-right font-mono text-xs text-blue-600 font-medium">
-                        {calculateRealMargin(cost, currentPrice, hasIva).toFixed(4)}
+                        {calculateRealMargin(cost, currentPrice, hasIva).toFixed(2)}
                       </td>
                       <td className="p-2 text-right font-mono text-xs font-bold text-blue-700">
                         ${currentPrice.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -521,10 +521,10 @@ export default function ProductFormDialog({
                         })}
                       </td>
                       <td className="p-2 text-right font-mono text-xs">
-                        {marginDiscount.toFixed(3)}
+                        {marginDiscount.toFixed(2)}
                       </td>
                       <td className="p-2 text-right font-mono text-xs text-gray-600">
-                        {calculateRealMargin(cost, discountPrice, hasIva).toFixed(4)}
+                        {calculateRealMargin(cost, discountPrice, hasIva).toFixed(2)}
                       </td>
                       <td className="p-2 text-right font-mono text-xs font-medium">
                         ${discountPrice.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -544,10 +544,10 @@ export default function ProductFormDialog({
                         })}
                       </td>
                       <td className="p-2 text-right font-mono text-xs">
-                        {marginWholesale.toFixed(3)}
+                        {marginWholesale.toFixed(2)}
                       </td>
                       <td className="p-2 text-right font-mono text-xs text-gray-600">
-                        {calculateRealMargin(cost, wholesalePrice, hasIva).toFixed(4)}
+                        {calculateRealMargin(cost, wholesalePrice, hasIva).toFixed(2)}
                       </td>
                       <td className="p-2 text-right font-mono text-xs font-medium">
                         ${wholesalePrice.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
