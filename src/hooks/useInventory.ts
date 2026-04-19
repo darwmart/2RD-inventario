@@ -78,6 +78,16 @@ export function useInventory() {
     return newCategory;
   }, [setCategories]);
 
+  const updateCategory = useCallback((id: string, name: string, description: string) => {
+    setCategories(prev => prev.map(c =>
+      c.id === id ? { ...c, name, description } : c
+    ));
+  }, [setCategories]);
+
+  const deleteCategory = useCallback((id: string) => {
+    setCategories(prev => prev.filter(c => c.id !== id));
+  }, [setCategories]);
+
   const addSupplier = useCallback((supplierData: Omit<Supplier, 'id' | 'createdAt'>) => {
     // Generar código consecutivo numérico
     const maxCode = suppliers.reduce((max, s) => {
@@ -122,6 +132,8 @@ export function useInventory() {
     getProductsByCategory,
     getProductsBySupplier,
     addCategory,
+    updateCategory,
+    deleteCategory,
     addSupplier,
     updateSupplier,
     deleteSupplier

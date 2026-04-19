@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Search, Package, Edit, Trash2, FolderPlus, Settings2 } from 'lucide-react';
+import { Plus, Search, Package, Edit, Trash2, FolderPlus, Settings2, Edit2 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Product } from '@/types';
 import ProductFormDialog from '@/components/ProductFormDialog';
@@ -26,6 +26,8 @@ export default function Inventory() {
     updateProduct,
     deleteProduct,
     addCategory,
+    updateCategory,
+    deleteCategory,
     addSupplier,
     getLowStockProducts
   } = useInventory();
@@ -40,6 +42,7 @@ export default function Inventory() {
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [categoryName, setCategoryName] = useState('');
   const [categoryDescription, setCategoryDescription] = useState('');
+  const [editingCategory, setEditingCategory] = useState<{ id: string; name: string; description: string } | null>(null);
 
   // Estados para configuración de columnas
   const [isColumnConfigOpen, setIsColumnConfigOpen] = useState(false);
@@ -160,17 +163,53 @@ export default function Inventory() {
     addSupplier(supplierData);
   };
 
+  const openNewCategory = () => {
+    setEditingCategory(null);
+    setCategoryName('');
+    setCategoryDescription('');
+    setIsCategoryModalOpen(true);
+  };
+
+  const openEditCategory = (cat: { id: string; name: string; description: string }) => {
+    setEditingCategory(cat);
+    setCategoryName(cat.name);
+    setCategoryDescription(cat.description || '');
+    setIsCategoryModalOpen(true);
+  };
+
   const handleSaveCategory = () => {
     if (!categoryName.trim()) {
       toast.error('El nombre de la categoría es obligatorio');
       return;
     }
 
-    addCategory(categoryName.trim(), categoryDescription.trim());
-    toast.success('Categoría creada correctamente');
+    // Nombre duplicado
+    const dup = categories.find(c =>
+      c.name.trim().toLowerCase() === categoryName.trim().toLowerCase() &&
+      c.id !== editingCategory?.id
+    );
+    if (dup) { toast.error('Ya existe una categoría con ese nombre'); return; }
+
+    if (editingCategory) {
+      updateCategory(editingCategory.id, categoryName.trim(), categoryDescription.trim());
+      toast.success('Categoría actualizada');
+    } else {
+      addCategory(categoryName.trim(), categoryDescription.trim());
+      toast.success('Categoría creada correctamente');
+    }
     setCategoryName('');
     setCategoryDescription('');
+    setEditingCategory(null);
     setIsCategoryModalOpen(false);
+  };
+
+  const handleDeleteCategory = (cat: { id: string; name: string }) => {
+    const inUse = products.some(p => p.categoryId === cat.id);
+    if (inUse) { toast.error(`No puedes eliminar "${cat.name}" porque tiene artículos asignados`); return; }
+    if (!confirm(`¿Eliminar la categoría "${cat.name}"?`)) return;
+    deleteCategory(cat.id);
+    if (selectedCategory === cat.id) setSelectedCategory('all');
+    toast.success('Categoría eliminada');
   };
 
   return (
@@ -190,7 +229,7 @@ export default function Inventory() {
                 <Settings2 className="h-4 w-4 mr-2" />
                 Columnas
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setIsCategoryModalOpen(true)}>
+              <Button variant="outline" size="sm" onClick={openNewCategory}>
                 <FolderPlus className="h-4 w-4 mr-2" />
                 Nueva Categoría
               </Button>
@@ -220,14 +259,30 @@ export default function Inventory() {
               {categories.map(category => (
                 <div
                   key={category.id}
-                  className={`px-3 py-2 text-sm rounded cursor-pointer ${
+                  className={`group flex items-center justify-between px-3 py-2 text-sm rounded cursor-pointer ${
                     selectedCategory === category.id
                       ? 'bg-blue-100 text-blue-700 font-medium'
                       : 'hover:bg-gray-100'
                   }`}
                   onClick={() => setSelectedCategory(category.id)}
                 >
-                  📦 {category.name}
+                  <span>📦 {category.name}</span>
+                  <div className="hidden group-hover:flex gap-1">
+                    <button
+                      className="p-0.5 rounded hover:bg-blue-200 text-blue-600"
+                      onClick={(e) => { e.stopPropagation(); openEditCategory(category); }}
+                      title="Editar"
+                    >
+                      <Edit2 className="h-3 w-3" />
+                    </button>
+                    <button
+                      className="p-0.5 rounded hover:bg-red-200 text-red-600"
+                      onClick={(e) => { e.stopPropagation(); handleDeleteCategory(category); }}
+                      title="Eliminar"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -496,7 +551,7 @@ export default function Inventory() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FolderPlus className="h-5 w-5" />
-              Nueva Categoría
+              {editingCategory ? 'Editar Categoría' : 'Nueva Categoría'}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -538,8 +593,11 @@ export default function Inventory() {
               Cancelar
             </Button>
             <Button onClick={handleSaveCategory}>
-              <Plus className="h-4 w-4 mr-2" />
-              Crear Categoría
+              {editingCategory ? (
+                <><Edit2 className="h-4 w-4 mr-2" />Guardar cambios</>
+              ) : (
+                <><Plus className="h-4 w-4 mr-2" />Crear Categoría</>
+              )}
             </Button>
           </div>
         </DialogContent>
