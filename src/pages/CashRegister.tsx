@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useSales } from '@/hooks/useSales';
 import { useExpenses } from '@/hooks/useExpenses';
 import { useSettings } from '@/hooks/useSettings';
+import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,11 +12,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Calculator, CreditCard, Banknote, Smartphone, DoorOpen, DoorClosed, ArrowRightLeft } from 'lucide-react';
+import { Calendar, Calculator, CreditCard, Banknote, Smartphone, DoorOpen, DoorClosed, ArrowRightLeft, Pencil } from 'lucide-react';
 import { PaymentMethod, Sale, CashRegisterSession, AccountingRecord } from '@/types';
 import { toast } from 'sonner';
 
 export default function CashRegister() {
+  const { isAdmin } = useAuth();
   const { sales, paymentMethods, getSalesByDate, advisors } = useSales();
   const { addExpense, getExpensesByDate } = useExpenses();
   const { banks, updateBankBalance } = useSettings();
@@ -46,8 +48,12 @@ export default function CashRegister() {
   const [transferAmount, setTransferAmount] = useState<string>('');
   const [transferDescription, setTransferDescription] = useState<string>('');
 
-  // Base del día por fecha (persistencia en localStorage)
-  const [dailyBaseMap, setDailyBaseMap] = useLocalStorage<Record<string, { amount: number; updatedAt: string }>>('dailyBaseMap', {});
+  // Estados para modificar sesión cerrada
+  const [isEditSessionDialog, setIsEditSessionDialog] = useState(false);
+  const [editOpeningAmount, setEditOpeningAmount] = useState<string>('');
+  const [editClosingAmount, setEditClosingAmount] = useState<string>('');
+  const [editClosingNotes, setEditClosingNotes] = useState<string>('');
+
 
   // Obtener la sesión de caja del día seleccionado
   const currentSession = cashSessions.find(s => s.date === selectedDate);
@@ -61,6 +67,7 @@ export default function CashRegister() {
 
   const handleAddExpense = () => {
     const amount = Number(expenseAmount);
+    if (!currentSession || currentSession.status === 'closed') { toast.error('La caja está cerrada. No se pueden registrar egresos.'); return; }
     if (!advisorInput) { toast.error('Selecciona un asesor'); return; }
     if (isNaN(amount) || amount <= 0) { toast.error('El monto debe ser mayor a $0'); return; }
     if (!expenseDesc.trim()) { toast.error('La descripción del gasto es obligatoria'); return; }
@@ -87,12 +94,6 @@ export default function CashRegister() {
     };
 
     setCashSessions([...cashSessions, newSession]);
-
-    // Sincronizar base del día con el monto de apertura
-    setDailyBaseMap(prev => ({
-      ...prev,
-      [selectedDate]: { amount, updatedAt: new Date().toISOString() }
-    }));
 
     // Registrar en contabilidad como ingreso
     const newRecord: AccountingRecord = {
@@ -182,20 +183,63 @@ export default function CashRegister() {
     setIsTransferDialog(false);
   };
 
+  // Abrir dialog de edición de sesión cerrada
+  const handleOpenEditSession = () => {
+    if (!currentSession) return;
+    setEditOpeningAmount(String(currentSession.openingAmount));
+    setEditClosingAmount(String(currentSession.closingAmount ?? ''));
+    setEditClosingNotes(currentSession.notes ?? '');
+    setIsEditSessionDialog(true);
+  };
+
+  // Guardar cambios en sesión cerrada
+  const handleSaveEditSession = () => {
+    if (!currentSession) return;
+    const opening = Number(editOpeningAmount);
+    const closing = Number(editClosingAmount);
+    if (isNaN(opening) || opening < 0) { toast.error('Monto de apertura inválido'); return; }
+    if (isNaN(closing) || closing < 0) { toast.error('Monto de cierre inválido'); return; }
+    const expected = calculateExpectedCash();
+    const difference = closing - expected;
+    setCashSessions(cashSessions.map(s => s.id === currentSession.id
+      ? { ...s, openingAmount: opening, closingAmount: closing, difference, notes: editClosingNotes }
+      : s
+    ));
+    toast.success('Sesión de caja actualizada');
+    setIsEditSessionDialog(false);
+  };
+
+  // Reabrir sesión cerrada
+  const handleReopenSession = () => {
+    if (!currentSession) return;
+    if (!confirm('¿Estás seguro de reabrir esta caja? Se podrán registrar nuevos egresos.')) return;
+    setCashSessions(cashSessions.map(s => s.id === currentSession.id
+      ? { ...s, status: 'open', closingAmount: undefined, closingTime: undefined, difference: undefined, notes: undefined }
+      : s
+    ));
+    setIsEditSessionDialog(false);
+    toast.success('Caja reabierta correctamente');
+  };
+
   // Calcular efectivo esperado en caja
   const calculateExpectedCash = () => {
     // Efectivo inicial (apertura)
     const initial = currentSession?.openingAmount || 0;
 
-    // Ventas en efectivo del día
+    // Ventas en efectivo del día (por tipo, no por ID hardcodeado)
     const cashSales = dailySales
-      .filter(sale => sale.paymentMethod.id === '1') // ID 1 = Efectivo
+      .filter(sale => sale.paymentMethod.type === 'cash')
       .reduce((sum, sale) => sum + sale.total, 0);
+
+    // Abonos en efectivo del día
+    const cashDeposits = depositRecordsOfDay
+      .filter(rec => rec.method.type === 'cash')
+      .reduce((sum, rec) => sum + rec.amount, 0);
 
     // Gastos del día
     const expenses = totalExpenses;
 
-    return initial + cashSales - expenses;
+    return initial + cashSales + cashDeposits - expenses;
   };
 
   // --- Ventas del día (todas las completadas del mismo día) ---
@@ -204,22 +248,6 @@ export default function CashRegister() {
   }, [selectedDate, getSalesByDate]);
 
 
-  const baseAmount = dailyBaseMap[selectedDate]?.amount ?? 0;
-
-  // Control del input editable
-  const [baseInput, setBaseInput] = useState<string>('');
-  useEffect(() => {
-    setBaseInput(baseAmount ? String(baseAmount) : '');
-  }, [selectedDate, baseAmount]);
-
-  const handleSaveBase = () => {
-    const value = Number(baseInput);
-    if (isNaN(value) || value < 0) return;
-    setDailyBaseMap(prev => ({
-      ...prev,
-      [selectedDate]: { amount: Math.round(value), updatedAt: new Date().toISOString() }
-    }));
-  };
   /*const handleAddExpense = () => {
     const amount = Number(expenseAmount);
     if (!advisorInput || isNaN(amount) || amount <= 0) return;
@@ -377,10 +405,11 @@ const depositRecordsOfDay = useMemo(() => {
     };
   }, [summary, depositSummary]);
 
-  // Cierre estimado en efectivo: base del día + efectivo ingresado en el día
- const estimatedCloseCash = useMemo(() => {
-  return baseAmount + totalsWithDeposits.cash - totalExpenses;
-  }, [baseAmount, totalsWithDeposits, totalExpenses]);
+  // Cierre estimado en efectivo: apertura + efectivo del día - gastos
+  const estimatedCloseCash = useMemo(() => {
+    const opening = currentSession?.openingAmount ?? 0;
+    return opening + totalsWithDeposits.cash - totalExpenses;
+  }, [currentSession, totalsWithDeposits, totalExpenses]);
 
  
   const getPaymentIcon = (type: 'cash' | 'electronic' | 'credit') => {
@@ -496,6 +525,15 @@ const depositRecordsOfDay = useMemo(() => {
                 )}
               </div>
 
+              {currentSession.status === 'closed' && isAdmin() && (
+                <div className="flex gap-2 mt-2">
+                  <Button variant="outline" size="sm" onClick={handleOpenEditSession}>
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Modificar Cierre
+                  </Button>
+                </div>
+              )}
+
               {currentSession.status === 'open' && (
                 <div className="flex gap-2">
                   <Dialog open={isClosingDialog} onOpenChange={setIsClosingDialog}>
@@ -587,57 +625,53 @@ const depositRecordsOfDay = useMemo(() => {
         </CardContent>
       </Card>
 
-      {/* Base del Día */}
-      <Card className="mb-8">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Base del Día</CardTitle>
-          <div className="text-xs text-muted-foreground">
-            {dailyBaseMap[selectedDate]?.updatedAt
-              ? new Date(dailyBaseMap[selectedDate].updatedAt).toLocaleDateString('es-CO')
-              : null}
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-            <div className="p-3 bg-gray-50 rounded-lg">
-              <p className="text-xs text-gray-600">Base registrada</p>
-              <p className="text-xl font-bold">${baseAmount.toLocaleString('es-CO')}</p>
-            </div>
-            <div className="p-3 bg-gray-50 rounded-lg">
-              <p className="text-xs text-gray-600">Efectivo del día</p>
-              <p className="text-xl font-bold text-green-600">${totalsWithDeposits.cash.toLocaleString('es-CO')}</p>
-            </div>
-            <div className="p-3 bg-gray-50 rounded-lg">
-              <p className="text-xs text-gray-600">Cierre estimado</p>
-              <p className="text-xl font-bold text-indigo-600">${estimatedCloseCash.toLocaleString('es-CO')}</p>
-            </div>
-            <div className="p-3 bg-gray-50 rounded-lg">
-              <p className="text-xs text-gray-600">Transacciones</p>
-              <p className="text-xl font-bold">
-                {summary.totalTransactions + depositSummary.totalTransactions}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex gap-3 items-end">
-            <div className="flex-1">
-              <Label>Ingresar/actualizar base</Label>
+      {/* Dialog modificar sesión cerrada */}
+      <Dialog open={isEditSessionDialog} onOpenChange={setIsEditSessionDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Modificar Caja — {selectedDate}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>Monto de apertura</Label>
               <Input
                 type="number"
-                min={0}
-                value={baseInput}
-                onChange={(e) => setBaseInput(e.target.value)}
+                value={editOpeningAmount}
+                onChange={(e) => setEditOpeningAmount(e.target.value)}
                 placeholder="0"
               />
             </div>
-            <Button onClick={handleSaveBase} className="mt-2">
-              Guardar base
-            </Button>
+            <div>
+              <Label>Monto de cierre (efectivo contado)</Label>
+              <Input
+                type="number"
+                value={editClosingAmount}
+                onChange={(e) => setEditClosingAmount(e.target.value)}
+                placeholder="0"
+              />
+            </div>
+            <div>
+              <Label>Notas</Label>
+              <Input
+                value={editClosingNotes}
+                onChange={(e) => setEditClosingNotes(e.target.value)}
+                placeholder="Observaciones del cierre"
+              />
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button onClick={handleSaveEditSession} className="flex-1">
+                Guardar cambios
+              </Button>
+              <Button variant="outline" onClick={handleReopenSession} className="flex-1 text-orange-600 border-orange-300 hover:bg-orange-50">
+                <DoorOpen className="h-4 w-4 mr-2" />
+                Reabrir caja
+              </Button>
+            </div>
           </div>
-        </CardContent>
-      </Card>
- 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        </DialogContent>
+      </Dialog>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
@@ -705,6 +739,23 @@ const depositRecordsOfDay = useMemo(() => {
             </p>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Cierre Estimado
+            </CardTitle>
+            <Calculator className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-indigo-600">
+              ${estimatedCloseCash.toLocaleString('es-CO')}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Apertura + efectivo − gastos
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -715,34 +766,51 @@ const depositRecordsOfDay = useMemo(() => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {Object.entries(summary.paymentBreakdown).map(([method, data]) => {
-                const paymentMethodInfo = paymentMethods.find(pm => pm.name === method);
-                const depositData = depositSummary.depositBreakdown[method] || { count: 0, amount: 0 };
-                return (
-                  <div key={method} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      {paymentMethodInfo && getPaymentIcon(paymentMethodInfo.type)}
-                      <div>
-                        <p className="font-medium">{method}</p>
-                        <p className="text-xs text-gray-600">
-                          {data.count} ventas
-                          {depositData.count > 0 && ` • ${depositData.count} abonos`}
-                        </p>
+              {(() => {
+                // Unir métodos de ventas y métodos de abonos en una sola lista
+                const allMethods = new Set([
+                  ...Object.keys(summary.paymentBreakdown),
+                  ...Object.keys(depositSummary.depositBreakdown)
+                ]);
+                return Array.from(allMethods).map(method => {
+                  const paymentMethodInfo = paymentMethods.find(pm => pm.name === method);
+                  const salesData = summary.paymentBreakdown[method] || { count: 0, amount: 0 };
+                  const depositData = depositSummary.depositBreakdown[method] || { count: 0, amount: 0 };
+                  return (
+                    <div key={method} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        {paymentMethodInfo && getPaymentIcon(paymentMethodInfo.type)}
+                        <div>
+                          <p className="font-medium">{method}</p>
+                          <p className="text-xs text-gray-600">
+                            {salesData.count > 0 && `${salesData.count} ventas`}
+                            {salesData.count > 0 && depositData.count > 0 && ' • '}
+                            {depositData.count > 0 && `${depositData.count} abonos`}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        {salesData.amount > 0 && (
+                          <>
+                            <p className="font-bold">Ventas: ${salesData.amount.toLocaleString('es-CO')}</p>
+                            <p className="text-xs text-gray-600 mb-1">
+                              {((salesData.amount / summary.totalSales) * 100 || 0).toFixed(1)}% del total ventas
+                            </p>
+                          </>
+                        )}
+                        {depositData.amount > 0 && (
+                          <>
+                            <p className="font-bold text-purple-700">Abonos: ${depositData.amount.toLocaleString('es-CO')}</p>
+                            <p className="text-xs text-gray-600">
+                              {((depositData.amount / (depositSummary.totalDeposits || 1)) * 100 || 0).toFixed(1)}% del total abonos
+                            </p>
+                          </>
+                        )}
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-bold">Ventas: ${data.amount.toLocaleString('es-CO')}</p>
-                      <p className="text-xs text-gray-600 mb-1">
-                        {((data.amount / summary.totalSales) * 100 || 0).toFixed(1)}% del total ventas
-                      </p>
-                      <p className="font-bold text-purple-700">Abonos: ${depositData.amount.toLocaleString('es-CO')}</p>
-                      <p className="text-xs text-gray-600">
-                        {((depositData.amount / (depositSummary.totalDeposits || 1)) * 100 || 0).toFixed(1)}% del total abonos
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                });
+              })()}
             </div>
           </CardContent>
         </Card>
@@ -751,10 +819,22 @@ const depositRecordsOfDay = useMemo(() => {
         {/* Lista de ventas del día */}
         <Card className="mb-8">
         <CardHeader>
-          <CardTitle>Egresos (Gastos y Préstamos)</CardTitle>
+          <CardTitle className="flex items-center justify-between">
+            Egresos (Gastos y Préstamos)
+            {currentSession?.status === 'closed' && (
+              <Badge variant="secondary">Caja cerrada — solo lectura</Badge>
+            )}
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          {/* Formulario para registrar egreso */}
+          {/* Formulario para registrar egreso — bloqueado si caja cerrada o no abierta */}
+          {(!currentSession || currentSession.status === 'closed') ? (
+            <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500 mb-4 text-center">
+              {!currentSession
+                ? 'Abre la caja para registrar egresos.'
+                : 'La caja está cerrada. No se pueden registrar nuevos egresos.'}
+            </div>
+          ) : (
 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
   <div>
     <Label>Asesor</Label>
@@ -801,7 +881,10 @@ const depositRecordsOfDay = useMemo(() => {
     />
   </div>
 </div>
-<Button onClick={handleAddExpense}>Registrar Egreso</Button>
+          )}
+          {currentSession?.status === 'open' && (
+            <Button onClick={handleAddExpense}>Registrar Egreso</Button>
+          )}
 
 {/* Filtro por asesor */}
 <div className="mt-6">
