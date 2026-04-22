@@ -162,28 +162,18 @@ export default function Accounting() {
         });
       });
 
-    // 5. Traspasos y aperturas (desde accountingRecords)
+    // 5. Traspasos desde Arqueo de Caja → ingresan a Caja Fuerte
+    // Las aperturas de caja son internas del Arqueo y no afectan la contabilidad
     accountingRecords.forEach(r => {
       if (r.tipo === 'traspaso') {
         list.push({
           id: `transfer-${r.id}`,
           date: new Date(r.fecha),
           type: 'traspaso',
-          description: r.descripcion || 'Traspaso a Caja Principal',
+          description: r.descripcion || 'Traspaso a Caja Fuerte',
           amount: r.monto,
-          bank: 'efectivo',
-          bankLabel: 'Efectivo',
-          direction: 'out',
-        });
-      } else if (r.tipo === 'ingreso' && r.descripcion?.startsWith('Apertura')) {
-        list.push({
-          id: `opening-${r.id}`,
-          date: new Date(r.fecha),
-          type: 'apertura',
-          description: r.descripcion,
-          amount: r.monto,
-          bank: 'efectivo',
-          bankLabel: 'Efectivo',
+          bank: 'caja-principal',
+          bankLabel: getBankLabel('caja-principal'),
           direction: 'in',
         });
       }
@@ -222,6 +212,7 @@ export default function Accounting() {
     const gastos   = filtered.filter(m => m.type === 'gasto').reduce((s, m) => s + m.amount, 0);
     const compras  = filtered.filter(m => m.type === 'compra').reduce((s, m) => s + m.amount, 0);
     const traspasos = filtered.filter(m => m.type === 'traspaso').reduce((s, m) => s + m.amount, 0);
+    // La utilidad no incluye traspasos (son movimientos internos efectivo → Caja Fuerte)
     return { ventas, abonos, gastos, compras, traspasos, utilidad: ventas + abonos - gastos - compras };
   }, [filtered]);
 
@@ -234,8 +225,7 @@ export default function Accounting() {
     abono:    { label: 'Abono',    color: 'bg-blue-100 text-blue-700',    icon: <ArrowDownCircle className="h-3 w-3" /> },
     gasto:    { label: 'Gasto',    color: 'bg-red-100 text-red-700',      icon: <ArrowUpCircle className="h-3 w-3" /> },
     compra:   { label: 'Compra',   color: 'bg-orange-100 text-orange-700',icon: <ShoppingBag className="h-3 w-3" /> },
-    traspaso: { label: 'Traspaso', color: 'bg-purple-100 text-purple-700',icon: <ArrowRightLeft className="h-3 w-3" /> },
-    apertura: { label: 'Apertura', color: 'bg-gray-100 text-gray-700',    icon: <Banknote className="h-3 w-3" /> },
+    traspaso: { label: 'A Caja Fuerte', color: 'bg-purple-100 text-purple-700', icon: <ArrowRightLeft className="h-3 w-3" /> },
   };
 
   return (
@@ -250,9 +240,9 @@ export default function Accounting() {
 
         {/* Saldo por banco */}
         <div>
-          <h2 className="text-sm font-semibold text-gray-500 uppercase mb-3">Saldo acumulado por banco</h2>
+          <h2 className="text-sm font-semibold text-gray-500 uppercase mb-3">Saldo consolidado (Caja Fuerte y Bancos)</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {banks.filter(b => b.isActive).map(b => (
+            {banks.filter(b => b.isActive && b.id !== 'efectivo').map(b => (
               <Card key={b.id} className={bankBalances[b.id] < 0 ? 'border-red-200' : ''}>
                 <CardContent className="pt-4">
                   <p className="text-xs text-gray-500 mb-1">{b.name}</p>
@@ -290,7 +280,6 @@ export default function Accounting() {
                     <SelectItem value="gasto">Gastos</SelectItem>
                     <SelectItem value="compra">Compras</SelectItem>
                     <SelectItem value="traspaso">Traspasos</SelectItem>
-                    <SelectItem value="apertura">Aperturas</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -348,7 +337,7 @@ export default function Accounting() {
           </Card>
           <Card>
             <CardContent className="pt-4">
-              <p className="text-xs text-gray-500">Traspasos</p>
+              <p className="text-xs text-gray-500">Traspasos a Caja Fuerte</p>
               <p className="text-lg font-bold text-purple-600">{fmt(summary.traspasos)}</p>
             </CardContent>
           </Card>

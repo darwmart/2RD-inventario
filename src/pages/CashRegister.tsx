@@ -167,7 +167,7 @@ export default function CashRegister() {
     const newRecord: AccountingRecord = {
       id: Date.now(),
       tipo: 'traspaso',
-      descripcion: transferDescription || `Traspaso de efectivo a Caja Principal`,
+      descripcion: transferDescription || `Traspaso de efectivo a Caja Fuerte`,
       monto: amount,
       banco: 'efectivo', // Sale del efectivo
       fecha: new Date().toISOString(),
@@ -177,7 +177,7 @@ export default function CashRegister() {
     // Actualizar balance de caja principal
     updateBankBalance('caja-principal', amount);
 
-    toast.success(`Traspaso de $${amount.toLocaleString('es-CO')} a Caja Principal realizado exitosamente`);
+    toast.success(`Traspaso de $${amount.toLocaleString('es-CO')} a Caja Fuerte realizado exitosamente`);
     setTransferAmount('');
     setTransferDescription('');
     setIsTransferDialog(false);

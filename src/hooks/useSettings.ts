@@ -26,7 +26,7 @@ const defaultTaxSettings: TaxSettings = {
 
 const defaultBanks: Bank[] = [
   { id: 'efectivo', name: 'Efectivo', isActive: true, balance: 0 },
-  { id: 'caja-principal', name: 'Caja Principal', isActive: true, balance: 0 },
+  { id: 'caja-principal', name: 'Caja Fuerte', isActive: true, balance: 0 },
   { id: 'colpatria', name: 'Colpatria', isActive: true, balance: 0 },
   { id: 'bbva', name: 'BBVA', isActive: true, balance: 0 },
   { id: 'nequi', name: 'Nequi', isActive: true, balance: 0 },
