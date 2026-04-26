@@ -23,10 +23,14 @@ type Movement = {
   date: Date;
   type: 'venta' | 'abono' | 'gasto' | 'compra' | 'traspaso' | 'apertura';
   description: string;
-  amount: number;
+  amount: number;        // Neto real (ya descontada comisión)
+  grossAmount?: number;  // Bruto antes de comisión (solo crédito)
+  commissionAmt?: number;// Valor de la comisión descontada
   bank: string;
   bankLabel: string;
   direction: 'in' | 'out';
+  settled: boolean;      // true = dinero ya disponible en banco
+  expectedDate?: Date;   // Fecha estimada de acreditación (crédito con paymentDays)
 };
 
 export default function Accounting() {
@@ -48,19 +52,25 @@ export default function Accounting() {
     return banks.find(b => b.id === bankId)?.name ?? bankId;
   };
 
-  const mapPaymentToBank = (paymentName: string, paymentType: string): string => {
+  const mapPaymentToBank = (paymentName: string, paymentType: string, bankId?: string): string => {
     if (paymentType === 'cash') return 'efectivo';
+    // Banco configurado explícitamente en el método de pago (más confiable)
+    if (bankId && banks.find(b => b.id === bankId && b.isActive)) return bankId;
+    // Fallback: buscar por nombre
     const name = paymentName.toLowerCase();
     const matched = banks.find(b => b.isActive && b.id !== 'efectivo' && name.includes(b.name.toLowerCase()));
     if (matched) return matched.id;
-    const firstNonCash = banks.find(b => b.isActive && b.id !== 'efectivo');
-    return firstNonCash?.id ?? 'efectivo';
+    const firstNonCash = banks.find(b => b.isActive && b.id !== 'efectivo' && b.id !== 'caja-principal');
+    return firstNonCash?.id ?? 'caja-principal';
   };
 
-  const netAmount = (amount: number, paymentName: string): number => {
+  const netAmount = (amount: number, paymentName: string, platformCommission?: number): number => {
     const name = paymentName.toLowerCase();
     let net = amount;
-    if (cardSettings.commissionsEnabled) {
+    // Comisión de plataforma crédito (Sistecredito, Addi, etc.)
+    if (platformCommission && platformCommission > 0) {
+      net -= amount * platformCommission / 100;
+    } else if (cardSettings.commissionsEnabled) {
       if (name.includes('débito')) net -= amount * cardSettings.debitCommission / 100;
       else if (name.includes('crédito')) net -= amount * cardSettings.creditCommission / 100;
     }
@@ -70,6 +80,37 @@ export default function Accounting() {
     return Math.round(net);
   };
 
+  const addDays = (date: Date, days: number): Date => {
+    const d = new Date(date);
+    d.setDate(d.getDate() + days);
+    return d;
+  };
+
+  // Calcula la fecha esperada de pago según el período de recaudo de la plataforma
+  const getExpectedPaymentDate = (saleDate: Date, pm: { paymentDays?: number; paymentPeriod?: string }): Date | undefined => {
+    const days = pm.paymentDays ?? 0;
+    if (!pm.paymentPeriod || pm.paymentPeriod === 'immediate') {
+      return days > 0 ? addDays(saleDate, days) : undefined;
+    }
+    if (pm.paymentPeriod === 'weekly') {
+      // Fin de la semana (domingo) de la venta + días de pago
+      const d = new Date(saleDate);
+      const daysToSunday = d.getDay() === 0 ? 0 : 7 - d.getDay();
+      const endOfWeek = addDays(d, daysToSunday);
+      return addDays(endOfWeek, days);
+    }
+    if (pm.paymentPeriod === 'monthly') {
+      // Último día del mes de la venta + días de pago
+      const d = new Date(saleDate);
+      const endOfMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+      return addDays(endOfMonth, days);
+    }
+    return undefined;
+  };
+
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+
   // ─── Construir lista unificada de movimientos ──────────────────────────────
   const allMovements = useMemo((): Movement[] => {
     const list: Movement[] = [];
@@ -78,16 +119,27 @@ export default function Accounting() {
     sales
       .filter(s => s.status === 'completed' && s.type === 'sale')
       .forEach(s => {
-        const bank = mapPaymentToBank(s.paymentMethod.name, s.paymentMethod.type);
+        const pm = s.paymentMethod;
+        const bank = mapPaymentToBank(pm.name, pm.type, pm.bankId);
+        const saleDate = new Date(s.createdAt);
+        const commission = pm.type === 'credit' ? pm.commission : undefined;
+        const gross = s.total;
+        const net = netAmount(gross, pm.name, commission);
+        const expectedDate = pm.type === 'credit' ? getExpectedPaymentDate(saleDate, pm) : undefined;
+        const settled = !expectedDate || expectedDate <= today;
         list.push({
           id: `sale-${s.id}`,
-          date: new Date(s.createdAt),
+          date: saleDate,
           type: 'venta',
           description: `Venta #${s.saleNumber ?? ''} — ${s.items.map(i => i.productName).join(', ')}`,
-          amount: netAmount(s.total, s.paymentMethod.name),
+          amount: net,
+          grossAmount: commission ? gross : undefined,
+          commissionAmt: commission ? Math.round(gross * commission / 100) : undefined,
           bank,
           bankLabel: getBankLabel(bank),
           direction: 'in',
+          settled,
+          expectedDate,
         });
       });
 
@@ -99,7 +151,8 @@ export default function Accounting() {
           s.deposits.forEach(d => {
             const pmName = d.method?.name ?? s.paymentMethod.name;
             const pmType = d.method?.type ?? s.paymentMethod.type;
-            const bank = mapPaymentToBank(pmName, pmType);
+            const pmBankId = d.method?.bankId ?? s.paymentMethod.bankId;
+            const bank = mapPaymentToBank(pmName, pmType, pmBankId);
             list.push({
               id: `deposit-${s.id}-${d.createdAt}`,
               date: new Date(d.createdAt),
@@ -109,10 +162,11 @@ export default function Accounting() {
               bank,
               bankLabel: getBankLabel(bank),
               direction: 'in',
+              settled: true,
             });
           });
         } else if (s.deposit && s.deposit > 0) {
-          const bank = mapPaymentToBank(s.paymentMethod.name, s.paymentMethod.type);
+          const bank = mapPaymentToBank(s.paymentMethod.name, s.paymentMethod.type, s.paymentMethod.bankId);
           list.push({
             id: `deposit-${s.id}`,
             date: new Date(s.createdAt),
@@ -122,6 +176,7 @@ export default function Accounting() {
             bank,
             bankLabel: getBankLabel(bank),
             direction: 'in',
+            settled: true,
           });
         }
       });
@@ -137,6 +192,7 @@ export default function Accounting() {
         bank: 'efectivo',
         bankLabel: 'Efectivo',
         direction: 'out',
+        settled: true,
       });
     });
 
@@ -159,6 +215,7 @@ export default function Accounting() {
           bank,
           bankLabel: getBankLabel(bank),
           direction: 'out',
+          settled: true,
         });
       });
 
@@ -175,6 +232,7 @@ export default function Accounting() {
           bank: 'caja-principal',
           bankLabel: getBankLabel('caja-principal'),
           direction: 'in',
+          settled: true,
         });
       }
     });
@@ -194,26 +252,44 @@ export default function Accounting() {
     });
   }, [allMovements, fechaInicio, fechaFin, filterType, filterBank]);
 
-  // ─── Balance por banco (todos los movimientos históricos) ─────────────────
+  // ─── Balance por banco (solo movimientos acreditados / settled) ───────────
   const bankBalances = useMemo(() => {
     const balances: Record<string, number> = {};
     banks.filter(b => b.isActive).forEach(b => { balances[b.id] = 0; });
     allMovements.forEach(m => {
       if (balances[m.bank] === undefined) balances[m.bank] = 0;
-      balances[m.bank] += m.direction === 'in' ? m.amount : -m.amount;
+      if (m.direction === 'out') {
+        balances[m.bank] -= m.amount;
+      } else if (m.settled) {
+        // Solo suma si el dinero ya fue acreditado
+        balances[m.bank] += m.amount;
+      }
     });
     return balances;
   }, [allMovements, banks]);
 
+  // ─── Total pendiente de cobro (crédito no acreditado aún) ─────────────────
+  const pendingByBank = useMemo(() => {
+    const pending: Record<string, number> = {};
+    allMovements
+      .filter(m => m.direction === 'in' && !m.settled)
+      .forEach(m => {
+        pending[m.bank] = (pending[m.bank] ?? 0) + m.amount;
+      });
+    return pending;
+  }, [allMovements]);
+
   // ─── Resumen del período filtrado ─────────────────────────────────────────
   const summary = useMemo(() => {
-    const ventas   = filtered.filter(m => m.type === 'venta').reduce((s, m) => s + m.amount, 0);
-    const abonos   = filtered.filter(m => m.type === 'abono').reduce((s, m) => s + m.amount, 0);
-    const gastos   = filtered.filter(m => m.type === 'gasto').reduce((s, m) => s + m.amount, 0);
-    const compras  = filtered.filter(m => m.type === 'compra').reduce((s, m) => s + m.amount, 0);
-    const traspasos = filtered.filter(m => m.type === 'traspaso').reduce((s, m) => s + m.amount, 0);
-    // La utilidad no incluye traspasos (son movimientos internos efectivo → Caja Fuerte)
-    return { ventas, abonos, gastos, compras, traspasos, utilidad: ventas + abonos - gastos - compras };
+    const ventasSettled   = filtered.filter(m => m.type === 'venta' && m.settled).reduce((s, m) => s + m.amount, 0);
+    const ventasPending   = filtered.filter(m => m.type === 'venta' && !m.settled).reduce((s, m) => s + m.amount, 0);
+    const abonos          = filtered.filter(m => m.type === 'abono').reduce((s, m) => s + m.amount, 0);
+    const gastos          = filtered.filter(m => m.type === 'gasto').reduce((s, m) => s + m.amount, 0);
+    const compras         = filtered.filter(m => m.type === 'compra').reduce((s, m) => s + m.amount, 0);
+    const traspasos       = filtered.filter(m => m.type === 'traspaso').reduce((s, m) => s + m.amount, 0);
+    const comisiones      = filtered.filter(m => m.type === 'venta' && m.commissionAmt).reduce((s, m) => s + (m.commissionAmt ?? 0), 0);
+    const ventas = ventasSettled + ventasPending;
+    return { ventas, ventasSettled, ventasPending, abonos, gastos, compras, traspasos, comisiones, utilidad: ventas + abonos - gastos - compras };
   }, [filtered]);
 
   // ─── Helpers de UI ─────────────────────────────────────────────────────────
@@ -242,16 +318,23 @@ export default function Accounting() {
         <div>
           <h2 className="text-sm font-semibold text-gray-500 uppercase mb-3">Saldo consolidado (Caja Fuerte y Bancos)</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {banks.filter(b => b.isActive && b.id !== 'efectivo').map(b => (
-              <Card key={b.id} className={bankBalances[b.id] < 0 ? 'border-red-200' : ''}>
-                <CardContent className="pt-4">
-                  <p className="text-xs text-gray-500 mb-1">{b.name}</p>
-                  <p className={`text-xl font-bold ${bankBalances[b.id] < 0 ? 'text-red-600' : 'text-gray-900'}`}>
-                    {fmt(bankBalances[b.id] ?? 0)}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
+            {banks.filter(b => b.isActive && b.id !== 'efectivo').map(b => {
+              const balance = bankBalances[b.id] ?? 0;
+              const pending = pendingByBank[b.id] ?? 0;
+              return (
+                <Card key={b.id} className={balance < 0 ? 'border-red-200' : ''}>
+                  <CardContent className="pt-4">
+                    <p className="text-xs text-gray-500 mb-1">{b.name}</p>
+                    <p className={`text-xl font-bold ${balance < 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                      {fmt(balance)}
+                    </p>
+                    {pending > 0 && (
+                      <p className="text-xs text-amber-600 mt-1">+ {fmt(pending)} por cobrar</p>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </div>
 
@@ -310,41 +393,58 @@ export default function Accounting() {
         </Card>
 
         {/* Resumen del período */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
           <Card>
-            <CardContent className="pt-4">
+            <CardContent className="pt-3 pb-3">
               <p className="text-xs text-gray-500">Ventas</p>
-              <p className="text-lg font-bold text-green-600">{fmt(summary.ventas)}</p>
+              <p className="text-base font-bold text-green-600">{fmt(summary.ventas)}</p>
+              {summary.ventasPending > 0 && (
+                <p className="text-xs text-amber-600">{fmt(summary.ventasPending)} pendiente</p>
+              )}
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="pt-4">
+            <CardContent className="pt-3 pb-3">
+              <p className="text-xs text-gray-500">Por cobrar</p>
+              <p className="text-base font-bold text-amber-600">{fmt(summary.ventasPending)}</p>
+              <p className="text-xs text-gray-400">crédito pendiente</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-3 pb-3">
+              <p className="text-xs text-gray-500">Comisiones</p>
+              <p className="text-base font-bold text-rose-500">{fmt(summary.comisiones)}</p>
+              <p className="text-xs text-gray-400">cobradas plataformas</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-3 pb-3">
               <p className="text-xs text-gray-500">Abonos</p>
-              <p className="text-lg font-bold text-blue-600">{fmt(summary.abonos)}</p>
+              <p className="text-base font-bold text-blue-600">{fmt(summary.abonos)}</p>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="pt-4">
+            <CardContent className="pt-3 pb-3">
               <p className="text-xs text-gray-500">Gastos</p>
-              <p className="text-lg font-bold text-red-600">{fmt(summary.gastos)}</p>
+              <p className="text-base font-bold text-red-600">{fmt(summary.gastos)}</p>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="pt-4">
+            <CardContent className="pt-3 pb-3">
               <p className="text-xs text-gray-500">Compras</p>
-              <p className="text-lg font-bold text-orange-600">{fmt(summary.compras)}</p>
+              <p className="text-base font-bold text-orange-600">{fmt(summary.compras)}</p>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="pt-4">
-              <p className="text-xs text-gray-500">Traspasos a Caja Fuerte</p>
-              <p className="text-lg font-bold text-purple-600">{fmt(summary.traspasos)}</p>
+            <CardContent className="pt-3 pb-3">
+              <p className="text-xs text-gray-500">Traspasos</p>
+              <p className="text-base font-bold text-purple-600">{fmt(summary.traspasos)}</p>
             </CardContent>
           </Card>
           <Card className={summary.utilidad < 0 ? 'border-red-300' : 'border-green-300'}>
-            <CardContent className="pt-4">
+            <CardContent className="pt-3 pb-3">
               <p className="text-xs text-gray-500">Utilidad neta</p>
-              <p className={`text-lg font-bold ${summary.utilidad < 0 ? 'text-red-600' : 'text-green-700'}`}>
+              <p className={`text-base font-bold ${summary.utilidad < 0 ? 'text-red-600' : 'text-green-700'}`}>
                 {fmt(summary.utilidad)}
               </p>
             </CardContent>
@@ -370,6 +470,7 @@ export default function Accounting() {
                     <TableHead>Tipo</TableHead>
                     <TableHead>Descripción</TableHead>
                     <TableHead>Banco</TableHead>
+                    <TableHead>Estado</TableHead>
                     <TableHead className="text-right">Entrada</TableHead>
                     <TableHead className="text-right">Salida</TableHead>
                   </TableRow>
@@ -378,7 +479,7 @@ export default function Accounting() {
                   {filtered.map(m => {
                     const cfg = typeConfig[m.type];
                     return (
-                      <TableRow key={m.id}>
+                      <TableRow key={m.id} className={!m.settled && m.direction === 'in' ? 'bg-amber-50' : ''}>
                         <TableCell className="text-xs text-gray-500 whitespace-nowrap">
                           {fmtDate(m.date)}
                         </TableCell>
@@ -387,11 +488,25 @@ export default function Accounting() {
                             {cfg.icon}{cfg.label}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-sm max-w-xs truncate">{m.description}</TableCell>
+                        <TableCell className="text-sm max-w-xs">
+                          <span className="truncate block">{m.description}</span>
+                          {m.commissionAmt && (
+                            <span className="text-xs text-rose-500">Comisión: -{fmt(m.commissionAmt)}</span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-xs">{m.bankLabel}</TableCell>
+                        <TableCell className="text-xs">
+                          {!m.settled && m.direction === 'in' ? (
+                            <span className="text-amber-600 font-medium">
+                              Por cobrar{m.expectedDate ? ` ${m.expectedDate.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' })}` : ''}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">Acreditado</span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-right font-mono text-sm">
                           {m.direction === 'in' ? (
-                            <span className="text-green-600">{fmt(m.amount)}</span>
+                            <span className={m.settled ? 'text-green-600' : 'text-amber-500'}>{fmt(m.amount)}</span>
                           ) : '—'}
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">

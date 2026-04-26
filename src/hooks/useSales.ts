@@ -112,12 +112,16 @@ export function useSales() {
     return sales.filter(sale => sale.advisorId === advisorId);
   }, [sales]);
 
-  const addPaymentMethod = useCallback((name: string, type: 'cash' | 'electronic' | 'credit') => {
+  const addPaymentMethod = useCallback((name: string, type: 'cash' | 'electronic' | 'credit', bankId?: string, commission?: number, paymentPeriod?: 'weekly' | 'monthly', paymentDays?: number) => {
     const newPaymentMethod: PaymentMethod = {
       id: uuidv4(),
       name,
       type,
-      isActive: true
+      isActive: true,
+      ...(bankId ? { bankId } : {}),
+      ...(commission !== undefined ? { commission } : {}),
+      ...(paymentPeriod ? { paymentPeriod } : {}),
+      ...(paymentDays !== undefined ? { paymentDays } : {}),
     };
     setPaymentMethods(prev => [...prev, newPaymentMethod]);
     return newPaymentMethod;

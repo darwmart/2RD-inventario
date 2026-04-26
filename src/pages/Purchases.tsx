@@ -37,6 +37,10 @@ export default function Purchases() {
   const [dueDate, setDueDate] = useState('');
   const [searchPurchase, setSearchPurchase] = useState('');
 
+  // Estado para marcar compra a crédito como pagada
+  const [payingPurchase, setPayingPurchase] = useState<Purchase | null>(null);
+  const [payingBankId, setPayingBankId] = useState('');
+
   // Estado para crear producto rápido
   const [isCreatingProduct, setIsCreatingProduct] = useState(false);
   const [newProductForm, setNewProductForm] = useState({
@@ -112,9 +116,10 @@ export default function Purchases() {
 
       // Filtro de búsqueda por proveedor o factura
       const searchLower = searchPurchase.toLowerCase();
+      const docNumber = (purchase.documentNumber || '').toLowerCase();
       const matchesSearch = searchPurchase === '' ||
         purchase.supplierName.toLowerCase().includes(searchLower) ||
-        purchase.invoiceNumber.toLowerCase().includes(searchLower);
+        docNumber.includes(searchLower);
 
       return matchesDate && matchesSearch;
     });
@@ -300,7 +305,7 @@ export default function Purchases() {
 
   const openEditPurchase = (purchase: Purchase) => {
     setEditingPurchase(purchase);
-    setInvoiceNumber(purchase.invoiceNumber);
+    setInvoiceNumber(purchase.documentNumber || '');
     setSelectedSupplier(purchase.supplierId);
     setCart(purchase.items);
     setNotes(purchase.notes || '');
@@ -479,6 +484,46 @@ export default function Purchases() {
         toast.success('Compra eliminada exitosamente');
       }
     }
+  };
+
+  const handleConfirmPayment = () => {
+    if (!payingPurchase || !payingBankId) {
+      toast.error('Selecciona el banco con el que se realizó el pago');
+      return;
+    }
+    const bank = banks.find(b => b.id === payingBankId);
+
+    // Descontar del banco
+    updateBankBalance(payingBankId, -payingPurchase.total);
+
+    // Registrar en contabilidad
+    const newRecord: AccountingRecord = {
+      id: Date.now(),
+      tipo: 'compra',
+      descripcion: `Pago crédito ${payingPurchase.documentNumber} - ${payingPurchase.supplierName}`,
+      proveedor: payingPurchase.supplierName,
+      factura: payingPurchase.documentNumber,
+      monto: payingPurchase.total,
+      banco: payingBankId,
+      fecha: new Date().toISOString(),
+    };
+    setAccountingRecords(prev => [...prev, newRecord]);
+
+    // Actualizar la compra: quitar dueDate, agregar banco de pago
+    updatePurchase(payingPurchase.id, {
+      invoiceNumber: payingPurchase.documentNumber,
+      supplierId: payingPurchase.supplierId,
+      supplierName: payingPurchase.supplierName,
+      items: payingPurchase.items,
+      paymentMethod: { ...payingPurchase.paymentMethod },
+      paymentDetails: { bankId: payingBankId, bankName: bank?.name || '' },
+      tax: payingPurchase.tax,
+      notes: payingPurchase.notes,
+    });
+
+    toast.success(`Pago de $${payingPurchase.total.toLocaleString('es-CO')} registrado desde ${bank?.name || payingBankId}`);
+    setPayingPurchase(null);
+    setPayingBankId('');
   };
 
   const handleCreateProduct = () => {
@@ -857,14 +902,34 @@ export default function Purchases() {
                 <div key={purchase.id} className="border rounded-lg p-4">
                   <div className="flex justify-between items-start mb-3">
                     <div>
-                      <h4 className="font-bold text-lg">Factura: {purchase.invoiceNumber}</h4>
+                      <h4 className="font-bold text-lg">Factura: {purchase.documentNumber}</h4>
                       <p className="text-sm text-gray-600">Proveedor: {purchase.supplierName}</p>
                       <p className="text-xs text-gray-500">
                         {new Date(purchase.createdAt).toLocaleString('es-CO')}
                       </p>
+                      {purchase.paymentDetails?.dueDate && !purchase.paymentDetails?.bankId && (
+                        <span className="text-xs font-medium text-orange-600 bg-orange-50 px-2 py-0.5 rounded mt-1 inline-block">
+                          Crédito pendiente — Vence: {new Date(purchase.paymentDetails.dueDate).toLocaleDateString('es-CO')}
+                        </span>
+                      )}
+                      {purchase.paymentDetails?.bankId && purchase.paymentDetails?.dueDate === undefined && (
+                        <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded mt-1 inline-block">
+                          Pagada
+                        </span>
+                      )}
                     </div>
                     <div className="text-right">
                       <div className="flex gap-2 mb-2">
+                        {purchase.paymentDetails?.dueDate && !purchase.paymentDetails?.bankId && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-green-600 hover:text-green-700 border-green-300"
+                            onClick={() => { setPayingPurchase(purchase); setPayingBankId(''); }}
+                          >
+                            Marcar pagada
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="outline"

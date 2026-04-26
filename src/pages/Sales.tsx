@@ -696,10 +696,14 @@ export default function Sales() {
                               </TableCell>
                               <TableCell>
                                 <Input
-                                  type="number"
-                                  value={item.unitPrice}
-                                  onChange={(e) => updateCartItemPrice(item.productId, parseFloat(e.target.value) || 0)}
-                                  className="w-20"
+                                  type="text"
+                                  inputMode="numeric"
+                                  value={item.unitPrice.toLocaleString('es-CO')}
+                                  onChange={(e) => {
+                                    const raw = e.target.value.replace(/\./g, '').replace(/[^0-9]/g, '');
+                                    updateCartItemPrice(item.productId, Number(raw) || 0);
+                                  }}
+                                  className="w-24"
                                 />
                               </TableCell>
                               <TableCell>
@@ -753,7 +757,7 @@ export default function Sales() {
                                 {method.name}
                               </SelectItem>
                             ))}
-                          </SelectContent>75095213
+                          </SelectContent>
                       </Select>
                       </div>
                     </div>
@@ -801,9 +805,13 @@ export default function Sales() {
                     <div>
                         <Label>Descuento</Label>
                       <Input
-                        type="number"
-                        value={discount}
-                        onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
+                        type="text"
+                        inputMode="numeric"
+                        value={discount ? discount.toLocaleString('es-CO') : ''}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/\./g, '').replace(/[^0-9]/g, '');
+                          setDiscount(Number(raw) || 0);
+                        }}
                         placeholder="0"
                       />
                     </div>

@@ -23,8 +23,16 @@ export default function Settings() {
   const [isAddingPaymentMethod, setIsAddingPaymentMethod] = useState(false);
   const [newPaymentMethod, setNewPaymentMethod] = useState({
     name: '',
-    type: 'electronic' as 'cash' | 'electronic' | 'credit'
+    type: 'electronic' as 'cash' | 'electronic' | 'credit',
+    bankId: '' as string,
+    commission: '' as string,
+    paymentPeriod: 'immediate' as 'immediate' | 'weekly' | 'monthly',
+    paymentDays: '' as string,
   });
+  const [editingPaymentMethod, setEditingPaymentMethod] = useState<{
+    id: string; name: string; type: 'cash' | 'electronic' | 'credit';
+    bankId: string; commission: string; paymentPeriod: 'immediate' | 'weekly' | 'monthly'; paymentDays: string;
+  } | null>(null);
 
   const [isBankDialogOpen, setIsBankDialogOpen] = useState(false);
   const [editingBank, setEditingBank] = useState<Bank | null>(null);
@@ -83,10 +91,17 @@ export default function Settings() {
       return;
     }
 
-    addPaymentMethod(newPaymentMethod.name.trim(), newPaymentMethod.type);
+    addPaymentMethod(
+      newPaymentMethod.name.trim(),
+      newPaymentMethod.type,
+      newPaymentMethod.bankId || undefined,
+      newPaymentMethod.commission ? Number(newPaymentMethod.commission) : undefined,
+      newPaymentMethod.paymentPeriod !== 'immediate' ? newPaymentMethod.paymentPeriod : undefined,
+      newPaymentMethod.paymentDays ? Number(newPaymentMethod.paymentDays) : undefined,
+    );
     toast.success('Método de pago agregado exitosamente');
 
-    setNewPaymentMethod({ name: '', type: 'electronic' });
+    setNewPaymentMethod({ name: '', type: 'electronic', bankId: '', commission: '', paymentPeriod: 'immediate', paymentDays: '' });
     setIsAddingPaymentMethod(false);
   };
 
@@ -163,6 +178,24 @@ export default function Settings() {
       deletePaymentMethod(methodId);
       toast.success('Método de pago eliminado exitosamente');
     }
+  };
+
+  const handleSaveEditPaymentMethod = () => {
+    if (!editingPaymentMethod) return;
+    if (!editingPaymentMethod.name.trim()) {
+      toast.error('El nombre del método es obligatorio');
+      return;
+    }
+    updatePaymentMethod(editingPaymentMethod.id, {
+      name: editingPaymentMethod.name.trim(),
+      type: editingPaymentMethod.type,
+      bankId: editingPaymentMethod.bankId || undefined,
+      commission: editingPaymentMethod.commission ? Number(editingPaymentMethod.commission) : undefined,
+      paymentPeriod: editingPaymentMethod.paymentPeriod !== 'immediate' ? editingPaymentMethod.paymentPeriod : undefined,
+      paymentDays: editingPaymentMethod.paymentDays ? Number(editingPaymentMethod.paymentDays) : undefined,
+    });
+    toast.success('Método de pago actualizado');
+    setEditingPaymentMethod(null);
   };
 
   const handleOpenPrinterDialog = (printer?: PrinterType) => {
@@ -407,7 +440,7 @@ export default function Settings() {
                             <Select
                               value={newPaymentMethod.type}
                               onValueChange={(value: 'cash' | 'electronic' | 'credit') =>
-                                setNewPaymentMethod({...newPaymentMethod, type: value})
+                                setNewPaymentMethod({...newPaymentMethod, type: value, bankId: ''})
                               }
                             >
                               <SelectTrigger>
@@ -420,6 +453,68 @@ export default function Settings() {
                               </SelectContent>
                             </Select>
                           </div>
+                          {newPaymentMethod.type !== 'cash' && (
+                            <div>
+                              <Label>Banco destino</Label>
+                              <p className="text-xs text-gray-500 mb-1">¿En qué cuenta se acredita el dinero?</p>
+                              <Select
+                                value={newPaymentMethod.bankId}
+                                onValueChange={(v) => setNewPaymentMethod({...newPaymentMethod, bankId: v})}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Seleccionar banco..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {banks.filter(b => b.isActive && b.id !== 'efectivo').map(b => (
+                                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+                          {newPaymentMethod.type === 'credit' && (
+                            <>
+                              <div>
+                                <Label>Comisión de la plataforma (%)</Label>
+                                <p className="text-xs text-gray-500 mb-1">% que cobra la plataforma por cada venta (ej: 8)</p>
+                                <Input
+                                  type="number" min="0" max="100" step="0.1"
+                                  value={newPaymentMethod.commission}
+                                  onChange={(e) => setNewPaymentMethod({...newPaymentMethod, commission: e.target.value})}
+                                  placeholder="Ej: 8"
+                                />
+                              </div>
+                              <div>
+                                <Label>Período de recaudo</Label>
+                                <p className="text-xs text-gray-500 mb-1">¿Cada cuánto agrupa las ventas antes de pagar?</p>
+                                <Select
+                                  value={newPaymentMethod.paymentPeriod}
+                                  onValueChange={(v: 'immediate' | 'weekly' | 'monthly') => setNewPaymentMethod({...newPaymentMethod, paymentPeriod: v})}
+                                >
+                                  <SelectTrigger><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="immediate">Por transacción (paga individualmente)</SelectItem>
+                                    <SelectItem value="weekly">Semanal (recauda lun–dom, paga después)</SelectItem>
+                                    <SelectItem value="monthly">Mensual (recauda el mes, paga después)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div>
+                                <Label>Días de pago después del cierre del período</Label>
+                                <p className="text-xs text-gray-500 mb-1">
+                                  {newPaymentMethod.paymentPeriod === 'monthly' && 'Días después del fin de mes para recibir el pago'}
+                                  {newPaymentMethod.paymentPeriod === 'weekly' && 'Días después del domingo para recibir el pago'}
+                                  {newPaymentMethod.paymentPeriod === 'immediate' && 'Días desde la venta para recibir el pago'}
+                                </p>
+                                <Input
+                                  type="number" min="0" step="1"
+                                  value={newPaymentMethod.paymentDays}
+                                  onChange={(e) => setNewPaymentMethod({...newPaymentMethod, paymentDays: e.target.value})}
+                                  placeholder="Ej: 30"
+                                />
+                              </div>
+                            </>
+                          )}
                           <div className="flex justify-end gap-2">
                             <Button variant="outline" onClick={() => setIsAddingPaymentMethod(false)}>
                               Cancelar
@@ -441,12 +536,28 @@ export default function Settings() {
                             <CreditCard className="h-5 w-5 text-gray-500" />
                             <div>
                               <p className="font-medium">{method.name}</p>
-                              <Badge
-                                variant={getPaymentTypeBadgeColor(method.type)}
-                                className="text-xs mt-1"
-                              >
-                                {getPaymentTypeLabel(method.type)}
-                              </Badge>
+                              <div className="flex flex-wrap items-center gap-2 mt-1">
+                                <Badge variant={getPaymentTypeBadgeColor(method.type)} className="text-xs">
+                                  {getPaymentTypeLabel(method.type)}
+                                </Badge>
+                                {method.bankId && (
+                                  <span className="text-xs text-gray-500">
+                                    → {banks.find(b => b.id === method.bankId)?.name ?? method.bankId}
+                                  </span>
+                                )}
+                                {method.commission !== undefined && (
+                                  <span className="text-xs text-rose-500">Comisión: {method.commission}%</span>
+                                )}
+                                {method.paymentPeriod && method.paymentPeriod !== 'immediate' && (
+                                  <span className="text-xs text-amber-600">
+                                    {method.paymentPeriod === 'weekly' ? 'Recaudo semanal' : 'Recaudo mensual'}
+                                    {method.paymentDays ? ` + ${method.paymentDays} días` : ''}
+                                  </span>
+                                )}
+                                {(!method.paymentPeriod || method.paymentPeriod === 'immediate') && method.paymentDays !== undefined && (
+                                  <span className="text-xs text-amber-600">Pago: {method.paymentDays} días</span>
+                                )}
+                              </div>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
@@ -457,6 +568,13 @@ export default function Settings() {
                                 toast.success(checked ? `${method.name} activado` : `${method.name} desactivado`);
                               }}
                             />
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setEditingPaymentMethod({ id: method.id, name: method.name, type: method.type, bankId: method.bankId ?? '', commission: method.commission?.toString() ?? '', paymentPeriod: method.paymentPeriod ?? 'immediate', paymentDays: method.paymentDays?.toString() ?? '' })}
+                            >
+                              <Edit className="h-4 w-4 text-blue-500" />
+                            </Button>
                             <Button
                               size="sm"
                               variant="ghost"
@@ -473,6 +591,115 @@ export default function Settings() {
                   </div>
                 </div>
               )}
+
+              {/* Diálogo editar método de pago */}
+              <Dialog open={!!editingPaymentMethod} onOpenChange={(open) => { if (!open) setEditingPaymentMethod(null); }}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Editar Método de Pago</DialogTitle>
+                  </DialogHeader>
+                  {editingPaymentMethod && (
+                    <div className="space-y-4">
+                      <div>
+                        <Label>Nombre del Método</Label>
+                        <Input
+                          value={editingPaymentMethod.name}
+                          onChange={(e) => setEditingPaymentMethod({ ...editingPaymentMethod, name: e.target.value })}
+                          placeholder="Ej: Bre-B, Transfiya, Nequi..."
+                        />
+                      </div>
+                      <div>
+                        <Label>Tipo</Label>
+                        <Select
+                          value={editingPaymentMethod.type}
+                          onValueChange={(value: 'cash' | 'electronic' | 'credit') =>
+                            setEditingPaymentMethod({ ...editingPaymentMethod, type: value, bankId: '' })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="cash">Efectivo</SelectItem>
+                            <SelectItem value="electronic">Electrónico</SelectItem>
+                            <SelectItem value="credit">Crédito</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {editingPaymentMethod.type !== 'cash' && (
+                        <div>
+                          <Label>Banco destino</Label>
+                          <p className="text-xs text-gray-500 mb-1">¿En qué cuenta se acredita el dinero?</p>
+                          <Select
+                            value={editingPaymentMethod.bankId}
+                            onValueChange={(v) => setEditingPaymentMethod({ ...editingPaymentMethod, bankId: v })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccionar banco..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {banks.filter(b => b.isActive && b.id !== 'efectivo').map(b => (
+                                <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                      {editingPaymentMethod.type === 'credit' && (
+                        <>
+                          <div>
+                            <Label>Comisión de la plataforma (%)</Label>
+                            <p className="text-xs text-gray-500 mb-1">% que cobra la plataforma por cada venta (ej: 8)</p>
+                            <Input
+                              type="number" min="0" max="100" step="0.1"
+                              value={editingPaymentMethod.commission}
+                              onChange={(e) => setEditingPaymentMethod({ ...editingPaymentMethod, commission: e.target.value })}
+                              placeholder="Ej: 8"
+                            />
+                          </div>
+                          <div>
+                            <Label>Período de recaudo</Label>
+                            <p className="text-xs text-gray-500 mb-1">¿Cada cuánto agrupa las ventas antes de pagar?</p>
+                            <Select
+                              value={editingPaymentMethod.paymentPeriod}
+                              onValueChange={(v: 'immediate' | 'weekly' | 'monthly') => setEditingPaymentMethod({ ...editingPaymentMethod, paymentPeriod: v })}
+                            >
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="immediate">Por transacción (paga individualmente)</SelectItem>
+                                <SelectItem value="weekly">Semanal (recauda lun–dom, paga después)</SelectItem>
+                                <SelectItem value="monthly">Mensual (recauda el mes, paga después)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label>Días de pago después del cierre del período</Label>
+                            <p className="text-xs text-gray-500 mb-1">
+                              {editingPaymentMethod.paymentPeriod === 'monthly' && 'Días después del fin de mes para recibir el pago'}
+                              {editingPaymentMethod.paymentPeriod === 'weekly' && 'Días después del domingo para recibir el pago'}
+                              {editingPaymentMethod.paymentPeriod === 'immediate' && 'Días desde la venta para recibir el pago'}
+                            </p>
+                            <Input
+                              type="number" min="0" step="1"
+                              value={editingPaymentMethod.paymentDays}
+                              onChange={(e) => setEditingPaymentMethod({ ...editingPaymentMethod, paymentDays: e.target.value })}
+                              placeholder="Ej: 30"
+                            />
+                          </div>
+                        </>
+                      )}
+                      <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => setEditingPaymentMethod(null)}>
+                          Cancelar
+                        </Button>
+                        <Button onClick={handleSaveEditPaymentMethod}>
+                          Guardar Cambios
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </DialogContent>
+              </Dialog>
 
               {/* SECCIÓN: Bancos */}
               {selectedSection === 'bancos' && (

@@ -37,6 +37,10 @@ export type PaymentMethod = {
   name: string;
   type: 'cash' | 'electronic' | 'credit';
   isActive: boolean;
+  bankId?: string;           // Banco destino donde se acredita el dinero
+  commission?: number;       // % de comisión que cobra la plataforma por venta (ej: 8)
+  paymentPeriod?: 'immediate' | 'weekly' | 'monthly'; // Período de recaudo
+  paymentDays?: number;      // Días después del cierre del período para transferir (ej: 30)
 };
 
 export type Advisor = {

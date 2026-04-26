@@ -146,7 +146,7 @@ export function usePurchases() {
       purchase.id === purchaseId
         ? {
             ...purchase,
-            invoiceNumber: purchaseData.invoiceNumber,
+            documentNumber: purchaseData.invoiceNumber,
             supplierId: purchaseData.supplierId,
             supplierName: purchaseData.supplierName,
             items: purchaseData.items,
@@ -156,6 +156,7 @@ export function usePurchases() {
             paymentMethod: purchaseData.paymentMethod,
             paymentDetails: purchaseData.paymentDetails,
             notes: purchaseData.notes,
+            updatedAt: new Date(),
           }
         : purchase
     ));

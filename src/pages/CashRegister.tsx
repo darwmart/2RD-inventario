@@ -163,6 +163,15 @@ export default function CashRegister() {
       return;
     }
 
+    // Validar que no supere el efectivo disponible en caja
+    const availableCash = estimatedCloseCash;
+    if (amount > availableCash) {
+      toast.error(
+        `El traspaso ($${amount.toLocaleString('es-CO')}) supera el efectivo disponible en caja ($${availableCash.toLocaleString('es-CO')})`
+      );
+      return;
+    }
+
     // Registrar en contabilidad como traspaso
     const newRecord: AccountingRecord = {
       id: Date.now(),
@@ -239,7 +248,10 @@ export default function CashRegister() {
     // Gastos del día
     const expenses = totalExpenses;
 
-    return initial + cashSales + cashDeposits - expenses;
+    // Traspasos a Caja Fuerte del día
+    const transfers = dailyTransfers;
+
+    return initial + cashSales + cashDeposits - expenses - transfers;
   };
 
   // --- Ventas del día (todas las completadas del mismo día) ---
@@ -405,11 +417,25 @@ const depositRecordsOfDay = useMemo(() => {
     };
   }, [summary, depositSummary]);
 
-  // Cierre estimado en efectivo: apertura + efectivo del día - gastos
+  // Traspasos a Caja Fuerte realizados en el día seleccionado (comparación en hora local)
+  const dailyTransfers = useMemo(() => {
+    const toLocalKey = (isoStr: string) => {
+      const d = new Date(isoStr);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${dd}`;
+    };
+    return accountingRecords
+      .filter(r => r.tipo === 'traspaso' && toLocalKey(r.fecha) === selectedDate)
+      .reduce((sum, r) => sum + r.monto, 0);
+  }, [accountingRecords, selectedDate]);
+
+  // Cierre estimado en efectivo: apertura + efectivo del día - gastos - traspasos
   const estimatedCloseCash = useMemo(() => {
     const opening = currentSession?.openingAmount ?? 0;
-    return opening + totalsWithDeposits.cash - totalExpenses;
-  }, [currentSession, totalsWithDeposits, totalExpenses]);
+    return opening + totalsWithDeposits.cash - totalExpenses - dailyTransfers;
+  }, [currentSession, totalsWithDeposits, totalExpenses, dailyTransfers]);
 
  
   const getPaymentIcon = (type: 'cash' | 'electronic' | 'credit') => {
@@ -587,12 +613,22 @@ const depositRecordsOfDay = useMemo(() => {
                     </DialogTrigger>
                     <DialogContent>
                       <DialogHeader>
-                        <DialogTitle>Traspaso de Efectivo a Caja Principal</DialogTitle>
+                        <DialogTitle>Traspaso de Efectivo a Caja Fuerte</DialogTitle>
                       </DialogHeader>
                       <div className="space-y-4 py-4">
-                        <div className="p-4 bg-blue-50 rounded-lg">
-                          <p className="text-sm text-blue-800">
-                            El efectivo se traspasará a <strong>Caja Principal</strong> y se registrará automáticamente en contabilidad.
+                        <div className="p-4 bg-blue-50 rounded-lg space-y-1">
+                          <div className="flex justify-between text-sm text-blue-800">
+                            <span>Efectivo disponible en caja:</span>
+                            <strong>${estimatedCloseCash.toLocaleString('es-CO')}</strong>
+                          </div>
+                          {dailyTransfers > 0 && (
+                            <div className="flex justify-between text-xs text-blue-600">
+                              <span>Ya traspassado hoy:</span>
+                              <span>${dailyTransfers.toLocaleString('es-CO')}</span>
+                            </div>
+                          )}
+                          <p className="text-xs text-blue-600 mt-1">
+                            El traspaso se descontará del efectivo de caja e ingresará a Caja Fuerte.
                           </p>
                         </div>
                         <div>
@@ -602,6 +638,7 @@ const depositRecordsOfDay = useMemo(() => {
                             value={transferAmount}
                             onChange={(e) => setTransferAmount(e.target.value)}
                             placeholder="0"
+                            max={estimatedCloseCash}
                           />
                         </div>
                         <div>
