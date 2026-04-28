@@ -42,7 +42,8 @@ export default function PurchasesFactuSOL() {
     updatePurchase,
     deletePurchase,
     convertDeliveryToInvoice,
-    updateDocumentStatus
+    updateDocumentStatus,
+    markAsPaid,
   } = usePurchases();
   const { banks, taxSettings, updateBankBalance } = useSettings();
   const [accountingRecords, setAccountingRecords] = useLocalStorage<AccountingRecord[]>('accountingRecords', []);
@@ -150,7 +151,7 @@ export default function PurchasesFactuSOL() {
     const badges = {
       pending: { label: 'Pendiente', variant: 'secondary' as const, icon: Clock },
       partial: { label: 'Parcial', variant: 'default' as const, icon: Clock },
-      completed: { label: 'Servido', variant: 'default' as const, icon: CheckCircle },
+      completed: { label: 'Pagado', variant: 'default' as const, icon: CheckCircle },
       invoiced: { label: 'Facturado', variant: 'default' as const, icon: FileText },
       cancelled: { label: 'Anulado', variant: 'destructive' as const, icon: XCircle },
     };
@@ -185,25 +186,13 @@ export default function PurchasesFactuSOL() {
     if (!payingInvoice) return;
 
     try {
-      // Actualizar estado a completado
-      updateDocumentStatus(payingInvoice.id, 'completed');
+      const bankName = banks.find(b => b.id === selectedBank)?.name || 'Efectivo';
+
+      // Actualizar estado + guardar bankId y paidAt en paymentDetails
+      markAsPaid(payingInvoice.id, selectedBank, bankName);
 
       // Descontar del banco seleccionado
       updateBankBalance(selectedBank, -payingInvoice.total);
-
-      // Registrar en contabilidad
-      const bankName = banks.find(b => b.id === selectedBank)?.name || 'Efectivo';
-      const newRecord: AccountingRecord = {
-        id: Date.now(),
-        tipo: 'compra',
-        descripcion: `Factura ${payingInvoice.documentNumber}`,
-        proveedor: payingInvoice.supplierName,
-        factura: payingInvoice.documentNumber,
-        monto: payingInvoice.total,
-        banco: selectedBank,
-        fecha: new Date().toISOString(),
-      };
-      setAccountingRecords(prev => [...prev, newRecord]);
 
       toast.success(`Factura ${payingInvoice.documentNumber} marcada como pagada`);
       setIsPaymentModalOpen(false);

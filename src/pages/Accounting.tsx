@@ -200,9 +200,10 @@ export default function Accounting() {
     purchases
       .filter(p => p.status !== 'cancelled')
       .forEach(p => {
-        // Una compra a crédito PAGADA tiene bankId en paymentDetails (y no tiene dueDate)
-        const isPaidCredit = !!(p.paymentDetails?.bankId && !p.paymentDetails?.dueDate);
-        const isUnpaidCredit = !isPaidCredit && !!(p.paymentMethod?.type === 'credit' || p.paymentDetails?.dueDate);
+        // Crédito pagado: tiene dueDate (era crédito) Y bankId (fue pagado con markAsPaid)
+        const isPaidCredit = !!(p.paymentDetails?.dueDate && p.paymentDetails?.bankId);
+        // Crédito pendiente: tiene dueDate pero aún no tiene bankId
+        const isUnpaidCredit = !!(p.paymentDetails?.dueDate && !p.paymentDetails?.bankId);
         if (isUnpaidCredit) return; // crédito pendiente: aún no sale del banco
         const isCash = p.paymentDetails?.isCashPayment || p.paymentMethod?.type === 'cash';
         const bank = isCash

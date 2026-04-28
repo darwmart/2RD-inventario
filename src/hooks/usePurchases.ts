@@ -214,6 +214,25 @@ export function usePurchases() {
     ));
   }, [setPurchases]);
 
+  // Marcar factura de crédito como pagada — guarda bankId y paidAt en paymentDetails
+  const markAsPaid = useCallback((purchaseId: string, bankId: string, bankName: string) => {
+    setPurchases(prev => prev.map(p =>
+      p.id === purchaseId
+        ? {
+            ...p,
+            status: 'completed' as DocumentStatus,
+            paymentDetails: {
+              ...p.paymentDetails,
+              bankId,
+              bankName,
+              paidAt: new Date().toISOString(),
+            },
+            updatedAt: new Date(),
+          }
+        : p
+    ));
+  }, [setPurchases]);
+
   return {
     purchases,
     addPurchase,
@@ -224,6 +243,7 @@ export function usePurchases() {
     getPurchasesBySupplier,
     convertDeliveryToInvoice,
     updateDocumentStatus,
+    markAsPaid,
     generateDocumentNumber,
   };
 }
