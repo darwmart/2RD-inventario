@@ -294,6 +294,7 @@ export type PurchaseDocument = {
     bankId?: string;
     bankName?: string;
     isCashPayment?: boolean;
+    paidAt?: string; // Fecha en que se pagó (para créditos)
   };
 
   // Referencias a documentos relacionados

@@ -103,6 +103,17 @@ export default function Purchases() {
     return `${y}-${m}-${dd}`;
   });
 
+  // Obtener nombre del proveedor compatible con ambos formatos (legacy y nuevo)
+  const getSupplierName = (s: typeof suppliers[0]) =>
+    (s.commercialName || '').trim() || (s.fiscalName || '').trim() || ((s as any).name || '').trim() || '';
+
+  // Resolver el nombre del proveedor: primero el snapshot guardado, luego busca por supplierId
+  const resolveSupplierName = (purchase: Purchase) => {
+    if (purchase.supplierName && purchase.supplierName.trim()) return purchase.supplierName.trim();
+    const s = suppliers.find(x => x.id === purchase.supplierId);
+    return s ? (getSupplierName(s) || 'Sin proveedor') : 'Sin proveedor';
+  };
+
   // Filtrar compras por fecha y búsqueda
   const filteredPurchases = useMemo(() => {
     return purchases.filter(purchase => {
@@ -117,13 +128,16 @@ export default function Purchases() {
       // Filtro de búsqueda por proveedor o factura
       const searchLower = searchPurchase.toLowerCase();
       const docNumber = (purchase.documentNumber || '').toLowerCase();
+      const supplierLabel = (purchase.supplierName || '').trim() ||
+        (suppliers.find(s => s.id === purchase.supplierId) ?
+          getSupplierName(suppliers.find(s => s.id === purchase.supplierId)!) : '');
       const matchesSearch = searchPurchase === '' ||
-        purchase.supplierName.toLowerCase().includes(searchLower) ||
+        supplierLabel.toLowerCase().includes(searchLower) ||
         docNumber.includes(searchLower);
 
       return matchesDate && matchesSearch;
     });
-  }, [purchases, selectedDate, searchPurchase]);
+  }, [purchases, selectedDate, searchPurchase, suppliers]);
 
   const addToCart = (product: Product, quantity: number = 1) => {
     const existingItemIndex = cart.findIndex(item => item.productId === product.id);
@@ -196,7 +210,7 @@ export default function Purchases() {
     // Factura duplicada para el mismo proveedor
     const dupInvoice = purchases.find(p =>
       p.supplierId === selectedSupplier &&
-      p.invoiceNumber.trim().toLowerCase() === invoiceNumber.trim().toLowerCase() &&
+      (p.documentNumber || '').trim().toLowerCase() === invoiceNumber.trim().toLowerCase() &&
       p.id !== editingPurchase?.id
     );
     if (dupInvoice) {
@@ -239,6 +253,7 @@ export default function Purchases() {
     } else if (selectedMethod.type === 'cash') {
       // Consignación (efectivo)
       paymentDetails.isCashPayment = true;
+      paymentDetails.bankId = 'efectivo';
       bankName = 'Efectivo';
     }
 
@@ -254,7 +269,7 @@ export default function Purchases() {
     const purchase = addPurchase({
       invoiceNumber,
       supplierId: supplier.id,
-      supplierName: supplier.name,
+      supplierName: getSupplierName(supplier),
       items: cart,
       paymentMethod,
       paymentDetails,
@@ -276,8 +291,8 @@ export default function Purchases() {
       const newRecord: AccountingRecord = {
         id: Date.now(),
         tipo: 'compra',
-        descripcion: `Compra ${invoiceNumber} - ${supplier.name}`,
-        proveedor: supplier.name,
+        descripcion: `Compra ${invoiceNumber} - ${getSupplierName(supplier)}`,
+        proveedor: getSupplierName(supplier),
         factura: invoiceNumber,
         monto: total,
         banco: selectedMethod.bankId || 'efectivo',
@@ -291,7 +306,7 @@ export default function Purchases() {
       updateBankBalance(bankId, -total);
     }
 
-    toast.success(`Compra ${purchase.invoiceNumber} registrada exitosamente`);
+    toast.success(`Compra ${purchase.documentNumber} registrada exitosamente`);
 
     // Limpiar formulario
     setCart([]);
@@ -342,7 +357,7 @@ export default function Purchases() {
     // Factura duplicada para el mismo proveedor
     const dupInvoice = purchases.find(p =>
       p.supplierId === selectedSupplier &&
-      p.invoiceNumber.trim().toLowerCase() === invoiceNumber.trim().toLowerCase() &&
+      (p.documentNumber || '').trim().toLowerCase() === invoiceNumber.trim().toLowerCase() &&
       p.id !== editingPurchase?.id
     );
     if (dupInvoice) {
@@ -375,6 +390,7 @@ export default function Purchases() {
       paymentDetails.bankName = bank?.name || '';
     } else if (selectedMethod.type === 'cash') {
       paymentDetails.isCashPayment = true;
+      paymentDetails.bankId = 'efectivo';
     }
 
     // Crear objeto de método de pago compatible
@@ -430,7 +446,7 @@ export default function Purchases() {
     updatePurchase(editingPurchase.id, {
       invoiceNumber,
       supplierId: supplier.id,
-      supplierName: supplier.name,
+      supplierName: getSupplierName(supplier),
       items: cart,
       paymentMethod,
       paymentDetails,
@@ -497,11 +513,12 @@ export default function Purchases() {
     updateBankBalance(payingBankId, -payingPurchase.total);
 
     // Registrar en contabilidad
+    const supplierLabel = resolveSupplierName(payingPurchase);
     const newRecord: AccountingRecord = {
       id: Date.now(),
       tipo: 'compra',
-      descripcion: `Pago crédito ${payingPurchase.documentNumber} - ${payingPurchase.supplierName}`,
-      proveedor: payingPurchase.supplierName,
+      descripcion: `Pago crédito ${payingPurchase.documentNumber} - ${supplierLabel}`,
+      proveedor: supplierLabel,
       factura: payingPurchase.documentNumber,
       monto: payingPurchase.total,
       banco: payingBankId,
@@ -509,14 +526,14 @@ export default function Purchases() {
     };
     setAccountingRecords(prev => [...prev, newRecord]);
 
-    // Actualizar la compra: quitar dueDate, agregar banco de pago
+    // Actualizar la compra: quitar dueDate, agregar banco de pago y fecha de pago
     updatePurchase(payingPurchase.id, {
       invoiceNumber: payingPurchase.documentNumber,
       supplierId: payingPurchase.supplierId,
-      supplierName: payingPurchase.supplierName,
+      supplierName: resolveSupplierName(payingPurchase),
       items: payingPurchase.items,
-      paymentMethod: { ...payingPurchase.paymentMethod },
-      paymentDetails: { bankId: payingBankId, bankName: bank?.name || '' },
+      paymentMethod: payingPurchase.paymentMethod ?? { id: 'credito', name: 'Crédito', type: 'credit' as const, isActive: true },
+      paymentDetails: { bankId: payingBankId, bankName: bank?.name || '', paidAt: new Date().toISOString() },
       tax: payingPurchase.tax,
       notes: payingPurchase.notes,
     });
@@ -653,7 +670,7 @@ export default function Purchases() {
                         <SelectContent>
                           {suppliers.map(supplier => (
                             <SelectItem key={supplier.id} value={supplier.id}>
-                              {supplier.name}
+                              {getSupplierName(supplier)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -903,7 +920,7 @@ export default function Purchases() {
                   <div className="flex justify-between items-start mb-3">
                     <div>
                       <h4 className="font-bold text-lg">Factura: {purchase.documentNumber}</h4>
-                      <p className="text-sm text-gray-600">Proveedor: {purchase.supplierName}</p>
+                      <p className="text-sm text-gray-600">Proveedor: {resolveSupplierName(purchase)}</p>
                       <p className="text-xs text-gray-500">
                         {new Date(purchase.createdAt).toLocaleString('es-CO')}
                       </p>
@@ -997,6 +1014,39 @@ export default function Purchases() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Dialog: Registrar pago de compra a crédito */}
+      <Dialog open={!!payingPurchase} onOpenChange={(open) => {
+        if (!open) { setPayingPurchase(null); setPayingBankId(''); }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Registrar Pago — {payingPurchase?.documentNumber}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-gray-600">
+              Proveedor: <strong>{payingPurchase ? resolveSupplierName(payingPurchase) : ''}</strong><br />
+              Total a pagar: <strong>${payingPurchase?.total.toLocaleString('es-CO')}</strong>
+            </p>
+            <div>
+              <Label>Banco con el que se realiza el pago</Label>
+              <Select value={payingBankId} onValueChange={setPayingBankId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar banco..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {banks.filter(b => b.isActive && b.id !== 'efectivo').map(b => (
+                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={handleConfirmPayment} className="w-full" disabled={!payingBankId}>
+              Confirmar Pago
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </ScrollArea>
   );
 }

@@ -200,17 +200,25 @@ export default function Accounting() {
     purchases
       .filter(p => p.status !== 'cancelled')
       .forEach(p => {
-        const isCredit = p.paymentMethod?.type === 'credit' || p.paymentDetails?.dueDate;
-        if (isCredit) return; // crédito aún no sale del banco
+        // Una compra a crédito PAGADA tiene bankId en paymentDetails (y no tiene dueDate)
+        const isPaidCredit = !!(p.paymentDetails?.bankId && !p.paymentDetails?.dueDate);
+        const isUnpaidCredit = !isPaidCredit && !!(p.paymentMethod?.type === 'credit' || p.paymentDetails?.dueDate);
+        if (isUnpaidCredit) return; // crédito pendiente: aún no sale del banco
         const isCash = p.paymentDetails?.isCashPayment || p.paymentMethod?.type === 'cash';
         const bank = isCash
           ? 'efectivo'
           : (p.paymentDetails?.bankId ?? 'efectivo');
+        // Para créditos pagados usar la fecha de pago; para compras normales usar la de creación
+        const movDate = isPaidCredit && p.paymentDetails?.paidAt
+          ? new Date(p.paymentDetails.paidAt)
+          : new Date(p.createdAt);
+        const supplierLabel = p.supplierName || 'Sin proveedor';
+        const docLabel = p.supplierInvoiceNumber ?? p.documentNumber ?? '—';
         list.push({
           id: `purchase-${p.id}`,
-          date: new Date(p.createdAt),
+          date: movDate,
           type: 'compra',
-          description: `Compra — ${p.supplierName} Factura: ${p.supplierInvoiceNumber ?? p.documentNumber}`,
+          description: `Compra — ${supplierLabel} | Factura: ${docLabel}`,
           amount: p.total,
           bank,
           bankLabel: getBankLabel(bank),

@@ -87,6 +87,17 @@ export default function PurchasesFactuSOL() {
   const [notes, setNotes] = useState('');
   const [searchProduct, setSearchProduct] = useState('');
 
+  // Obtener nombre del proveedor (compatible con ambos formatos de datos)
+  const getSupplierName = (s: any): string =>
+    (s?.commercialName || '').trim() || (s?.fiscalName || '').trim() || (s?.name || '').trim() || '';
+
+  // Resolver nombre: primero snapshot guardado, luego busca por supplierId
+  const resolveSupplierName = (doc: PurchaseDocument): string => {
+    if (doc.supplierName && doc.supplierName.trim()) return doc.supplierName.trim();
+    const s = suppliers.find(x => x.id === doc.supplierId);
+    return s ? (getSupplierName(s) || 'Sin proveedor') : 'Sin proveedor';
+  };
+
   // Filtrar documentos según tab activo
   const filteredDocuments = useMemo(() => {
     return purchases.filter(doc => {
@@ -289,7 +300,7 @@ export default function PurchasesFactuSOL() {
       updatePurchase(editingDocument.id, {
         invoiceNumber: editingDocument.documentNumber,
         supplierId: supplier.id,
-        supplierName: supplier.name,
+        supplierName: getSupplierName(supplier),
         items,
         tax,
         notes,
@@ -307,7 +318,7 @@ export default function PurchasesFactuSOL() {
       const newDoc = createDocument({
         documentType: activeTab,
         supplierId: supplier.id,
-        supplierName: supplier.name,
+        supplierName: getSupplierName(supplier),
         warehouse,
         items,
         tax,
@@ -716,7 +727,7 @@ export default function PurchasesFactuSOL() {
                           )}
                         </TableCell>
                         <TableCell>{new Date(doc.createdAt).toLocaleDateString('es-CO')}</TableCell>
-                        <TableCell>{doc.supplierName}</TableCell>
+                        <TableCell>{resolveSupplierName(doc)}</TableCell>
                         <TableCell className="text-right">${doc.subtotal.toLocaleString('es-CO')}</TableCell>
                         <TableCell className="text-right">${(doc.tax || 0).toLocaleString('es-CO')}</TableCell>
                         <TableCell className="text-right font-bold">${doc.total.toLocaleString('es-CO')}</TableCell>
@@ -1084,7 +1095,7 @@ export default function PurchasesFactuSOL() {
                   Factura: <span className="font-mono font-bold">{payingInvoice?.documentNumber}</span>
                 </p>
                 <p className="text-sm text-gray-600">
-                  Proveedor: <span className="font-medium">{payingInvoice?.supplierName}</span>
+                  Proveedor: <span className="font-medium">{payingInvoice ? resolveSupplierName(payingInvoice) : ''}</span>
                 </p>
                 <p className="text-sm text-gray-600">
                   Total: <span className="font-mono font-bold text-lg">${payingInvoice?.total.toLocaleString('es-CO')}</span>
