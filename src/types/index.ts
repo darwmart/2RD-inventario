@@ -297,6 +297,14 @@ export type PurchaseDocument = {
     paidAt?: string; // Fecha en que se pagó (para créditos)
   };
 
+  // Historial de pagos (permite pagos parciales y saldos pendientes)
+  payments?: {
+    date: string;
+    amount: number;
+    bankId: string;
+    bankName: string;
+  }[];
+
   // Referencias a documentos relacionados
   orderRef?: string; // Referencia al pedido origen
   deliveryRef?: string; // Referencia al albarán origen

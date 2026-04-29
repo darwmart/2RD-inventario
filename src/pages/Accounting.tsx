@@ -205,6 +205,11 @@ export default function Accounting() {
         // Crédito pendiente: tiene dueDate pero aún no tiene bankId
         const isUnpaidCredit = !!(p.paymentDetails?.dueDate && !p.paymentDetails?.bankId);
         if (isUnpaidCredit) return; // crédito pendiente: aún no sale del banco
+        // Factura con pagos parciales: solo mostrar cuando esté completamente pagada
+        if (p.payments && p.payments.length > 0) {
+          const paidTotal = p.payments.reduce((s, pay) => s + pay.amount, 0);
+          if (paidTotal < p.total) return; // saldo pendiente: aún no está cubierta
+        }
         const isCash = p.paymentDetails?.isCashPayment || p.paymentMethod?.type === 'cash';
         const bank = isCash
           ? 'efectivo'

@@ -99,6 +99,14 @@ export default function PurchasesFactuSOL() {
     return s ? (getSupplierName(s) || 'Sin proveedor') : 'Sin proveedor';
   };
 
+  // Total ya pagado (suma de todos los apuntes de pago)
+  const getPaidAmount = (doc: PurchaseDocument): number =>
+    (doc.payments || []).reduce((sum, p) => sum + p.amount, 0);
+
+  // Saldo pendiente de pago
+  const getPendingAmount = (doc: PurchaseDocument): number =>
+    Math.max(0, doc.total - getPaidAmount(doc));
+
   // Filtrar documentos según tab activo
   const filteredDocuments = useMemo(() => {
     return purchases.filter(doc => {
@@ -181,18 +189,20 @@ export default function PurchasesFactuSOL() {
     setIsPaymentModalOpen(true);
   };
 
-  // Marcar factura como pagada
+  // Marcar factura como pagada (total o saldo pendiente)
   const handleMarkAsPaid = () => {
     if (!payingInvoice) return;
 
     try {
       const bankName = banks.find(b => b.id === selectedBank)?.name || 'Efectivo';
+      // Descontar solo el saldo pendiente (no el total, si ya hay pagos previos)
+      const amountToPay = getPendingAmount(payingInvoice);
 
-      // Actualizar estado + guardar bankId y paidAt en paymentDetails
-      markAsPaid(payingInvoice.id, selectedBank, bankName);
+      // Actualizar estado + guardar bankId, paidAt y payment entry
+      markAsPaid(payingInvoice.id, selectedBank, bankName, amountToPay);
 
-      // Descontar del banco seleccionado
-      updateBankBalance(selectedBank, -payingInvoice.total);
+      // Descontar únicamente el saldo pendiente del banco
+      updateBankBalance(selectedBank, -amountToPay);
 
       toast.success(`Factura ${payingInvoice.documentNumber} marcada como pagada`);
       setIsPaymentModalOpen(false);
@@ -285,6 +295,18 @@ export default function PurchasesFactuSOL() {
     const tax = taxSettings.ivaEnabled ? (subtotal * taxSettings.ivaPercentage / 100) : 0;
 
     if (editingDocument) {
+      // Detectar si hay pagos previos y el nuevo total supera lo pagado
+      const paidAmt = getPaidAmount(editingDocument);
+      const newTotal = subtotal + tax;
+      let newStatus = undefined;
+      if (editingDocument.documentType === 'invoice') {
+        if (paidAmt > 0 && newTotal > paidAmt) {
+          newStatus = 'partial' as const; // Nuevo total excede lo pagado → saldo pendiente
+        } else if (paidAmt > 0 && newTotal <= paidAmt && editingDocument.status === 'partial') {
+          newStatus = 'completed' as const; // El total volvió al rango pagado
+        }
+      }
+
       // Actualizar documento existente
       updatePurchase(editingDocument.id, {
         invoiceNumber: editingDocument.documentNumber,
@@ -300,8 +322,11 @@ export default function PurchasesFactuSOL() {
           isActive: true,
         },
         paymentDetails: editingDocument.paymentDetails,
+        status: newStatus,
       });
-      toast.success('Documento actualizado');
+      toast.success(newStatus === 'partial'
+        ? 'Documento actualizado — hay un saldo pendiente de pago'
+        : 'Documento actualizado');
     } else {
       // Crear nuevo documento
       const newDoc = createDocument({
@@ -627,15 +652,15 @@ export default function PurchasesFactuSOL() {
                   Convertir a Factura
                 </Button>
               )}
-              {selectedDocument && selectedDocument.documentType === 'invoice' && selectedDocument.status === 'pending' && (
+              {selectedDocument && selectedDocument.documentType === 'invoice' && (selectedDocument.status === 'pending' || selectedDocument.status === 'partial') && (
                 <Button
                   size="sm"
                   variant="default"
-                  className="bg-green-600 hover:bg-green-700"
+                  className={selectedDocument.status === 'partial' ? 'bg-orange-600 hover:bg-orange-700' : 'bg-green-600 hover:bg-green-700'}
                   onClick={() => handleOpenPayment(selectedDocument)}
                 >
                   <CheckCircle className="h-4 w-4 mr-1" />
-                  Marcar como Pagada
+                  {selectedDocument.status === 'partial' ? 'Pagar Saldo Pendiente' : 'Marcar como Pagada'}
                 </Button>
               )}
             </div>
@@ -1079,18 +1104,54 @@ export default function PurchasesFactuSOL() {
               <DialogTitle>Marcar Factura como Pagada</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <p className="text-sm text-gray-600">
-                  Factura: <span className="font-mono font-bold">{payingInvoice?.documentNumber}</span>
-                </p>
-                <p className="text-sm text-gray-600">
-                  Proveedor: <span className="font-medium">{payingInvoice ? resolveSupplierName(payingInvoice) : ''}</span>
-                </p>
-                <p className="text-sm text-gray-600">
-                  Total: <span className="font-mono font-bold text-lg">${payingInvoice?.total.toLocaleString('es-CO')}</span>
-                </p>
+              {/* Encabezado de la factura */}
+              <div className="grid grid-cols-2 gap-4 text-sm border-b pb-3">
+                <div>
+                  <span className="text-gray-500">Factura:</span>{' '}
+                  <span className="font-mono font-bold">{payingInvoice?.documentNumber}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500">Proveedor:</span>{' '}
+                  <span className="font-medium">{payingInvoice ? resolveSupplierName(payingInvoice) : ''}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500">Total factura:</span>{' '}
+                  <span className="font-mono">${payingInvoice?.total.toLocaleString('es-CO')}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500">Importe pendiente:</span>{' '}
+                  <span className="font-mono font-bold text-red-600 text-base">
+                    ${payingInvoice ? getPendingAmount(payingInvoice).toLocaleString('es-CO') : '0'}
+                  </span>
+                </div>
               </div>
 
+              {/* Pagos anteriores */}
+              {payingInvoice && (payingInvoice.payments || []).length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-blue-700 mb-1">Pagos anteriores</p>
+                  <table className="w-full text-xs border border-gray-200 rounded">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="text-left px-2 py-1 font-medium text-gray-600">Fecha</th>
+                        <th className="text-right px-2 py-1 font-medium text-gray-600">Importe</th>
+                        <th className="text-left px-2 py-1 font-medium text-gray-600">Banco</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(payingInvoice.payments || []).map((pay, i) => (
+                        <tr key={i} className="border-t border-gray-100">
+                          <td className="px-2 py-1">{new Date(pay.date).toLocaleDateString('es-CO')}</td>
+                          <td className="px-2 py-1 text-right font-mono">${pay.amount.toLocaleString('es-CO')}</td>
+                          <td className="px-2 py-1 text-gray-600">{pay.bankName}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Banco para este pago */}
               <div className="space-y-2">
                 <Label>Banco / Forma de Pago</Label>
                 <Select value={selectedBank} onValueChange={setSelectedBank}>
@@ -1114,7 +1175,7 @@ export default function PurchasesFactuSOL() {
 
               <div className="bg-yellow-50 border border-yellow-200 p-3 rounded text-sm text-yellow-800">
                 <p className="font-medium">⚠️ Atención:</p>
-                <p>Se debitará ${payingInvoice?.total.toLocaleString('es-CO')} del banco seleccionado.</p>
+                <p>Se debitará <strong>${payingInvoice ? getPendingAmount(payingInvoice).toLocaleString('es-CO') : '0'}</strong> del banco seleccionado.</p>
               </div>
             </div>
 

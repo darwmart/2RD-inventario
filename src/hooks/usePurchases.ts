@@ -138,6 +138,7 @@ export function usePurchases() {
     };
     tax?: number;
     notes?: string;
+    status?: DocumentStatus;
   }) => {
     const subtotal = purchaseData.items.reduce((sum, item) => sum + item.total, 0);
     const total = subtotal + (purchaseData.tax || 0);
@@ -156,6 +157,7 @@ export function usePurchases() {
             paymentMethod: purchaseData.paymentMethod,
             paymentDetails: purchaseData.paymentDetails,
             notes: purchaseData.notes,
+            ...(purchaseData.status !== undefined ? { status: purchaseData.status } : {}),
             updatedAt: new Date(),
           }
         : purchase
@@ -214,8 +216,8 @@ export function usePurchases() {
     ));
   }, [setPurchases]);
 
-  // Marcar factura de crédito como pagada — guarda bankId y paidAt en paymentDetails
-  const markAsPaid = useCallback((purchaseId: string, bankId: string, bankName: string) => {
+  // Marcar factura como pagada (total o saldo pendiente) — guarda bankId, paidAt y payment entry
+  const markAsPaid = useCallback((purchaseId: string, bankId: string, bankName: string, amount: number) => {
     setPurchases(prev => prev.map(p =>
       p.id === purchaseId
         ? {
@@ -227,6 +229,10 @@ export function usePurchases() {
               bankName,
               paidAt: new Date().toISOString(),
             },
+            payments: [
+              ...(p.payments || []),
+              { date: new Date().toISOString(), amount, bankId, bankName },
+            ],
             updatedAt: new Date(),
           }
         : p
