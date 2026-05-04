@@ -65,11 +65,18 @@ export default function CashRegister() {
     return dailyExpenses.filter(e => e.advisor === advisorFilter);
   }, [advisorFilter, dailyExpenses]);
 
+  const parseMoney = (s: string) => parseInt(s.replace(/\./g, ''), 10) || 0;
+  const fmtMoneyInput = (s: string) => {
+    const raw = s.replace(/\D/g, '');
+    return raw === '' ? '' : raw.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  };
+  const numToMoneyStr = (n: number) => n > 0 ? Math.round(n).toLocaleString('es-CO') : '';
+
   const handleAddExpense = () => {
-    const amount = Number(expenseAmount);
+    const amount = parseMoney(expenseAmount);
     if (!currentSession || currentSession.status === 'closed') { toast.error('La caja está cerrada. No se pueden registrar egresos.'); return; }
     if (!advisorInput) { toast.error('Selecciona un asesor'); return; }
-    if (isNaN(amount) || amount <= 0) { toast.error('El monto debe ser mayor a $0'); return; }
+    if (amount <= 0) { toast.error('El monto debe ser mayor a $0'); return; }
     if (!expenseDesc.trim()) { toast.error('La descripción del gasto es obligatoria'); return; }
     const advisor = advisors.find(a => a.id === advisorInput);
     addExpense(advisorInput, advisor?.name ?? advisorInput, expenseType, amount, expenseDesc);
@@ -79,8 +86,8 @@ export default function CashRegister() {
 
   // Función para abrir caja
   const handleOpenCashRegister = () => {
-    const amount = Number(openingAmount);
-    if (isNaN(amount) || amount < 0) {
+    const amount = parseMoney(openingAmount);
+    if (amount < 0) {
       toast.error('Ingresa un monto válido');
       return;
     }
@@ -118,8 +125,8 @@ export default function CashRegister() {
       return;
     }
 
-    const amount = Number(closingAmount);
-    if (isNaN(amount) || amount < 0) {
+    const amount = parseMoney(closingAmount);
+    if (amount < 0) {
       toast.error('Ingresa un monto válido');
       return;
     }
@@ -157,8 +164,8 @@ export default function CashRegister() {
       return;
     }
 
-    const amount = Number(transferAmount);
-    if (isNaN(amount) || amount <= 0) {
+    const amount = parseMoney(transferAmount);
+    if (amount <= 0) {
       toast.error('Ingresa un monto válido');
       return;
     }
@@ -195,8 +202,8 @@ export default function CashRegister() {
   // Abrir dialog de edición de sesión cerrada
   const handleOpenEditSession = () => {
     if (!currentSession) return;
-    setEditOpeningAmount(String(currentSession.openingAmount));
-    setEditClosingAmount(String(currentSession.closingAmount ?? ''));
+    setEditOpeningAmount(numToMoneyStr(currentSession.openingAmount));
+    setEditClosingAmount(numToMoneyStr(currentSession.closingAmount ?? 0));
     setEditClosingNotes(currentSession.notes ?? '');
     setIsEditSessionDialog(true);
   };
@@ -204,10 +211,10 @@ export default function CashRegister() {
   // Guardar cambios en sesión cerrada
   const handleSaveEditSession = () => {
     if (!currentSession) return;
-    const opening = Number(editOpeningAmount);
-    const closing = Number(editClosingAmount);
-    if (isNaN(opening) || opening < 0) { toast.error('Monto de apertura inválido'); return; }
-    if (isNaN(closing) || closing < 0) { toast.error('Monto de cierre inválido'); return; }
+    const opening = parseMoney(editOpeningAmount);
+    const closing = parseMoney(editClosingAmount);
+    if (opening < 0) { toast.error('Monto de apertura inválido'); return; }
+    if (closing < 0) { toast.error('Monto de cierre inválido'); return; }
     const expected = calculateExpectedCash();
     const difference = closing - expected;
     setCashSessions(cashSessions.map(s => s.id === currentSession.id
@@ -504,10 +511,11 @@ const depositRecordsOfDay = useMemo(() => {
                     <div>
                       <Label>Monto inicial en efectivo</Label>
                       <Input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         value={openingAmount}
-                        onChange={(e) => setOpeningAmount(e.target.value)}
-                        placeholder="0"
+                        onChange={(e) => setOpeningAmount(fmtMoneyInput(e.target.value))}
+                        placeholder=""
                       />
                     </div>
                     <Button onClick={handleOpenCashRegister} className="w-full">
@@ -583,10 +591,11 @@ const depositRecordsOfDay = useMemo(() => {
                         <div>
                           <Label>Efectivo contado en caja</Label>
                           <Input
-                            type="number"
+                            type="text"
+                            inputMode="numeric"
                             value={closingAmount}
-                            onChange={(e) => setClosingAmount(e.target.value)}
-                            placeholder="0"
+                            onChange={(e) => setClosingAmount(fmtMoneyInput(e.target.value))}
+                            placeholder=""
                           />
                         </div>
                         <div>
@@ -634,11 +643,11 @@ const depositRecordsOfDay = useMemo(() => {
                         <div>
                           <Label>Monto a traspasar</Label>
                           <Input
-                            type="number"
+                            type="text"
+                            inputMode="numeric"
                             value={transferAmount}
-                            onChange={(e) => setTransferAmount(e.target.value)}
-                            placeholder="0"
-                            max={estimatedCloseCash}
+                            onChange={(e) => setTransferAmount(fmtMoneyInput(e.target.value))}
+                            placeholder=""
                           />
                         </div>
                         <div>
@@ -672,19 +681,21 @@ const depositRecordsOfDay = useMemo(() => {
             <div>
               <Label>Monto de apertura</Label>
               <Input
-                type="number"
+                type="text"
+                inputMode="numeric"
                 value={editOpeningAmount}
-                onChange={(e) => setEditOpeningAmount(e.target.value)}
-                placeholder="0"
+                onChange={(e) => setEditOpeningAmount(fmtMoneyInput(e.target.value))}
+                placeholder=""
               />
             </div>
             <div>
               <Label>Monto de cierre (efectivo contado)</Label>
               <Input
-                type="number"
+                type="text"
+                inputMode="numeric"
                 value={editClosingAmount}
-                onChange={(e) => setEditClosingAmount(e.target.value)}
-                placeholder="0"
+                onChange={(e) => setEditClosingAmount(fmtMoneyInput(e.target.value))}
+                placeholder=""
               />
             </div>
             <div>
@@ -902,11 +913,11 @@ const depositRecordsOfDay = useMemo(() => {
   <div>
     <Label>Monto</Label>
     <Input
-      type="number"
-      min={0}
+      type="text"
+      inputMode="numeric"
       value={expenseAmount}
-      onChange={e => setExpenseAmount(e.target.value)}
-      placeholder="0"
+      onChange={e => setExpenseAmount(fmtMoneyInput(e.target.value))}
+      placeholder=""
     />
   </div>
   <div>

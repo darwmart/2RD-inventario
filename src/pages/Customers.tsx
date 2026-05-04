@@ -37,6 +37,8 @@ export default function Customers() {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
+  const [creditLimitStr, setCreditLimitStr] = useState('');
+  const fmtMoneyInput = (s: string) => { const raw = s.replace(/\D/g, ''); return raw === '' ? '' : raw.replace(/\B(?=(\d{3})+(?!\d))/g, '.'); };
 
   const filtered = useMemo(() => {
     const q = searchTerm.toLowerCase();
@@ -57,6 +59,7 @@ export default function Customers() {
   const openNew = () => {
     setEditingCustomer(null);
     setForm({ ...emptyForm });
+    setCreditLimitStr('');
     setIsFormOpen(true);
   };
 
@@ -75,6 +78,7 @@ export default function Customers() {
       notes: customer.notes || '',
       isActive: customer.isActive,
     });
+    setCreditLimitStr(customer.creditLimit ? Math.round(customer.creditLimit).toLocaleString('es-CO') : '');
     setIsFormOpen(true);
   };
 
@@ -309,7 +313,7 @@ export default function Customers() {
             </div>
             <div>
               <Label>Cupo de crédito</Label>
-              <Input type="number" min={0} value={form.creditLimit} onChange={e => setForm(f => ({ ...f, creditLimit: Number(e.target.value) }))} />
+              <Input type="text" inputMode="numeric" value={creditLimitStr} onChange={e => { const f = fmtMoneyInput(e.target.value); setCreditLimitStr(f); setForm(prev => ({ ...prev, creditLimit: f === '' ? 0 : parseInt(f.replace(/\./g, ''), 10) })); }} />
             </div>
             <div className="col-span-2">
               <Label>Observaciones</Label>

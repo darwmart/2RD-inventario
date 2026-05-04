@@ -22,6 +22,7 @@ import Warehouses from './pages/Warehouses';
 import Customers from './pages/Customers';
 import StockConciliation from './pages/StockConciliation';
 import AdvisorCommissions from './pages/AdvisorCommissions';
+import Reports from './pages/Reports';
 
 const queryClient = new QueryClient();
 
@@ -187,6 +188,17 @@ function AppRoutes() {
           <ProtectedRoute requireAdmin>
             <Layout>
               <AdvisorCommissions />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/reports"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Reports />
             </Layout>
           </ProtectedRoute>
         }

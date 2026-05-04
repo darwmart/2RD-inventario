@@ -48,6 +48,8 @@ export default function ProductFormDialog({
 
   // Precios
   const [cost, setCost] = useState(0);
+  const [costStr, setCostStr] = useState('');
+  const fmtMoneyInput = (s: string) => { const raw = s.replace(/\D/g, ''); return raw === '' ? '' : raw.replace(/\B(?=(\d{3})+(?!\d))/g, '.'); };
 
   // Márgenes de ganancia (%)
   const [marginSuggested, setMarginSuggested] = useState(0);
@@ -72,6 +74,7 @@ export default function ProductFormDialog({
   const [editingTariff, setEditingTariff] = useState<'suggested' | 'current' | 'discount' | 'wholesale' | null>(null);
   const [tempMargin, setTempMargin] = useState(0);
   const [tempPrice, setTempPrice] = useState(0);
+  const [tempPriceStr, setTempPriceStr] = useState('');
 
   // Porcentaje de IVA
   const IVA_PERCENTAGE = 19;
@@ -130,6 +133,7 @@ export default function ProductFormDialog({
       setSupplierId(product.supplierId || '');
       setHasIva(product.hasIva);
       setCost(product.cost);
+      setCostStr(product.cost ? Math.round(product.cost).toLocaleString('es-CO') : '');
 
       // Calcular márgenes basados en precios existentes
       setMarginSuggested(calculateMargin(product.cost, product.suggestedPrice));
@@ -158,6 +162,7 @@ export default function ProductFormDialog({
     setSupplierId('');
     setHasIva(true);
     setCost(0);
+    setCostStr('');
     setMarginSuggested(0);
     setMarginCurrent(0);
     setMarginDiscount(0);
@@ -187,6 +192,7 @@ export default function ProductFormDialog({
     };
     setTempMargin(margins[tariff]);
     setTempPrice(prices[tariff]);
+    setTempPriceStr(prices[tariff] ? Math.round(prices[tariff]).toLocaleString('es-CO') : '');
     setEditingTariff(tariff);
   };
 
@@ -202,7 +208,9 @@ export default function ProductFormDialog({
   // Manejar cambio de margen en el modal
   const handleTempMarginChange = (newMargin: number) => {
     setTempMargin(newMargin);
-    setTempPrice(calculatePrice(cost, newMargin));
+    const newPrice = calculatePrice(cost, newMargin);
+    setTempPrice(newPrice);
+    setTempPriceStr(newPrice ? Math.round(newPrice).toLocaleString('es-CO') : '');
   };
 
   // Manejar cambio de precio en el modal
@@ -427,12 +435,12 @@ export default function ProductFormDialog({
                   <div>
                     <Label className="text-xs font-medium">Precio de costo *</Label>
                     <Input
-                      type="number"
-                      value={cost || ''}
-                      onChange={(e) => setCost(parseFloat(e.target.value) || 0)}
-                      placeholder="0.00"
+                      type="text"
+                      inputMode="numeric"
+                      value={costStr}
+                      onChange={(e) => { const f = fmtMoneyInput(e.target.value); setCostStr(f); setCost(f === '' ? 0 : parseInt(f.replace(/\./g, ''), 10)); }}
+                      placeholder=""
                       className="h-9"
-                      step="0.01"
                     />
                   </div>
                   {hasIva && (
@@ -640,11 +648,11 @@ export default function ProductFormDialog({
             <div>
               <Label className="text-sm font-medium">Precio de venta:</Label>
               <Input
-                type="number"
-                value={tempPrice || ''}
-                onChange={(e) => handleTempPriceChange(parseFloat(e.target.value) || 0)}
+                type="text"
+                inputMode="numeric"
+                value={tempPriceStr}
+                onChange={(e) => { const f = fmtMoneyInput(e.target.value); setTempPriceStr(f); handleTempPriceChange(f === '' ? 0 : parseInt(f.replace(/\./g, ''), 10)); }}
                 className="mt-1"
-                step="0.01"
               />
               <p className="text-xs text-gray-500 mt-1">
                 Edita el precio o el margen - se calculan automáticamente

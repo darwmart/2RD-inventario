@@ -20,7 +20,8 @@ import {
   User,
   UserCheck,
   ClipboardList,
-  RotateCcw
+  RotateCcw,
+  Activity
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -32,7 +33,7 @@ const allNavigation = [
   { name: 'Contabilidad', href: '/accounting', icon: Banknote, adminOnly: true },
   { name: 'Inventario', href: '/inventory', icon: Package, adminOnly: false },
   { name: 'Ventas', href: '/sales', icon: ShoppingCart, adminOnly: false },
-  { name: 'Cotizaciones', href: '/quotes', icon: FileText, adminOnly: false },
+  { name: 'Separados', href: '/quotes', icon: FileText, adminOnly: false },
   { name: 'Compras', href: '/purchases', icon: ShoppingBag, adminOnly: true },
   { name: 'Proveedores', href: '/suppliers', icon: Building2, adminOnly: false },
   { name: 'Bodegas Externas', href: '/warehouses', icon: Warehouse, adminOnly: false },
@@ -41,6 +42,7 @@ const allNavigation = [
   { name: 'Asesores', href: '/advisors', icon: Users, adminOnly: false },
   { name: 'Comisiones', href: '/advisor-commissions', icon: RotateCcw, adminOnly: true },
   { name: 'Conciliación Stock', href: '/stock-conciliation', icon: ClipboardList, adminOnly: true },
+  { name: 'Informes', href: '/reports', icon: Activity, adminOnly: false },
   { name: 'Alertas', href: '/alerts', icon: AlertCircle, adminOnly: false },
   { name: 'Configuración', href: '/settings', icon: Settings, adminOnly: true },
 ];

@@ -268,7 +268,10 @@ export default function PurchasesFactuSOL() {
 
     setSupplierInvoiceNumber(selectedDocument.supplierInvoiceNumber || '');
     setWarehouse(selectedDocument.warehouse || '[01] HELMETS BOUTIQUE');
-    setItems(selectedDocument.items);
+    setItems(selectedDocument.items.map((it: any) => ({
+      ...it,
+      unitCostStr: it.unitCost ? Math.round(it.unitCost).toLocaleString('es-CO') : '',
+    })));
     setNotes(selectedDocument.notes || '');
     setModalTab('general');
     setIsModalOpen(true);
@@ -392,6 +395,7 @@ export default function PurchasesFactuSOL() {
         productName: product.name,
         quantity: 1,
         unitCost: product.cost,
+        unitCostStr: product.cost ? Math.round(product.cost).toLocaleString('es-CO') : '',
         total: product.cost,
       }]);
     }
@@ -410,9 +414,13 @@ export default function PurchasesFactuSOL() {
   };
 
   // Actualizar precio unitario
-  const handleUpdatePrice = (index: number, price: number) => {
+  const handleUpdatePrice = (index: number, priceStr: string) => {
+    const raw = priceStr.replace(/\D/g, '');
+    const formatted = raw === '' ? '' : raw.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    const price = raw === '' ? 0 : parseInt(raw, 10);
     const newItems = [...items];
     newItems[index].unitCost = price;
+    newItems[index].unitCostStr = formatted;
     newItems[index].total = newItems[index].quantity * price;
     setItems(newItems);
   };
@@ -1011,10 +1019,10 @@ export default function PurchasesFactuSOL() {
                                 </TableCell>
                                 <TableCell>
                                   <Input
-                                    type="number"
-                                    step="0.01"
-                                    value={item.unitCost}
-                                    onChange={(e) => handleUpdatePrice(index, parseFloat(e.target.value) || 0)}
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={item.unitCostStr ?? (item.unitCost ? Math.round(item.unitCost).toLocaleString('es-CO') : '')}
+                                    onChange={(e) => handleUpdatePrice(index, e.target.value)}
                                     className="h-7 text-sm text-right font-mono"
                                   />
                                 </TableCell>

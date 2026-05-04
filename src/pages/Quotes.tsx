@@ -39,7 +39,7 @@ export default function Quotes() {
   // Estado del diálogo de Abono (para separados)
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
   const [depositSaleId, setDepositSaleId] = useState('');
-  const [depositAmountNew, setDepositAmountNew] = useState<number>(0);
+  const [depositAmountNew, setDepositAmountNew] = useState<string>('');
   const [depositPaymentMethodIdNew, setDepositPaymentMethodIdNew] = useState('');
 
  
@@ -261,7 +261,7 @@ export default function Quotes() {
   // Abrir diálogo de abono para un separado
   const openDepositDialog = (saleId: string) => {
     setDepositSaleId(saleId);
-    setDepositAmountNew(0);
+    setDepositAmountNew('');
     setDepositPaymentMethodIdNew('');
     setDepositDialogOpen(true);
   };
@@ -281,20 +281,21 @@ export default function Quotes() {
       toast.error('Selecciona un método de pago');
       return;
     }
-    if (depositAmountNew <= 0) {
+    const depositAmountNum = parseInt((depositAmountNew as string).replace(/\./g, ''), 10) || 0;
+    if (depositAmountNum <= 0) {
       toast.error('Ingresa un monto válido');
       return;
     }
     const pagado = sale.deposit ?? 0;
     const saldo = Math.max(0, sale.total - pagado);
-    if (depositAmountNew > saldo) {
+    if (depositAmountNum > saldo) {
       toast.error('El abono no puede superar el saldo pendiente');
       return;
     }
 
     try {
       // Registrar el abono en la venta
-      addSaleDeposit(depositSaleId, depositAmountNew, depositPaymentMethodIdNew);
+      addSaleDeposit(depositSaleId, depositAmountNum, depositPaymentMethodIdNew);
 
       // Obtener el método de pago para determinar el banco
       const paymentMethod = paymentMethods.find(pm => pm.id === depositPaymentMethodIdNew);
@@ -327,7 +328,7 @@ export default function Quotes() {
           // Verificar que el banco existe antes de actualizar
           const bankExists = banks.find(b => b.id === bankId);
           if (bankExists) {
-            updateBankBalance(bankId, depositAmountNew);
+            updateBankBalance(bankId, depositAmountNum);
           }
         }
       }
@@ -335,7 +336,7 @@ export default function Quotes() {
       toast.success('Abono registrado y saldo actualizado');
       setDepositDialogOpen(false);
       setDepositSaleId('');
-      setDepositAmountNew(0);
+      setDepositAmountNew('');
       setDepositPaymentMethodIdNew('');
     } catch (error) {
       console.error(error);
@@ -848,10 +849,15 @@ export default function Quotes() {
               <div>
                 <Label>Monto a Abonar</Label>
                 <Input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   value={depositAmountNew}
-                  onChange={(e) => setDepositAmountNew(parseFloat(e.target.value) || 0)}
-                  placeholder="0"
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\D/g, '');
+                    if (raw === '') { setDepositAmountNew(''); return; }
+                    setDepositAmountNew(raw.replace(/\B(?=(\d{3})+(?!\d))/g, '.'));
+                  }}
+                  placeholder=""
                 />
                 {remainingSelected > 0 && (
                   <div className="text-xs text-gray-500 mt-1">
