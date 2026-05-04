@@ -9,10 +9,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, CreditCard, Trash2, Calendar, Percent, Landmark, Edit, Edit2, Printer, Barcode, Star, Eye, Download, Upload, Database } from 'lucide-react';
+import { Plus, CreditCard, Trash2, Calendar, Percent, Landmark, Edit, Edit2, Printer, Barcode, Star, Eye, Download, Upload, Database, AlignLeft, AlignCenter, AlignRight, Move } from 'lucide-react';
 import { toast } from 'sonner';
-import { Bank, Printer as PrinterType } from '@/types';
+import { Bank, Printer as PrinterType, LabelField } from '@/types';
 import { importSampleData, clearAllData } from '@/utils/importSampleData';
 
 export default function Settings() {
@@ -54,10 +55,13 @@ export default function Settings() {
   const [isLabelDialogOpen, setIsLabelDialogOpen] = useState(false);
   const [editingLabel, setEditingLabel] = useState<string | null>(null);
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
+  const [labelFields, setLabelFields] = useState<LabelField[]>([]);
+  const [selectedFieldKey, setSelectedFieldKey] = useState<string | null>(null);
   const [labelForm, setLabelForm] = useState({
     code: '',
     name: '',
     description: '',
+    documentType: 'Etiquetas de artículos',
     printerName: 'Send To OneNote 2016',
     labelWidth: '75,00',
     labelHeight: '25,00',
@@ -262,10 +266,12 @@ export default function Settings() {
       const label = labelDesigns.find(d => d.id === labelId);
       if (label) {
         setEditingLabel(labelId);
+        setLabelFields(label.fields || DEFAULT_LABEL_FIELDS);
         setLabelForm({
           code: label.code,
           name: label.name,
           description: label.description || '',
+          documentType: label.documentType,
           printerName: label.printerName,
           labelWidth: label.labelWidth,
           labelHeight: label.labelHeight,
@@ -279,11 +285,13 @@ export default function Settings() {
       }
     } else {
       setEditingLabel(null);
+      setLabelFields(DEFAULT_LABEL_FIELDS);
       setLabelForm({
         code: '',
         name: '',
         description: '',
-        printerName: 'Send To OneNote 2016',
+        documentType: selectedDocumentType,
+        printerName: printers.find(p => p.isDefault)?.name || 'Send To OneNote 2016',
         labelWidth: '75,00',
         labelHeight: '25,00',
         labelsPerRow: '3',
@@ -294,6 +302,7 @@ export default function Settings() {
         verticalSpacing: '2,00'
       });
     }
+    setSelectedFieldKey(null);
     setIsLabelDialogOpen(true);
   };
 
@@ -303,41 +312,28 @@ export default function Settings() {
       return;
     }
 
+    const labelData = {
+      code: labelForm.code.trim(),
+      name: labelForm.name.trim(),
+      description: labelForm.description.trim(),
+      documentType: labelForm.documentType,
+      printerName: labelForm.printerName,
+      labelWidth: labelForm.labelWidth,
+      labelHeight: labelForm.labelHeight,
+      labelsPerRow: labelForm.labelsPerRow,
+      labelsPerColumn: labelForm.labelsPerColumn,
+      topMargin: labelForm.topMargin,
+      leftMargin: labelForm.leftMargin,
+      horizontalSpacing: labelForm.horizontalSpacing,
+      verticalSpacing: labelForm.verticalSpacing,
+      fields: labelFields,
+    };
+
     if (editingLabel) {
-      updateLabelDesign(editingLabel, {
-        code: labelForm.code.trim(),
-        name: labelForm.name.trim(),
-        description: labelForm.description.trim(),
-        printerName: labelForm.printerName,
-        labelWidth: labelForm.labelWidth,
-        labelHeight: labelForm.labelHeight,
-        labelsPerRow: labelForm.labelsPerRow,
-        labelsPerColumn: labelForm.labelsPerColumn,
-        topMargin: labelForm.topMargin,
-        leftMargin: labelForm.leftMargin,
-        horizontalSpacing: labelForm.horizontalSpacing,
-        verticalSpacing: labelForm.verticalSpacing,
-      });
+      updateLabelDesign(editingLabel, labelData);
       toast.success('Diseño actualizado exitosamente');
     } else {
-      const newLabel: any = {
-        id: Date.now().toString(),
-        code: labelForm.code.trim(),
-        name: labelForm.name.trim(),
-        description: labelForm.description.trim(),
-        documentType: selectedDocumentType,
-        printerName: labelForm.printerName,
-        labelWidth: labelForm.labelWidth,
-        labelHeight: labelForm.labelHeight,
-        labelsPerRow: labelForm.labelsPerRow,
-        labelsPerColumn: labelForm.labelsPerColumn,
-        topMargin: labelForm.topMargin,
-        leftMargin: labelForm.leftMargin,
-        horizontalSpacing: labelForm.horizontalSpacing,
-        verticalSpacing: labelForm.verticalSpacing,
-        createdAt: new Date(),
-      };
-      addLabelDesign(newLabel);
+      addLabelDesign({ ...labelData, id: Date.now().toString(), createdAt: new Date() } as any);
       toast.success('Diseño creado exitosamente');
     }
 
@@ -356,6 +352,91 @@ export default function Settings() {
   };
 
   const filteredDesigns = labelDesigns.filter(d => d.documentType === selectedDocumentType);
+
+  // ─── Designer constants ────────────────────────────────────────────────────
+  const DOCUMENT_TYPES = [
+    'Etiquetas de artículos',
+    'Etiquetas de envío',
+    'Facturas de venta',
+    'Cotizaciones',
+    'Separados',
+    'Pagarés',
+    'Recibos',
+    'Traspaso entre almacenes',
+    'Anticipos',
+    'Etiquetas personalizadas',
+  ];
+
+  const ALL_LABEL_FIELDS: { key: string; label: string }[] = [
+    { key: 'nombre', label: 'Descripción artículo' },
+    { key: 'referencia', label: 'Referencia' },
+    { key: 'codigo', label: 'Código artículo' },
+    { key: 'ean-texto', label: 'EAN código (texto)' },
+    { key: 'ean-barras', label: 'EAN código (barras)' },
+    { key: 'precio1', label: 'Precio 1' },
+    { key: 'precio2', label: 'Precio 2' },
+    { key: 'precio3', label: 'Precio descuento' },
+    { key: 'precio4', label: 'Precio mayoreo' },
+    { key: 'categoria', label: 'Categoría' },
+    { key: 'proveedor', label: 'Proveedor' },
+    { key: 'marca', label: 'Marca' },
+    { key: 'stock', label: 'Stock' },
+  ];
+
+  const FIELD_PREVIEW: Record<string, string> = {
+    nombre: 'Nombre del artículo',
+    referencia: 'REF-001',
+    codigo: 'PROD-001',
+    'ean-texto': '7700001234567',
+    'ean-barras': '',
+    precio1: '$ 12.500',
+    precio2: '$ 11.000',
+    precio3: '$ 10.500',
+    precio4: '$ 9.000',
+    categoria: 'Categoría',
+    proveedor: 'Proveedor XYZ',
+    marca: 'Marca',
+    stock: '15',
+  };
+
+  const DEFAULT_LABEL_FIELDS: LabelField[] = [
+    { key: 'nombre',    x: 1,  y: 1,  width: 73, height: 4,  fontSize: 8, bold: false, italic: false, underline: false, align: 'left',   visible: true },
+    { key: 'referencia',x: 1,  y: 6,  width: 35, height: 4,  fontSize: 7, bold: false, italic: false, underline: false, align: 'left',   visible: true },
+    { key: 'precio1',   x: 38, y: 6,  width: 36, height: 4,  fontSize: 9, bold: true,  italic: false, underline: false, align: 'right',  visible: true },
+    { key: 'ean-barras',x: 8,  y: 11, width: 59, height: 12, fontSize: 7, bold: false, italic: false, underline: false, align: 'center', visible: true },
+  ];
+
+  // Field helpers
+  const addLabelField = (key: string) => {
+    const w = parseFloat(labelForm.labelWidth.replace(',', '.')) || 75;
+    const existingCount = labelFields.length;
+    const newField: LabelField = {
+      key,
+      x: 1,
+      y: Math.min(existingCount * 5 + 1, parseFloat(labelForm.labelHeight.replace(',', '.')) - 6),
+      width: w - 2,
+      height: 4,
+      fontSize: 8,
+      bold: false,
+      italic: false,
+      underline: false,
+      align: 'left',
+      visible: true,
+    };
+    setLabelFields(prev => [...prev, newField]);
+    setSelectedFieldKey(key);
+  };
+
+  const removeLabelField = (key: string) => {
+    setLabelFields(prev => prev.filter(f => f.key !== key));
+    if (selectedFieldKey === key) setSelectedFieldKey(null);
+  };
+
+  const updateLabelField = (key: string, updates: Partial<LabelField>) => {
+    setLabelFields(prev => prev.map(f => f.key === key ? { ...f, ...updates } : f));
+  };
+
+  const selectedField = labelFields.find(f => f.key === selectedFieldKey) || null;
 
   const sections = [
     { id: 'metodos-pago', name: 'Métodos de Pago', icon: '💳' },
@@ -1323,10 +1404,9 @@ export default function Settings() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Etiquetas de artículos">Etiquetas de artículos</SelectItem>
-                        <SelectItem value="Pagarés">Pagarés</SelectItem>
-                        <SelectItem value="Traspaso entre almacenes">Traspaso entre almacenes</SelectItem>
-                        <SelectItem value="Etiquetas personalizadas">Etiquetas personalizadas</SelectItem>
+                        {DOCUMENT_TYPES.map(dt => (
+                          <SelectItem key={dt} value={dt}>{dt}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1793,202 +1873,385 @@ export default function Settings() {
           </DialogContent>
         </Dialog>
 
-        {/* Modal de Diseño de Etiquetas */}
-        <Dialog open={isLabelDialogOpen} onOpenChange={setIsLabelDialogOpen}>
-          <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Barcode className="h-5 w-5" />
-                {editingLabel ? 'Editar Diseño de Etiqueta' : 'Nuevo Diseño de Etiqueta'}
+        {/* Modal Diseñador de Etiquetas / Documentos */}
+        <Dialog open={isLabelDialogOpen} onOpenChange={(open) => { if (!open) { setIsLabelDialogOpen(false); setEditingLabel(null); } }}>
+          <DialogContent className="max-w-[1150px] w-[95vw] p-0 flex flex-col" style={{ height: '90vh', maxHeight: '90vh' }}>
+            <DialogHeader className="px-4 pt-4 pb-2 border-b shrink-0">
+              <DialogTitle className="flex items-center gap-2 text-base">
+                <Barcode className="h-4 w-4" />
+                {editingLabel ? `Editar: ${labelForm.name}` : 'Nuevo Diseño'}
               </DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-6 py-4">
-              {/* Vista Previa de Etiqueta */}
-              <div className="border-b pb-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <Printer className="h-4 w-4 text-gray-500" />
-                  <h4 className="font-medium">Vista Previa</h4>
+            {/* Fila de config básica */}
+            <div className="px-4 py-2 border-b bg-gray-50 shrink-0">
+              <div className="flex flex-wrap gap-2 items-end">
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs">Código *</Label>
+                  <Input className="h-7 text-xs w-20" value={labelForm.code}
+                    onChange={e => setLabelForm({...labelForm, code: e.target.value})} placeholder="Ej: 2" />
                 </div>
-                <div className="flex justify-center p-8 bg-gray-50 rounded-lg">
-                  <div
-                    className="border-2 border-black p-4 bg-white"
-                    style={{
-                      width: `${parseFloat(labelForm.labelWidth.replace(',', '.')) * 3.78}px`,
-                      height: `${parseFloat(labelForm.labelHeight.replace(',', '.')) * 3.78}px`,
-                      transition: 'all 0.3s ease'
-                    }}
-                  >
-                    <p className="text-xs font-medium mb-1 truncate">Descripción del artículo</p>
-                    <p className="text-xs mb-2 truncate">Ref: ABC123    P.V.P.:    10,00 €</p>
-                    <div className="flex flex-col items-center justify-center" style={{ marginTop: 'auto' }}>
-                      <svg
-                        className="mb-1"
-                        width={Math.min(140, parseFloat(labelForm.labelWidth.replace(',', '.')) * 3.78 - 20)}
-                        height="30"
-                      >
-                        <rect x="0" width="2" height="30" fill="black"/>
-                        <rect x="4" width="1" height="30" fill="black"/>
-                        <rect x="7" width="2" height="30" fill="black"/>
-                        <rect x="11" width="1" height="30" fill="black"/>
-                        <rect x="14" width="2" height="30" fill="black"/>
-                        <rect x="18" width="1" height="30" fill="black"/>
-                        <rect x="21" width="3" height="30" fill="black"/>
-                        <rect x="26" width="1" height="30" fill="black"/>
-                        <rect x="29" width="2" height="30" fill="black"/>
-                        <rect x="33" width="1" height="30" fill="black"/>
-                      </svg>
-                      <p className="text-xs mt-1 font-mono">1234567890</p>
-                    </div>
-                  </div>
+                <div className="flex flex-col gap-1 flex-1 min-w-[160px]">
+                  <Label className="text-xs">Nombre *</Label>
+                  <Input className="h-7 text-xs" value={labelForm.name}
+                    onChange={e => setLabelForm({...labelForm, name: e.target.value})} placeholder="Nombre del diseño" />
                 </div>
-
-                {/* Info display */}
-                <div className="mt-4 p-3 bg-blue-50 rounded border border-blue-200">
-                  <p className="text-xs text-blue-800">
-                    <strong>Vista previa:</strong> {labelForm.labelWidth} mm x {labelForm.labelHeight} mm |
-                    Etiquetas por hoja: {parseInt(labelForm.labelsPerRow || '1') * parseInt(labelForm.labelsPerColumn || '1')}
-                    ({labelForm.labelsPerRow} x {labelForm.labelsPerColumn})
-                  </p>
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs">Tipo de documento</Label>
+                  <Select value={labelForm.documentType} onValueChange={v => setLabelForm({...labelForm, documentType: v})}>
+                    <SelectTrigger className="h-7 text-xs w-44"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {DOCUMENT_TYPES.map(dt => <SelectItem key={dt} value={dt} className="text-xs">{dt}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
-              </div>
-
-              {/* Configuración de Etiqueta */}
-              <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <Barcode className="h-4 w-4 text-gray-500" />
-                  <h4 className="font-medium">Configuración de la Etiqueta</h4>
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs">Impresora</Label>
+                  <Select value={labelForm.printerName} onValueChange={v => setLabelForm({...labelForm, printerName: v})}>
+                    <SelectTrigger className="h-7 text-xs w-44"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {printers.filter(p => p.isActive).map(p => (
+                        <SelectItem key={p.id} value={p.name} className="text-xs">{p.name}{p.isDefault ? ' ✓' : ''}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label>Código del modelo <span className="text-red-500">*</span></Label>
-                    <Input
-                      type="text"
-                      value={labelForm.code}
-                      onChange={(e) => setLabelForm({...labelForm, code: e.target.value})}
-                      placeholder="ej: 10002, 2"
-                    />
-                  </div>
-                  <div>
-                    <Label>Nombre del modelo <span className="text-red-500">*</span></Label>
-                    <Input
-                      type="text"
-                      value={labelForm.name}
-                      onChange={(e) => setLabelForm({...labelForm, name: e.target.value})}
-                      placeholder="ej: Copia de Cód. Barras"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <Label>Descripción</Label>
-                    <Input
-                      type="text"
-                      value={labelForm.description}
-                      onChange={(e) => setLabelForm({...labelForm, description: e.target.value})}
-                      placeholder="Descripción adicional del diseño"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <Label>Impresora</Label>
-                    <Select value={labelForm.printerName} onValueChange={(value) => setLabelForm({...labelForm, printerName: value})}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona una impresora" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {printers.filter(p => p.isActive).map(printer => (
-                          <SelectItem key={printer.id} value={printer.name}>
-                            {printer.name} {printer.isDefault && '(Predeterminada)'}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Ancho de etiqueta (mm):</Label>
-                    <Input
-                      type="text"
-                      value={labelForm.labelWidth}
-                      onChange={(e) => setLabelForm({...labelForm, labelWidth: e.target.value})}
-                      placeholder="75,00"
-                    />
-                  </div>
-                  <div>
-                    <Label>Alto de etiqueta (mm):</Label>
-                    <Input
-                      type="text"
-                      value={labelForm.labelHeight}
-                      onChange={(e) => setLabelForm({...labelForm, labelHeight: e.target.value})}
-                      placeholder="25,00"
-                    />
-                  </div>
-                  <div>
-                    <Label>Número de etiquetas por fila:</Label>
-                    <Input
-                      type="text"
-                      value={labelForm.labelsPerRow}
-                      onChange={(e) => setLabelForm({...labelForm, labelsPerRow: e.target.value})}
-                      placeholder="3"
-                    />
-                  </div>
-                  <div>
-                    <Label>Número de etiquetas por columna:</Label>
-                    <Input
-                      type="text"
-                      value={labelForm.labelsPerColumn}
-                      onChange={(e) => setLabelForm({...labelForm, labelsPerColumn: e.target.value})}
-                      placeholder="9"
-                    />
-                  </div>
-                  <div>
-                    <Label>Margen superior (mm):</Label>
-                    <Input
-                      type="text"
-                      value={labelForm.topMargin}
-                      onChange={(e) => setLabelForm({...labelForm, topMargin: e.target.value})}
-                      placeholder="12,00"
-                    />
-                  </div>
-                  <div>
-                    <Label>Margen izquierdo (mm):</Label>
-                    <Input
-                      type="text"
-                      value={labelForm.leftMargin}
-                      onChange={(e) => setLabelForm({...labelForm, leftMargin: e.target.value})}
-                      placeholder="5,60"
-                    />
-                  </div>
-                  <div>
-                    <Label>Espaciado horizontal (mm):</Label>
-                    <Input
-                      type="text"
-                      value={labelForm.horizontalSpacing}
-                      onChange={(e) => setLabelForm({...labelForm, horizontalSpacing: e.target.value})}
-                      placeholder="1,00"
-                    />
-                  </div>
-                  <div>
-                    <Label>Espaciado vertical (mm):</Label>
-                    <Input
-                      type="text"
-                      value={labelForm.verticalSpacing}
-                      onChange={(e) => setLabelForm({...labelForm, verticalSpacing: e.target.value})}
-                      placeholder="2,00"
-                    />
-                  </div>
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs">Ancho (mm)</Label>
+                  <Input className="h-7 text-xs w-20" value={labelForm.labelWidth}
+                    onChange={e => setLabelForm({...labelForm, labelWidth: e.target.value})} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs">Alto (mm)</Label>
+                  <Input className="h-7 text-xs w-20" value={labelForm.labelHeight}
+                    onChange={e => setLabelForm({...labelForm, labelHeight: e.target.value})} />
                 </div>
               </div>
             </div>
 
-            {/* Botones de Acción */}
-            <div className="flex justify-end gap-2 border-t pt-4">
-              <Button variant="outline" onClick={() => {
-                setIsLabelDialogOpen(false);
-                setEditingLabel(null);
-              }}>
-                Cancelar
-              </Button>
-              <Button onClick={handleSaveLabel}>
-                {editingLabel ? 'Guardar cambios' : 'Crear diseño'}
-              </Button>
+            {/* Área principal con tabs */}
+            <Tabs defaultValue="campos" className="flex flex-col flex-1 overflow-hidden">
+              <TabsList className="mx-4 mt-2 shrink-0 w-fit">
+                <TabsTrigger value="campos" className="text-xs">Diseño de campos</TabsTrigger>
+                <TabsTrigger value="config" className="text-xs">Configuración de página</TabsTrigger>
+              </TabsList>
+
+              {/* TAB: Diseño de campos */}
+              <TabsContent value="campos" className="flex-1 overflow-hidden m-0 mt-2">
+                <div className="flex h-full border-t">
+
+                  {/* Panel izquierdo: campos disponibles */}
+                  <div className="w-44 shrink-0 border-r flex flex-col overflow-hidden">
+                    <div className="px-2 py-1 bg-gray-100 border-b">
+                      <p className="text-xs font-semibold text-gray-700">Campos disponibles</p>
+                    </div>
+                    <div className="flex-1 overflow-y-auto">
+                      {ALL_LABEL_FIELDS.map(f => {
+                        const isAdded = labelFields.some(lf => lf.key === f.key);
+                        return (
+                          <div
+                            key={f.key}
+                            className={`flex items-center gap-1 px-2 py-1 border-b text-xs cursor-pointer hover:bg-gray-50 ${
+                              isAdded && selectedFieldKey === f.key ? 'bg-blue-50' : ''
+                            }`}
+                            onClick={() => isAdded && setSelectedFieldKey(f.key)}
+                          >
+                            <button
+                              className={`w-4 h-4 rounded text-white text-[10px] leading-none flex items-center justify-center shrink-0 ${
+                                isAdded ? 'bg-red-400 hover:bg-red-600' : 'bg-green-500 hover:bg-green-700'
+                              }`}
+                              onClick={e => { e.stopPropagation(); isAdded ? removeLabelField(f.key) : addLabelField(f.key); }}
+                              title={isAdded ? 'Quitar campo' : 'Agregar campo'}
+                            >
+                              {isAdded ? '−' : '+'}
+                            </button>
+                            <span className={isAdded ? 'text-blue-700 font-medium' : 'text-gray-600'}>{f.label}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="px-2 py-1 border-t bg-gray-50">
+                      <p className="text-[10px] text-gray-400 leading-tight">
+                        {labelFields.length} campo{labelFields.length !== 1 ? 's' : ''} en diseño
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Panel central: vista previa */}
+                  <div className="flex-1 flex flex-col items-center overflow-auto bg-gray-200 p-4">
+                    {(() => {
+                      const lw = parseFloat(labelForm.labelWidth.replace(',', '.')) || 75;
+                      const lh = parseFloat(labelForm.labelHeight.replace(',', '.')) || 25;
+                      const sc = Math.min(480 / lw, 320 / lh, 10);
+                      return (
+                        <>
+                          <p className="text-[10px] text-gray-500 mb-2">
+                            Haz clic en un campo para seleccionarlo • {lw} × {lh} mm
+                          </p>
+                          <div
+                            className="relative bg-white shadow-md"
+                            style={{
+                              width: lw * sc,
+                              height: lh * sc,
+                              border: '1.5px solid #555',
+                            }}
+                            onClick={() => setSelectedFieldKey(null)}
+                          >
+                            {/* Grid de referencia (cada 5mm) */}
+                            <svg className="absolute inset-0 pointer-events-none" width={lw * sc} height={lh * sc} style={{ opacity: 0.12 }}>
+                              {Array.from({ length: Math.floor(lw / 5) + 1 }, (_, i) => (
+                                <line key={`v${i}`} x1={i * 5 * sc} y1={0} x2={i * 5 * sc} y2={lh * sc} stroke="#666" strokeWidth="0.5" />
+                              ))}
+                              {Array.from({ length: Math.floor(lh / 5) + 1 }, (_, i) => (
+                                <line key={`h${i}`} x1={0} y1={i * 5 * sc} x2={lw * sc} y2={i * 5 * sc} stroke="#666" strokeWidth="0.5" />
+                              ))}
+                            </svg>
+                            {/* Campos posicionados */}
+                            {labelFields.filter(f => f.visible).map(f => (
+                              <div
+                                key={f.key}
+                                className={`absolute overflow-hidden cursor-pointer select-none ${
+                                  selectedFieldKey === f.key
+                                    ? 'outline outline-2 outline-blue-500 z-10'
+                                    : 'outline outline-1 outline-dashed outline-gray-300 hover:outline-gray-500'
+                                }`}
+                                style={{
+                                  left: f.x * sc,
+                                  top: f.y * sc,
+                                  width: f.width * sc,
+                                  height: f.height * sc,
+                                  fontSize: Math.max(f.fontSize * sc / 6, 6),
+                                  fontWeight: f.bold ? 'bold' : 'normal',
+                                  fontStyle: f.italic ? 'italic' : 'normal',
+                                  textDecoration: f.underline ? 'underline' : 'none',
+                                  textAlign: f.align,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  padding: '0 1px',
+                                  backgroundColor: selectedFieldKey === f.key ? 'rgba(219,234,254,0.5)' : 'transparent',
+                                }}
+                                onClick={e => { e.stopPropagation(); setSelectedFieldKey(f.key); }}
+                              >
+                                {f.key === 'ean-barras' ? (
+                                  <svg width="100%" height="100%">
+                                    {[0,4,7,11,14,18,21,26,29,33,36,40,43,47,50,54,57,61,64,68,71,75,78,82].map((x, i) => (
+                                      <rect key={i} x={`${(x / 85) * 100}%`} width={`${((i % 3 === 0 ? 2 : i % 3 === 1 ? 1 : 3) / 85) * 100}%`} height="80%" y="10%" fill="black" />
+                                    ))}
+                                    <text x="50%" y="95%" textAnchor="middle" fontSize="6" fontFamily="monospace">7700001234567</text>
+                                  </svg>
+                                ) : (
+                                  <span className="truncate w-full">{FIELD_PREVIEW[f.key] || f.key}</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                          <p className="text-[10px] text-gray-400 mt-2">
+                            Escala 1mm = {sc.toFixed(1)}px
+                          </p>
+                        </>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Panel derecho: formato del campo */}
+                  <div className="w-56 shrink-0 border-l flex flex-col overflow-hidden">
+                    {selectedField ? (
+                      <>
+                        <div className="px-3 py-2 bg-blue-50 border-b">
+                          <p className="text-xs font-semibold text-blue-800">
+                            {ALL_LABEL_FIELDS.find(f => f.key === selectedField.key)?.label || selectedField.key}
+                          </p>
+                        </div>
+                        <div className="flex-1 overflow-y-auto divide-y">
+
+                          {/* Alineación */}
+                          <div className="p-2 space-y-1">
+                            <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">Alineación</p>
+                            <div className="flex gap-1">
+                              {(['left', 'center', 'right'] as const).map(a => (
+                                <button
+                                  key={a}
+                                  className={`flex-1 h-7 rounded border flex items-center justify-center ${
+                                    selectedField.align === a ? 'bg-blue-500 text-white border-blue-500' : 'border-gray-200 hover:bg-gray-50'
+                                  }`}
+                                  onClick={() => updateLabelField(selectedField.key, { align: a })}
+                                  title={a}
+                                >
+                                  {a === 'left' ? <AlignLeft className="h-3 w-3" /> :
+                                   a === 'center' ? <AlignCenter className="h-3 w-3" /> :
+                                   <AlignRight className="h-3 w-3" />}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Fuente */}
+                          <div className="p-2 space-y-2">
+                            <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">Fuente</p>
+                            <div className="flex items-center gap-1">
+                              <Label className="text-xs text-gray-500 w-16 shrink-0">Tamaño pt</Label>
+                              <Input
+                                type="number" min="4" max="72" step="1"
+                                className="h-7 text-xs"
+                                value={selectedField.fontSize}
+                                onChange={e => updateLabelField(selectedField.key, { fontSize: Number(e.target.value) })}
+                              />
+                            </div>
+                            <div className="flex gap-1">
+                              <button
+                                className={`flex-1 h-7 rounded border text-xs font-bold ${
+                                  selectedField.bold ? 'bg-blue-500 text-white border-blue-500' : 'border-gray-200 hover:bg-gray-50'
+                                }`}
+                                onClick={() => updateLabelField(selectedField.key, { bold: !selectedField.bold })}
+                              >N</button>
+                              <button
+                                className={`flex-1 h-7 rounded border text-xs italic ${
+                                  selectedField.italic ? 'bg-blue-500 text-white border-blue-500' : 'border-gray-200 hover:bg-gray-50'
+                                }`}
+                                onClick={() => updateLabelField(selectedField.key, { italic: !selectedField.italic })}
+                              >K</button>
+                              <button
+                                className={`flex-1 h-7 rounded border text-xs underline ${
+                                  selectedField.underline ? 'bg-blue-500 text-white border-blue-500' : 'border-gray-200 hover:bg-gray-50'
+                                }`}
+                                onClick={() => updateLabelField(selectedField.key, { underline: !selectedField.underline })}
+                              >S</button>
+                            </div>
+                          </div>
+
+                          {/* Posición */}
+                          <div className="p-2 space-y-2">
+                            <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1">
+                              <Move className="h-3 w-3" /> Posición (mm)
+                            </p>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <Label className="text-[10px] text-gray-500">X (izq)</Label>
+                                <Input type="number" min="0" step="0.5" className="h-7 text-xs"
+                                  value={selectedField.x}
+                                  onChange={e => updateLabelField(selectedField.key, { x: Number(e.target.value) })} />
+                              </div>
+                              <div>
+                                <Label className="text-[10px] text-gray-500">Y (sup)</Label>
+                                <Input type="number" min="0" step="0.5" className="h-7 text-xs"
+                                  value={selectedField.y}
+                                  onChange={e => updateLabelField(selectedField.key, { y: Number(e.target.value) })} />
+                              </div>
+                              <div>
+                                <Label className="text-[10px] text-gray-500">Ancho</Label>
+                                <Input type="number" min="1" step="0.5" className="h-7 text-xs"
+                                  value={selectedField.width}
+                                  onChange={e => updateLabelField(selectedField.key, { width: Number(e.target.value) })} />
+                              </div>
+                              <div>
+                                <Label className="text-[10px] text-gray-500">Alto</Label>
+                                <Input type="number" min="1" step="0.5" className="h-7 text-xs"
+                                  value={selectedField.height}
+                                  onChange={e => updateLabelField(selectedField.key, { height: Number(e.target.value) })} />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Visibilidad */}
+                          <div className="p-2 flex items-center gap-2">
+                            <Switch
+                              checked={selectedField.visible}
+                              onCheckedChange={v => updateLabelField(selectedField.key, { visible: v })}
+                            />
+                            <Label className="text-xs text-gray-600">Visible en impresión</Label>
+                          </div>
+
+                          {/* Botón quitar */}
+                          <div className="p-2">
+                            <Button
+                              variant="outline" size="sm"
+                              className="w-full h-7 text-xs text-red-600 border-red-200 hover:bg-red-50"
+                              onClick={() => removeLabelField(selectedField.key)}
+                            >
+                              <Trash2 className="h-3 w-3 mr-1" />
+                              Quitar campo
+                            </Button>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex-1 flex flex-col items-center justify-center p-4 text-center">
+                        <Barcode className="h-8 w-8 text-gray-300 mb-2" />
+                        <p className="text-xs text-gray-400">
+                          Agrega campos desde la lista y haz clic para editar su formato y posición
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+              </TabsContent>
+
+              {/* TAB: Configuración de página */}
+              <TabsContent value="config" className="flex-1 overflow-y-auto m-0 mt-0 border-t">
+                <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
+                  <div>
+                    <Label className="text-sm">Descripción del diseño</Label>
+                    <Input className="mt-1" value={labelForm.description}
+                      onChange={e => setLabelForm({...labelForm, description: e.target.value})}
+                      placeholder="Descripción adicional del diseño" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-sm">Etiquetas por fila</Label>
+                      <Input className="mt-1" value={labelForm.labelsPerRow}
+                        onChange={e => setLabelForm({...labelForm, labelsPerRow: e.target.value})} placeholder="3" />
+                    </div>
+                    <div>
+                      <Label className="text-sm">Etiquetas por columna</Label>
+                      <Input className="mt-1" value={labelForm.labelsPerColumn}
+                        onChange={e => setLabelForm({...labelForm, labelsPerColumn: e.target.value})} placeholder="9" />
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm">Margen superior (mm)</Label>
+                    <Input className="mt-1" value={labelForm.topMargin}
+                      onChange={e => setLabelForm({...labelForm, topMargin: e.target.value})} placeholder="12,00" />
+                  </div>
+                  <div>
+                    <Label className="text-sm">Margen izquierdo (mm)</Label>
+                    <Input className="mt-1" value={labelForm.leftMargin}
+                      onChange={e => setLabelForm({...labelForm, leftMargin: e.target.value})} placeholder="5,60" />
+                  </div>
+                  <div>
+                    <Label className="text-sm">Espaciado horizontal entre etiquetas (mm)</Label>
+                    <Input className="mt-1" value={labelForm.horizontalSpacing}
+                      onChange={e => setLabelForm({...labelForm, horizontalSpacing: e.target.value})} placeholder="1,00" />
+                  </div>
+                  <div>
+                    <Label className="text-sm">Espaciado vertical entre etiquetas (mm)</Label>
+                    <Input className="mt-1" value={labelForm.verticalSpacing}
+                      onChange={e => setLabelForm({...labelForm, verticalSpacing: e.target.value})} placeholder="2,00" />
+                  </div>
+                  <div className="md:col-span-2 p-3 bg-blue-50 rounded border border-blue-200">
+                    <p className="text-xs text-blue-800">
+                      <strong>Resumen:</strong> {labelForm.labelWidth} × {labelForm.labelHeight} mm |
+                      {' '}{parseInt(labelForm.labelsPerRow||'1') * parseInt(labelForm.labelsPerColumn||'1')} etiquetas por hoja
+                      ({labelForm.labelsPerRow} × {labelForm.labelsPerColumn})
+                    </p>
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
+
+            {/* Footer */}
+            <div className="flex justify-between items-center border-t px-4 py-3 shrink-0 bg-gray-50">
+              <p className="text-xs text-gray-500">
+                {labelFields.filter(f => f.visible).length} campo{labelFields.filter(f => f.visible).length !== 1 ? 's' : ''} visibles
+              </p>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => { setIsLabelDialogOpen(false); setEditingLabel(null); }}>
+                  Cancelar
+                </Button>
+                <Button size="sm" onClick={handleSaveLabel}>
+                  {editingLabel ? 'Guardar cambios' : 'Crear diseño'}
+                </Button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>

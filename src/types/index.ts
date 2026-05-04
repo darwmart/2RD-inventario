@@ -371,12 +371,26 @@ export type WarehouseTransaction = {
   createdBy: string;
 };
 
+export type LabelField = {
+  key: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  fontSize: number;
+  bold: boolean;
+  italic: boolean;
+  underline: boolean;
+  align: 'left' | 'center' | 'right';
+  visible: boolean;
+};
+
 export type LabelDesign = {
   id: string;
-  code: string; // Código del modelo (ej: 10002, 10003, 2)
-  name: string; // Nombre del modelo (ej: "Copia de Cód. Barras")
+  code: string;
+  name: string;
   description?: string;
-  documentType: string; // Tipo de documento (ej: "Etiquetas de artículos")
+  documentType: string;
   printerName: string;
   labelWidth: string; // mm
   labelHeight: string; // mm
@@ -386,5 +400,6 @@ export type LabelDesign = {
   leftMargin: string; // mm
   horizontalSpacing: string; // mm
   verticalSpacing: string; // mm
+  fields?: LabelField[];
   createdAt: Date;
 };

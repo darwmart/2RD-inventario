@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Product, Category, Supplier } from '@/types';
-import { Save, Package, Plus, FolderPlus } from 'lucide-react';
+import { Save, Package, Plus, FolderPlus, RefreshCw, CheckCircle, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import ImageUploader from '@/components/ImageUploader';
 
@@ -309,6 +309,33 @@ export default function ProductFormDialog({
     resetForm();
   };
 
+  // ── EAN-13 ────────────────────────────────────────────────────────────────
+
+  const calcEan13Check = (digits12: string): number => {
+    const d = digits12.split('').map(Number);
+    const sum = d.reduce((acc, n, i) => acc + n * (i % 2 === 0 ? 1 : 3), 0);
+    return (10 - (sum % 10)) % 10;
+  };
+
+  const validateEan13 = (code: string): boolean => {
+    if (!/^\d{13}$/.test(code)) return false;
+    return calcEan13Check(code.slice(0, 12)) === Number(code[12]);
+  };
+
+  const generateEan13 = () => {
+    // Prefijo Colombia 770 + 9 dígitos basados en timestamp
+    const base = '770' + String(Date.now()).slice(-9);
+    const check = calcEan13Check(base);
+    setBarcode(base + check);
+  };
+
+  const barcodeStatus = (() => {
+    if (!barcode) return null;
+    if (barcode.length === 13) return validateEan13(barcode) ? 'valid' : 'invalid';
+    if (/^\d+$/.test(barcode) && barcode.length < 13) return 'incomplete';
+    return null;
+  })();
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[800px] max-h-[90vh] overflow-hidden p-0">
@@ -339,12 +366,45 @@ export default function ProductFormDialog({
                 </div>
                 <div>
                   <Label className="text-xs font-medium">Código de barras</Label>
-                  <Input
-                    value={barcode}
-                    onChange={(e) => setBarcode(e.target.value)}
-                    placeholder="EAN-13"
-                    className="h-9"
-                  />
+                  <div className="flex gap-1">
+                    <div className="relative flex-1">
+                      <Input
+                        value={barcode}
+                        onChange={(e) => setBarcode(e.target.value.replace(/\D/g, '').slice(0, 13))}
+                        placeholder="EAN-13 (13 dígitos)"
+                        className={`h-9 pr-7 font-mono ${
+                          barcodeStatus === 'valid' ? 'border-green-500 focus-visible:ring-green-400' :
+                          barcodeStatus === 'invalid' ? 'border-red-400 focus-visible:ring-red-400' : ''
+                        }`}
+                        maxLength={13}
+                      />
+                      {barcodeStatus === 'valid' && (
+                        <CheckCircle className="absolute right-2 top-2.5 h-4 w-4 text-green-500 pointer-events-none" />
+                      )}
+                      {barcodeStatus === 'invalid' && (
+                        <XCircle className="absolute right-2 top-2.5 h-4 w-4 text-red-400 pointer-events-none" />
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={generateEan13}
+                      className="h-9 px-2 shrink-0"
+                      title="Generar EAN-13 automático (prefijo Colombia 770)"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                  {barcodeStatus === 'invalid' && (
+                    <p className="text-xs text-red-500 mt-0.5">Dígito verificador incorrecto</p>
+                  )}
+                  {barcodeStatus === 'incomplete' && (
+                    <p className="text-xs text-gray-400 mt-0.5">{barcode.length}/13 dígitos</p>
+                  )}
+                  {barcodeStatus === 'valid' && (
+                    <p className="text-xs text-green-600 mt-0.5">EAN-13 válido</p>
+                  )}
                 </div>
                 <div>
                   <div className="flex items-center justify-between mb-1">

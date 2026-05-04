@@ -87,8 +87,15 @@ export default function CashRegister() {
   // Función para abrir caja
   const handleOpenCashRegister = () => {
     const amount = parseMoney(openingAmount);
-    if (amount < 0) {
+    if (amount <= 0) {
       toast.error('Ingresa un monto válido');
+      return;
+    }
+
+    const cajaFuerte = banks.find(b => b.id === 'caja-principal');
+    const saldoCajaFuerte = cajaFuerte?.balance ?? 0;
+    if (amount > saldoCajaFuerte) {
+      toast.error(`Saldo insuficiente en Caja Fuerte. Disponible: $${saldoCajaFuerte.toLocaleString('es-CO')}`);
       return;
     }
 
@@ -102,18 +109,21 @@ export default function CashRegister() {
 
     setCashSessions([...cashSessions, newSession]);
 
-    // Registrar en contabilidad como ingreso
+    // Debitar saldo de Caja Fuerte (para validaciones futuras)
+    updateBankBalance('caja-principal', -amount);
+
+    // Registrar en contabilidad: dinero SALE de Caja Fuerte hacia la caja registradora
     const newRecord: AccountingRecord = {
       id: Date.now(),
-      tipo: 'ingreso',
+      tipo: 'traspaso',
       descripcion: `Apertura de caja - ${selectedDate}`,
       monto: amount,
-      banco: 'efectivo',
+      banco: 'caja-principal',
       fecha: new Date().toISOString(),
     };
     setAccountingRecords([...accountingRecords, newRecord]);
 
-    toast.success(`Caja abierta con $${amount.toLocaleString('es-CO')}`);
+    toast.success(`Caja abierta con $${amount.toLocaleString('es-CO')} — debitado de Caja Fuerte`);
     setOpeningAmount('');
     setIsOpeningDialog(false);
   };

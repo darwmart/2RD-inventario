@@ -233,21 +233,36 @@ export default function Accounting() {
         });
       });
 
-    // 5. Traspasos desde Arqueo de Caja → ingresan a Caja Fuerte
-    // Las aperturas de caja son internas del Arqueo y no afectan la contabilidad
+    // 5. Traspasos entre Caja Registradora y Caja Fuerte
     accountingRecords.forEach(r => {
       if (r.tipo === 'traspaso') {
-        list.push({
-          id: `transfer-${r.id}`,
-          date: new Date(r.fecha),
-          type: 'traspaso',
-          description: r.descripcion || 'Traspaso a Caja Fuerte',
-          amount: r.monto,
-          bank: 'caja-principal',
-          bankLabel: getBankLabel('caja-principal'),
-          direction: 'in',
-          settled: true,
-        });
+        if (r.banco === 'caja-principal') {
+          // Apertura de caja: dinero SALE de Caja Fuerte hacia la caja registradora
+          list.push({
+            id: `apertura-${r.id}`,
+            date: new Date(r.fecha),
+            type: 'apertura',
+            description: r.descripcion || 'Apertura de caja',
+            amount: r.monto,
+            bank: 'caja-principal',
+            bankLabel: getBankLabel('caja-principal'),
+            direction: 'out',
+            settled: true,
+          });
+        } else {
+          // Traspaso normal: dinero ENTRA a Caja Fuerte desde caja registradora
+          list.push({
+            id: `transfer-${r.id}`,
+            date: new Date(r.fecha),
+            type: 'traspaso',
+            description: r.descripcion || 'Traspaso a Caja Fuerte',
+            amount: r.monto,
+            bank: 'caja-principal',
+            bankLabel: getBankLabel('caja-principal'),
+            direction: 'in',
+            settled: true,
+          });
+        }
       }
     });
 
@@ -316,6 +331,7 @@ export default function Accounting() {
     gasto:    { label: 'Gasto',    color: 'bg-red-100 text-red-700',      icon: <ArrowUpCircle className="h-3 w-3" /> },
     compra:   { label: 'Compra',   color: 'bg-orange-100 text-orange-700',icon: <ShoppingBag className="h-3 w-3" /> },
     traspaso: { label: 'A Caja Fuerte', color: 'bg-purple-100 text-purple-700', icon: <ArrowRightLeft className="h-3 w-3" /> },
+    apertura: { label: 'Apertura Caja', color: 'bg-indigo-100 text-indigo-700', icon: <ArrowRightLeft className="h-3 w-3" /> },
   };
 
   return (
