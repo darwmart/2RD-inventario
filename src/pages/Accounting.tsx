@@ -200,37 +200,50 @@ export default function Accounting() {
     purchases
       .filter(p => p.status !== 'cancelled')
       .forEach(p => {
-        // Crédito pagado: tiene dueDate (era crédito) Y bankId (fue pagado con markAsPaid)
-        const isPaidCredit = !!(p.paymentDetails?.dueDate && p.paymentDetails?.bankId);
-        // Crédito pendiente: tiene dueDate pero aún no tiene bankId
-        const isUnpaidCredit = !!(p.paymentDetails?.dueDate && !p.paymentDetails?.bankId);
-        if (isUnpaidCredit) return; // crédito pendiente: aún no sale del banco
-        // Factura con pagos parciales: solo mostrar cuando esté completamente pagada
-        if (p.payments && p.payments.length > 0) {
-          const paidTotal = p.payments.reduce((s, pay) => s + pay.amount, 0);
-          if (paidTotal < p.total) return; // saldo pendiente: aún no está cubierta
-        }
-        const isCash = p.paymentDetails?.isCashPayment || p.paymentMethod?.type === 'cash';
-        const bank = isCash
-          ? 'efectivo'
-          : (p.paymentDetails?.bankId ?? 'efectivo');
-        // Para créditos pagados usar la fecha de pago; para compras normales usar la de creación
-        const movDate = isPaidCredit && p.paymentDetails?.paidAt
-          ? new Date(p.paymentDetails.paidAt)
-          : new Date(p.createdAt);
+        // Crédito pendiente (dueDate sin bankId): aún no se ha pagado, no sale del banco
+        const isUnpaidCredit = !!(p.paymentDetails?.dueDate && !p.paymentDetails?.bankId
+          && !(p.payments && p.payments.length > 0));
+        if (isUnpaidCredit) return;
+
         const supplierLabel = p.supplierName || 'Sin proveedor';
         const docLabel = p.supplierInvoiceNumber ?? p.documentNumber ?? '—';
-        list.push({
-          id: `purchase-${p.id}`,
-          date: movDate,
-          type: 'compra',
-          description: `Compra — ${supplierLabel} | Factura: ${docLabel}`,
-          amount: p.total,
-          bank,
-          bankLabel: getBankLabel(bank),
-          direction: 'out',
-          settled: true,
-        });
+
+        if (p.payments && p.payments.length > 0) {
+          // Un movimiento por cada pago registrado → banco correcto en cada uno
+          p.payments.forEach((pay, idx) => {
+            list.push({
+              id: `purchase-${p.id}-pay${idx}`,
+              date: new Date(pay.date),
+              type: 'compra',
+              description: `Compra — ${supplierLabel} | Factura: ${docLabel}`,
+              amount: pay.amount,
+              bank: pay.bankId || 'efectivo',
+              bankLabel: getBankLabel(pay.bankId || 'efectivo'),
+              direction: 'out',
+              settled: true,
+            });
+          });
+        } else {
+          // Pago único en el momento de creación (sin array payments)
+          const isPaidCredit = !!(p.paymentDetails?.dueDate && p.paymentDetails?.bankId);
+          const explicitBankId = p.paymentDetails?.bankId;
+          const isCash = !explicitBankId && (p.paymentDetails?.isCashPayment || p.paymentMethod?.type === 'cash');
+          const bank = isCash ? 'efectivo' : (explicitBankId ?? 'efectivo');
+          const movDate = isPaidCredit && p.paymentDetails?.paidAt
+            ? new Date(p.paymentDetails.paidAt)
+            : new Date(p.createdAt);
+          list.push({
+            id: `purchase-${p.id}`,
+            date: movDate,
+            type: 'compra',
+            description: `Compra — ${supplierLabel} | Factura: ${docLabel}`,
+            amount: p.total,
+            bank,
+            bankLabel: getBankLabel(bank),
+            direction: 'out',
+            settled: true,
+          });
+        }
       });
 
     // 5. Traspasos entre Caja Registradora y Caja Fuerte

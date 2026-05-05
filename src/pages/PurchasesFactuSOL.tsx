@@ -215,22 +215,18 @@ export default function PurchasesFactuSOL() {
 
   // Manejar conversión de albarán a factura
   const handleConvertToInvoice = (deliveryId: string) => {
-    // Aquí abrirías un modal para seleccionar método de pago
-    // Por ahora, uso datos por defecto
     try {
       const invoice = convertDeliveryToInvoice(deliveryId, {
         paymentMethod: {
-          id: 'efectivo',
-          name: 'Efectivo',
-          type: 'cash',
+          id: 'pendiente',
+          name: 'Pendiente',
+          type: 'credit',
           isActive: true,
         },
-        paymentDetails: {
-          isCashPayment: true,
-        },
+        paymentDetails: {},  // sin isCashPayment, sin bankId — se asigna al pagar
       });
 
-      // NO debitamos aquí, se debitará cuando se marque como completada/pagada
+      // NO debitamos aquí, se debitará cuando se marque como completada/pagada con el banco real
 
       toast.success(`Factura ${invoice.documentNumber} creada (pendiente de pago)`);
       setActiveTab('invoice');
