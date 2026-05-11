@@ -14,15 +14,18 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-
-    const ok = login(username.trim(), password);
-    if (ok) {
-      navigate('/', { replace: true });
-    } else {
-      setError('Usuario o contraseña incorrectos');
+    setIsSubmitting(true);
+    try {
+      const ok = await login(username.trim(), password);
+      if (ok) navigate('/', { replace: true });
+      else setError('Usuario o contraseña incorrectos');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -82,8 +85,8 @@ export default function Login() {
             </p>
           )}
 
-          <Button type="submit" className="w-full">
-            Ingresar
+          <Button type="submit" className="w-full" disabled={isSubmitting}>
+            {isSubmitting ? 'Ingresando...' : 'Ingresar'}
           </Button>
         </form>
 

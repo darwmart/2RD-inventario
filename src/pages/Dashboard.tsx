@@ -1,17 +1,16 @@
-import { useInventory } from '@/hooks/useInventory';
-import { useSales } from '@/hooks/useSales';
+import { useProducts, useSalesData } from '@/hooks/queries';
 import DashboardStatsCards from '@/components/dashboard/DashboardStatsCards';
 import LowStockWidget from '@/components/dashboard/LowStockWidget';
 import RecentSalesWidget from '@/components/dashboard/RecentSalesWidget';
 
 export default function Dashboard() {
-  const { products, getLowStockProducts } = useInventory();
-  const { sales } = useSales();
+  const { products, getLowStockProducts } = useProducts();
+  const { sales } = useSalesData();
 
   const lowStockProducts = getLowStockProducts();
-  const todaySales = sales.filter(sale => {
+  const todaySales = sales.filter(s => {
     const today = new Date().toDateString();
-    return new Date(sale.createdAt).toDateString() === today && sale.status === 'completed';
+    return new Date(s.createdAt).toDateString() === today && s.status === 'completed';
   });
 
   return (

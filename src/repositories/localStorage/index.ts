@@ -1,0 +1,10 @@
+export { LocalStorageProductRepository } from './LocalStorageProductRepository';
+export { LocalStorageCategoryRepository } from './LocalStorageCategoryRepository';
+export { LocalStorageSupplierRepository } from './LocalStorageSupplierRepository';
+export { LocalStorageSaleRepository } from './LocalStorageSaleRepository';
+export { LocalStorageCustomerRepository } from './LocalStorageCustomerRepository';
+export { LocalStorageAdvisorRepository } from './LocalStorageAdvisorRepository';
+export { LocalStoragePaymentMethodRepository } from './LocalStoragePaymentMethodRepository';
+export { LocalStorageExpenseRepository } from './LocalStorageExpenseRepository';
+export { LocalStorageBankRepository } from './LocalStorageBankRepository';
+export { LocalStorageSettingsRepository } from './LocalStorageSettingsRepository';

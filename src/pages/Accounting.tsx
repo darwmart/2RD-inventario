@@ -176,7 +176,13 @@ export default function Accounting() {
         });
       } else {
         list.push({
-          id: `transfer-${r.id}`, date: new Date(r.fecha), type: 'traspaso',
+          id: `transfer-out-${r.id}`, date: new Date(r.fecha), type: 'traspaso',
+          description: r.descripcion || 'Traspaso a Caja Fuerte',
+          amount: r.monto, bank: 'efectivo', bankLabel: 'Efectivo',
+          direction: 'out', settled: true,
+        });
+        list.push({
+          id: `transfer-in-${r.id}`, date: new Date(r.fecha), type: 'traspaso',
           description: r.descripcion || 'Traspaso a Caja Fuerte',
           amount: r.monto, bank: 'caja-principal', bankLabel: getBankLabel('caja-principal'),
           direction: 'in', settled: true,

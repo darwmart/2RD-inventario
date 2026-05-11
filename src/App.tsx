@@ -1,6 +1,7 @@
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from '@/infrastructure/queryClient';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Layout from './components/Layout';
@@ -23,8 +24,6 @@ import Customers from './pages/Customers';
 import StockConciliation from './pages/StockConciliation';
 import AdvisorCommissions from './pages/AdvisorCommissions';
 import Reports from './pages/Reports';
-
-const queryClient = new QueryClient();
 
 function AppRoutes() {
   const { user } = useAuth();

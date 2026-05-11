@@ -1,0 +1,11 @@
+export type { IBaseRepository } from './IBaseRepository';
+export type { IProductRepository } from './IProductRepository';
+export type { ICategoryRepository, CreateCategoryInput } from './ICategoryRepository';
+export type { ISupplierRepository, CreateSupplierInput } from './ISupplierRepository';
+export type { ISaleRepository } from './ISaleRepository';
+export type { ICustomerRepository, CreateCustomerInput } from './ICustomerRepository';
+export type { IAdvisorRepository, CreateAdvisorInput } from './IAdvisorRepository';
+export type { IPaymentMethodRepository, CreatePaymentMethodInput } from './IPaymentMethodRepository';
+export type { IExpenseRepository, CreateExpenseInput } from './IExpenseRepository';
+export type { IBankRepository, CreateBankInput } from './IBankRepository';
+export type { ISettingsRepository } from './ISettingsRepository';

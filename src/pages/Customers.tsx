@@ -1,21 +1,20 @@
 import { useState, useMemo } from 'react';
-import { useCustomers } from '@/hooks/useCustomers';
+import { useCustomersQuery } from '@/hooks/queries';
 import { Customer } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, Search } from 'lucide-react';
-import { toast } from 'sonner';
 import CustomerStatsCards from '@/components/customers/CustomerStatsCards';
 import CustomerTable from '@/components/customers/CustomerTable';
 import CustomerFormDialog, { CustomerFormData } from '@/components/customers/CustomerFormDialog';
 import CustomerHistoryDialog from '@/components/customers/CustomerHistoryDialog';
 
 export default function Customers() {
-  const { customers, addCustomer, updateCustomer, deleteCustomer } = useCustomers();
+  const { customers, addCustomer, updateCustomer, deleteCustomer } = useCustomersQuery();
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [searchTerm, setSearchTerm]         = useState('');
+  const [isFormOpen, setIsFormOpen]         = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen]   = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
@@ -23,28 +22,26 @@ export default function Customers() {
     const q = searchTerm.toLowerCase();
     return customers.filter(c =>
       c.name.toLowerCase().includes(q) ||
-      (c.document || '').toLowerCase().includes(q) ||
-      (c.phone || '').includes(q)
+      (c.document ?? '').toLowerCase().includes(q) ||
+      (c.phone ?? '').includes(q)
     );
   }, [customers, searchTerm]);
 
   const stats = useMemo(() => ({
-    total: customers.length,
-    active: customers.filter(c => c.isActive).length,
-    totalBalance: customers.reduce((sum, c) => sum + (c.balance || 0), 0),
+    total:        customers.length,
+    active:       customers.filter(c => c.isActive).length,
+    totalBalance: customers.reduce((sum, c) => sum + (c.balance ?? 0), 0),
   }), [customers]);
 
-  const openNew = () => { setEditingCustomer(null); setIsFormOpen(true); };
-  const openEdit = (customer: Customer) => { setEditingCustomer(customer); setIsFormOpen(true); };
-  const openHistory = (customer: Customer) => { setSelectedCustomer(customer); setIsHistoryOpen(true); };
+  const openNew  = () => { setEditingCustomer(null); setIsFormOpen(true); };
+  const openEdit = (c: Customer) => { setEditingCustomer(c); setIsFormOpen(true); };
+  const openHistory = (c: Customer) => { setSelectedCustomer(c); setIsHistoryOpen(true); };
 
   const handleSave = (data: CustomerFormData) => {
     if (editingCustomer) {
       updateCustomer(editingCustomer.id, data);
-      toast.success('Cliente actualizado');
     } else {
       addCustomer(data);
-      toast.success('Cliente creado');
     }
     setIsFormOpen(false);
     setEditingCustomer(null);
@@ -53,7 +50,6 @@ export default function Customers() {
   const handleDelete = (customer: Customer) => {
     if (!confirm(`¿Eliminar al cliente "${customer.name}"?`)) return;
     deleteCustomer(customer.id);
-    toast.success('Cliente eliminado');
   };
 
   return (
@@ -84,7 +80,12 @@ export default function Customers() {
         />
       </div>
 
-      <CustomerTable customers={filtered} onEdit={openEdit} onDelete={handleDelete} onHistory={openHistory} />
+      <CustomerTable
+        customers={filtered}
+        onEdit={openEdit}
+        onDelete={handleDelete}
+        onHistory={openHistory}
+      />
 
       <CustomerFormDialog
         open={isFormOpen}

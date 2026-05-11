@@ -1,7 +1,10 @@
 import { useState } from 'react';
-import { useInventory } from '@/hooks/useInventory';
-import { useSales } from '@/hooks/useSales';
-import { useSettings } from '@/hooks/useSettings';
+import { useProducts } from '@/hooks/queries/useProducts';
+import { useSalesData } from '@/hooks/queries/useSalesData';
+import { useAdvisors } from '@/hooks/queries/useAdvisors';
+import { usePaymentMethods } from '@/hooks/queries/usePaymentMethods';
+import { useBankSettings } from '@/hooks/queries/useBankSettings';
+import { useCompanySettings } from '@/hooks/queries/useCompanySettings';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
@@ -18,9 +21,12 @@ const PAYMENT_TO_BANK: Record<string, string | null> = {
 };
 
 export default function Quotes() {
-  const { products, updateStock } = useInventory();
-  const { addSale, advisors, sales, updateSale, paymentMethods, addSaleDeposit } = useSales();
-  const { companyInfo, taxSettings, updateBankBalance, banks } = useSettings();
+  const { products } = useProducts();
+  const { sales, addSaleAsync, addDeposit, convertToSale, cancelSale } = useSalesData();
+  const { advisors } = useAdvisors();
+  const { paymentMethods } = usePaymentMethods();
+  const { banks, updateBankBalance } = useBankSettings();
+  const { companyInfo, taxSettings } = useCompanySettings();
 
   const [isCreatingQuote, setIsCreatingQuote] = useState(false);
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
@@ -37,7 +43,7 @@ export default function Quotes() {
     if (bankId && banks.find(b => b.id === bankId)) updateBankBalance(bankId, amount);
   };
 
-  const handleCreate = (data: CreateQuoteFormData) => {
+  const handleCreate = async (data: CreateQuoteFormData) => {
     if (data.items.length === 0) { toast.error('Agrega productos para crear la cotización'); return; }
     if (!data.advisorId) { toast.error('Selecciona un asesor'); return; }
 
@@ -54,32 +60,29 @@ export default function Quotes() {
       ? paymentMethods.find(p => p.id === data.paymentMethodId)!
       : { id: 'pending', name: 'Pendiente', type: 'cash' as const, isActive: true };
 
-    const sale = addSale({
-      advisorId: data.advisorId,
-      items: data.items,
-      paymentMethod: method,
-      type: data.type,
-      ivaTotal: data.totalIVA,
-      ...(data.type === 'reserved' ? {
-        deposit: data.deposit,
-        customerName: data.customerName,
-        customerDocument: data.customerDocument,
-        customerPhone: data.customerPhone,
-      } : {}),
-    });
-
-    if (data.type === 'reserved') {
-      data.items.forEach(item => {
-        const product = products.find(p => p.id === item.productId);
-        if (product) updateStock(item.productId, product.stock, (product.reservedStock ?? 0) + item.quantity);
+    try {
+      await addSaleAsync({
+        advisorId: data.advisorId,
+        items: data.items,
+        paymentMethod: method,
+        type: data.type,
+        ivaTotal: data.totalIVA,
+        ...(data.type === 'reserved' ? {
+          deposit: data.deposit,
+          customerName: data.customerName,
+          customerDocument: data.customerDocument,
+          customerPhone: data.customerPhone,
+        } : {}),
       });
-      if (data.deposit && data.deposit > 0 && data.paymentMethodId) {
+
+      if (data.type === 'reserved' && data.deposit && data.deposit > 0 && data.paymentMethodId) {
         applyBankDeposit(data.paymentMethodId, data.deposit);
       }
-    }
 
-    toast.success(`${data.type === 'quote' ? 'Cotización' : 'Separado'} ${sale.saleNumber} creada exitosamente`);
-    setIsCreatingQuote(false);
+      setIsCreatingQuote(false);
+    } catch {
+      // El error ya es notificado por useSalesData via toast
+    }
   };
 
   const handleConfirmDeposit = (amount: number, paymentMethodId: string) => {
@@ -91,40 +94,13 @@ export default function Quotes() {
     const remaining = Math.max(0, sale.total - (sale.deposit ?? 0));
     if (amount > remaining) { toast.error('El abono no puede superar el saldo pendiente'); return; }
 
-    try {
-      addSaleDeposit(depositSaleId, amount, paymentMethodId);
-      applyBankDeposit(paymentMethodId, amount);
-      toast.success('Abono registrado y saldo actualizado');
-      setDepositDialogOpen(false);
-      setDepositSaleId('');
-    } catch (error) {
-      console.error(error);
-      toast.error('No se pudo registrar el abono');
-    }
-  };
+    const method = paymentMethods.find(p => p.id === paymentMethodId);
+    if (!method) { toast.error('Método de pago no encontrado'); return; }
 
-  const convertToSale = (saleId: string) => {
-    const sale = sales.find(s => s.id === saleId);
-    if (sale?.type === 'reserved') {
-      sale.items.forEach(item => {
-        const product = products.find(p => p.id === item.productId);
-        if (product) updateStock(item.productId, product.stock - item.quantity, 0);
-      });
-    }
-    updateSale(saleId, { status: 'completed' });
-    toast.success('Convertido a venta exitosamente');
-  };
-
-  const cancelQuote = (saleId: string) => {
-    const sale = sales.find(s => s.id === saleId);
-    if (sale?.type === 'reserved') {
-      sale.items.forEach(item => {
-        const product = products.find(p => p.id === item.productId);
-        if (product) updateStock(item.productId, product.stock, (product.reservedStock ?? 0) - item.quantity);
-      });
-    }
-    updateSale(saleId, { status: 'cancelled' });
-    toast.success('Cotización cancelada');
+    addDeposit(depositSaleId, amount, method);
+    applyBankDeposit(paymentMethodId, amount);
+    setDepositDialogOpen(false);
+    setDepositSaleId('');
   };
 
   return (
@@ -145,14 +121,14 @@ export default function Quotes() {
             quotes={quotes}
             companyInfo={companyInfo}
             onConvert={convertToSale}
-            onCancel={cancelQuote}
+            onCancel={cancelSale}
           />
           <ReservedList
             reserved={reserved}
             companyInfo={companyInfo}
             onDeposit={id => { setDepositSaleId(id); setDepositDialogOpen(true); }}
             onConvert={convertToSale}
-            onCancel={cancelQuote}
+            onCancel={cancelSale}
           />
         </div>
 

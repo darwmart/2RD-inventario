@@ -8,15 +8,14 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children, requireAdmin = false }: ProtectedRouteProps) {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, isLoading } = useAuth();
 
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
+  // Espera a que Supabase restaure la sesión antes de redirigir
+  if (isLoading) return null;
 
-  if (requireAdmin && !isAdmin()) {
-    return <Navigate to="/" replace />;
-  }
+  if (!user) return <Navigate to="/login" replace />;
+
+  if (requireAdmin && !isAdmin()) return <Navigate to="/" replace />;
 
   return <>{children}</>;
 }
