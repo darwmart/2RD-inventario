@@ -1,7 +1,13 @@
 import { useCallback } from 'react';
 import { Sale, SaleItem, PaymentMethod, Advisor } from '@/types';
 import { useLocalStorage } from './useLocalStorage';
-import { v4 as uuidv4 } from 'uuid';
+import {
+  buildSale,
+  createPaymentMethod,
+  createAdvisor,
+  addDepositToSale,
+  filterSalesByDate,
+} from '@/domain/sales';
 
 export function useSales() {
   const [sales, setSales] = useLocalStorage<Sale[]>('sales', []);
@@ -15,10 +21,10 @@ export function useSales() {
     { id: '7', name: 'Transfiya', type: 'electronic', isActive: true },
     { id: '8', name: 'Sistecredito', type: 'credit', isActive: true },
     { id: '9', name: 'Addi', type: 'credit', isActive: true },
-    { id: '10', name: 'Esmiopcion', type: 'credit', isActive: true }
+    { id: '10', name: 'Esmiopcion', type: 'credit', isActive: true },
   ]);
   const [advisors, setAdvisors] = useLocalStorage<Advisor[]>('advisors', [
-    { id: '1', name: 'Administrador', email: 'admin@tienda.com', phone: '', isActive: true, createdAt: new Date() }
+    { id: '1', name: 'Administrador', email: 'admin@tienda.com', phone: '', isActive: true, createdAt: new Date() },
   ]);
 
   const addSale = useCallback((saleData: {
@@ -37,154 +43,80 @@ export function useSales() {
     reteivaAmount?: number;
   }) => {
     const advisor = advisors.find(a => a.id === saleData.advisorId);
-    const subtotal = saleData.items.reduce((sum, item) => sum + item.total, 0);
-    const total = subtotal - (saleData.discount || 0);
-
-    const deposits = (saleData.type === 'reserved' && (saleData.deposit || 0) > 0)
-      ? [{
-          id: uuidv4(),
-          amount: saleData.deposit as number,
-          method: saleData.paymentMethod,
-          createdAt: new Date()
-        }]
-      : undefined;
-
-    const newSale: Sale = {
-      id: uuidv4(),
-      saleNumber: `V${Date.now()}`,
-      advisorId: saleData.advisorId,
-      advisorName: advisor?.name || 'Desconocido',
-      items: saleData.items,
-      subtotal,
-      discount: saleData.discount || 0,
-      total,
-      ivaTotal: saleData.ivaTotal,
-      commission: saleData.commission,
-      commissionAmount: saleData.commissionAmount,
-      reteivaAmount: saleData.reteivaAmount,
-      paymentMethod: saleData.paymentMethod,
-      customerName: saleData.customerName,
-      customerDocument: saleData.customerDocument,
-      customerPhone: saleData.customerPhone,
-      deposit: saleData.deposit,
-      deposits,
-      status: saleData.type === 'sale' ? 'completed' : 'pending',
-      type: saleData.type,
-      createdAt: new Date()
-    };
-
-    setSales(prev => [...prev, newSale]);
-    return newSale;
+    const sale = buildSale({ ...saleData, advisorName: advisor?.name || 'Desconocido' });
+    setSales(prev => [...prev, sale]);
+    return sale;
   }, [setSales, advisors]);
 
   const updateSale = useCallback((id: string, updates: Partial<Sale>) => {
-    setSales(prev => prev.map(sale =>
-      sale.id === id ? { ...sale, ...updates } : sale
-    ));
+    setSales(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
   }, [setSales]);
 
   const deleteSale = useCallback((id: string) => {
-    setSales(prev => prev.filter(sale => sale.id !== id));
+    setSales(prev => prev.filter(s => s.id !== id));
   }, [setSales]);
 
   const getSalesByDate = useCallback((date: string) => {
-    return sales.filter(sale => {
-      const saleDate = new Date(sale.createdAt);
-      const y = saleDate.getFullYear();
-      const m = String(saleDate.getMonth() + 1).padStart(2, '0');
-      const d = String(saleDate.getDate()).padStart(2, '0');
-      const saleDateKey = `${y}-${m}-${d}`;
-
-      // Si date ya está en formato YYYY-MM-DD, usarlo directamente
-      const targetDateKey = /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : (() => {
-        const td = new Date(date);
-        const ty = td.getFullYear();
-        const tm = String(td.getMonth() + 1).padStart(2, '0');
-        const tdd = String(td.getDate()).padStart(2, '0');
-        return `${ty}-${tm}-${tdd}`;
-      })();
-
-      return saleDateKey === targetDateKey;
-    });
+    return filterSalesByDate(sales, date);
   }, [sales]);
 
   const getSalesByAdvisor = useCallback((advisorId: string) => {
-    return sales.filter(sale => sale.advisorId === advisorId);
+    return sales.filter(s => s.advisorId === advisorId);
   }, [sales]);
 
-  const addPaymentMethod = useCallback((name: string, type: 'cash' | 'electronic' | 'credit', bankId?: string, commission?: number, paymentPeriod?: 'weekly' | 'monthly', paymentDays?: number) => {
-    const newPaymentMethod: PaymentMethod = {
-      id: uuidv4(),
-      name,
-      type,
-      isActive: true,
-      ...(bankId ? { bankId } : {}),
-      ...(commission !== undefined ? { commission } : {}),
-      ...(paymentPeriod ? { paymentPeriod } : {}),
-      ...(paymentDays !== undefined ? { paymentDays } : {}),
-    };
-    setPaymentMethods(prev => [...prev, newPaymentMethod]);
-    return newPaymentMethod;
+  const addPaymentMethod = useCallback((
+    name: string,
+    type: 'cash' | 'electronic' | 'credit',
+    bankId?: string,
+    commission?: number,
+    paymentPeriod?: 'immediate' | 'weekly' | 'monthly',
+    paymentDays?: number,
+  ) => {
+    const pm = createPaymentMethod(name, type, bankId, commission, paymentPeriod, paymentDays);
+    setPaymentMethods(prev => [...prev, pm]);
+    return pm;
   }, [setPaymentMethods]);
 
-  const addAdvisor = useCallback((advisorData: Omit<Advisor, 'id' | 'createdAt'>) => {
-    const newAdvisor: Advisor = {
-      ...advisorData,
-      id: uuidv4(),
-      createdAt: new Date()
-    };
-    setAdvisors(prev => [...prev, newAdvisor]);
-    return newAdvisor;
+  const updatePaymentMethod = useCallback((id: string, updates: Partial<PaymentMethod>) => {
+    setPaymentMethods(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
+  }, [setPaymentMethods]);
+
+  const deletePaymentMethod = useCallback((id: string) => {
+    setPaymentMethods(prev => prev.filter(m => m.id !== id));
+  }, [setPaymentMethods]);
+
+  const addAdvisor = useCallback((data: Omit<Advisor, 'id' | 'createdAt'>) => {
+    const advisor = createAdvisor(data);
+    setAdvisors(prev => [...prev, advisor]);
+    return advisor;
   }, [setAdvisors]);
 
-  // Registrar un abono (depósito) a un separado con su método de pago
   const addSaleDeposit = useCallback((saleId: string, amount: number, paymentMethodId: string) => {
     const pm = paymentMethods.find(p => p.id === paymentMethodId);
-    if (!pm) {
-      throw new Error('Método de pago inválido');
-    }
+    if (!pm) throw new Error('Método de pago inválido');
 
     let updatedSale: Sale | undefined;
-
     setSales(prev => prev.map(s => {
       if (s.id !== saleId) return s;
-      const newDepositRecord = {
-        id: uuidv4(),
-        amount,
-        method: pm,
-        createdAt: new Date()
-      };
-      const deposits = [...(s.deposits || []), newDepositRecord];
-      updatedSale = { ...s, deposit: (s.deposit || 0) + amount, deposits };
+      updatedSale = addDepositToSale(s, amount, pm);
       return updatedSale;
     }));
-
     return updatedSale!;
   }, [setSales, paymentMethods]);
 
- const updatePaymentMethod = useCallback((id: string, updates: Partial<PaymentMethod>) => {
-  setPaymentMethods(prev => prev.map(method =>
-    method.id === id ? { ...method, ...updates } : method
-  ));
-}, [setPaymentMethods]);
-
-const deletePaymentMethod = useCallback((id: string) => {
-  setPaymentMethods(prev => prev.filter(method => method.id !== id));
-}, [setPaymentMethods]);
-
-return {
-  sales,
-  paymentMethods,
-  advisors,
-  addSale,
-  updateSale,
-  deleteSale,
-  getSalesByDate,
-  getSalesByAdvisor,
-  addPaymentMethod,
-  updatePaymentMethod,
-  deletePaymentMethod,
-  addAdvisor,
-  addSaleDeposit,
-};
+  return {
+    sales,
+    paymentMethods,
+    advisors,
+    addSale,
+    updateSale,
+    deleteSale,
+    getSalesByDate,
+    getSalesByAdvisor,
+    addPaymentMethod,
+    updatePaymentMethod,
+    deletePaymentMethod,
+    addAdvisor,
+    addSaleDeposit,
+  };
 }

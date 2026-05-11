@@ -12,6 +12,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Label } from '@/components/ui/label';
 import { Plus, Search, CheckCircle, Trash2, ClipboardList, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { toast } from 'sonner';
+import { fmtDate } from '@/utils/dates';
 
 export default function StockConciliation() {
   const { products, updateStock } = useInventory();
@@ -88,7 +89,6 @@ export default function StockConciliation() {
   };
 
   const fmt = (n: number) => n.toLocaleString('es-CO');
-  const fmtDate = (d: Date | string) => new Date(d).toLocaleDateString('es-CO');
 
   const diffItems = draftItems.filter(i => i.difference !== 0);
   const positiveItems = draftItems.filter(i => i.difference > 0);

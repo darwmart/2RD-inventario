@@ -1,7 +1,14 @@
 import { useCallback } from 'react';
 import { Product, Category, Supplier } from '@/types';
 import { useLocalStorage } from './useLocalStorage';
-import { v4 as uuidv4 } from 'uuid';
+import {
+  CreateProductInput,
+  createProduct,
+  applyProductUpdate,
+  applyStockUpdate,
+  createCategory,
+  createSupplier,
+} from '@/domain/inventory';
 
 export function useInventory() {
   const [products, setProducts] = useLocalStorage<Product[]>('products', []);
@@ -12,110 +19,73 @@ export function useInventory() {
   ]);
   const [suppliers, setSuppliers] = useLocalStorage<Supplier[]>('suppliers', []);
 
- const addProduct = useCallback((productData: Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'reservedStock'>) => {
-  const newProduct: Product = {
-    ...productData,
-    id: uuidv4(),
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    reservedStock: 0,
-  };
-  setProducts(prev => [...prev, newProduct]);
-  return newProduct;
-}, [setProducts]);
+  const addProduct = useCallback((data: CreateProductInput) => {
+    const product = createProduct(data);
+    setProducts(prev => [...prev, product]);
+    return product;
+  }, [setProducts]);
 
   const updateProduct = useCallback((id: string, updates: Partial<Product>) => {
-    setProducts(prev => prev.map(product => 
-      product.id === id 
-        ? { ...product, ...updates, updatedAt: new Date() }
-        : product
-    ));
+    setProducts(prev => applyProductUpdate(prev, id, updates));
   }, [setProducts]);
 
   const deleteProduct = useCallback((id: string) => {
-    setProducts(prev => prev.filter(product => product.id !== id));
+    setProducts(prev => prev.filter(p => p.id !== id));
   }, [setProducts]);
 
   const updateStock = useCallback((productId: string, newStock: number, newReservedStock?: number) => {
-  setProducts(prev => prev.map(product =>
-    product.id === productId
-      ? { ...product, stock: newStock, reservedStock: newReservedStock ?? product.reservedStock ?? 0, updatedAt: new Date() }
-      : product
-  ));
-}, [setProducts]);
+    setProducts(prev => applyStockUpdate(prev, productId, newStock, newReservedStock));
+  }, [setProducts]);
 
   const findProductByBarcode = useCallback((barcode: string) => {
-    return products.find(product => product.barcode === barcode);
+    return products.find(p => p.barcode === barcode);
   }, [products]);
 
   const findProductByReference = useCallback((reference: string) => {
-    return products.find(product => 
-      product.reference.toLowerCase().includes(reference.toLowerCase()) ||
-      product.name.toLowerCase().includes(reference.toLowerCase())
+    return products.find(p =>
+      p.reference.toLowerCase().includes(reference.toLowerCase()) ||
+      p.name.toLowerCase().includes(reference.toLowerCase()),
     );
   }, [products]);
 
   const getLowStockProducts = useCallback(() => {
-    return products.filter(product => product.stock <= product.minStock);
+    return products.filter(p => p.stock <= p.minStock);
   }, [products]);
 
   const getProductsByCategory = useCallback((categoryId: string) => {
-    return products.filter(product => product.categoryId === categoryId);
+    return products.filter(p => p.categoryId === categoryId);
   }, [products]);
 
   const getProductsBySupplier = useCallback((supplierId: string) => {
-    return products.filter(product => product.supplierId === supplierId);
+    return products.filter(p => p.supplierId === supplierId);
   }, [products]);
 
   const addCategory = useCallback((name: string, description: string) => {
-    const newCategory: Category = {
-      id: uuidv4(),
-      name,
-      description,
-      createdAt: new Date()
-    };
-    setCategories(prev => [...prev, newCategory]);
-    return newCategory;
+    const category = createCategory(name, description);
+    setCategories(prev => [...prev, category]);
+    return category;
   }, [setCategories]);
 
   const updateCategory = useCallback((id: string, name: string, description: string) => {
-    setCategories(prev => prev.map(c =>
-      c.id === id ? { ...c, name, description } : c
-    ));
+    setCategories(prev => prev.map(c => c.id === id ? { ...c, name, description } : c));
   }, [setCategories]);
 
   const deleteCategory = useCallback((id: string) => {
     setCategories(prev => prev.filter(c => c.id !== id));
   }, [setCategories]);
 
-  const addSupplier = useCallback((supplierData: Omit<Supplier, 'id' | 'createdAt'>) => {
-    // Generar código consecutivo numérico
-    const maxCode = suppliers.reduce((max, s) => {
-      const code = parseInt(s.code || '0');
-      return code > max ? code : max;
-    }, 0);
-    const nextCode = (maxCode + 1).toString();
-
-    const newSupplier: Supplier = {
-      ...supplierData,
-      code: nextCode,
-      id: uuidv4(),
-      createdAt: new Date()
-    };
-    setSuppliers(prev => [...prev, newSupplier]);
-    return newSupplier;
+  const addSupplier = useCallback((data: Omit<Supplier, 'id' | 'createdAt'>) => {
+    const supplier = createSupplier(suppliers, data);
+    setSuppliers(prev => [...prev, supplier]);
+    return supplier;
   }, [setSuppliers, suppliers]);
 
   const updateSupplier = useCallback((id: string, updates: Partial<Supplier>) => {
-    setSuppliers(prev => prev.map(supplier =>
-      supplier.id === id
-        ? { ...supplier, ...updates }
-        : supplier
-    ));
+    setSuppliers(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
   }, [setSuppliers]);
 
   const deleteSupplier = useCallback((id: string) => {
-    setSuppliers(prev => prev.filter(supplier => supplier.id !== id));
+    setSuppliers(prev => prev.filter(s => s.id !== id));
   }, [setSuppliers]);
 
   return {
@@ -136,6 +106,6 @@ export function useInventory() {
     deleteCategory,
     addSupplier,
     updateSupplier,
-    deleteSupplier
+    deleteSupplier,
   };
 }

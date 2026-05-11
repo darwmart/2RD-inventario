@@ -9,6 +9,8 @@ import { Product, Category, Supplier } from '@/types';
 import { Save, Package, Plus, FolderPlus, RefreshCw, CheckCircle, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import ImageUploader from '@/components/ImageUploader';
+import { fmtMoneyInput } from '@/utils/formatters';
+import { calcEan13Check, validateEan13 } from '@/utils/barcode';
 
 type ProductFormDialogProps = {
   open: boolean;
@@ -49,7 +51,6 @@ export default function ProductFormDialog({
   // Precios
   const [cost, setCost] = useState(0);
   const [costStr, setCostStr] = useState('');
-  const fmtMoneyInput = (s: string) => { const raw = s.replace(/\D/g, ''); return raw === '' ? '' : raw.replace(/\B(?=(\d{3})+(?!\d))/g, '.'); };
 
   // Márgenes de ganancia (%)
   const [marginSuggested, setMarginSuggested] = useState(0);
@@ -311,22 +312,9 @@ export default function ProductFormDialog({
 
   // ── EAN-13 ────────────────────────────────────────────────────────────────
 
-  const calcEan13Check = (digits12: string): number => {
-    const d = digits12.split('').map(Number);
-    const sum = d.reduce((acc, n, i) => acc + n * (i % 2 === 0 ? 1 : 3), 0);
-    return (10 - (sum % 10)) % 10;
-  };
-
-  const validateEan13 = (code: string): boolean => {
-    if (!/^\d{13}$/.test(code)) return false;
-    return calcEan13Check(code.slice(0, 12)) === Number(code[12]);
-  };
-
   const generateEan13 = () => {
-    // Prefijo Colombia 770 + 9 dígitos basados en timestamp
     const base = '770' + String(Date.now()).slice(-9);
-    const check = calcEan13Check(base);
-    setBarcode(base + check);
+    setBarcode(base + calcEan13Check(base));
   };
 
   const barcodeStatus = (() => {

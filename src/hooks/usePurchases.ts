@@ -2,73 +2,22 @@ import { useCallback } from 'react';
 import { Purchase, PurchaseDocument, PurchaseItem, PaymentMethod, DocumentType, DocumentStatus } from '@/types';
 import { useLocalStorage } from './useLocalStorage';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  CreateDocumentInput,
+  generateDocumentNumber,
+  buildDocument,
+  applyPayment,
+  convertDelivery,
+} from '@/domain/purchases';
 
 export function usePurchases() {
   const [purchases, setPurchases] = useLocalStorage<PurchaseDocument[]>('purchases', []);
 
-  // Generar número de documento según tipo y año
-  const generateDocumentNumber = useCallback((type: DocumentType) => {
-    const year = new Date().getFullYear();
-    const prefix = type === 'delivery' ? 'A' : 'F';
-
-    // Filtrar documentos del mismo tipo y año
-    const docsOfType = purchases.filter(p => {
-      const docYear = new Date(p.createdAt).getFullYear();
-      return p.documentType === type && docYear === year;
-    });
-
-    const nextNumber = docsOfType.length + 1;
-    return `${prefix}-${year}-${String(nextNumber).padStart(4, '0')}`;
-  }, [purchases]);
-
-  // Crear documento de compra (Pedido, Albarán o Factura)
-  const createDocument = useCallback((data: {
-    documentType: DocumentType;
-    supplierId: string;
-    supplierName: string;
-    items: PurchaseItem[];
-    tax?: number;
-    notes?: string;
-    supplierInvoiceNumber?: string;
-    paymentMethod?: PaymentMethod;
-    paymentDetails?: {
-      dueDate?: string;
-      bankId?: string;
-      bankName?: string;
-      isCashPayment?: boolean;
-    };
-    orderRef?: string;
-    deliveryRef?: string;
-  }) => {
-    const subtotal = data.items.reduce((sum, item) => sum + item.total, 0);
-    const total = subtotal + (data.tax || 0);
-
-    // Las facturas se crean con estado 'pending', se cambiarán a 'completed' cuando se paguen
-    const status: DocumentStatus = 'pending';
-
-    const newDocument: PurchaseDocument = {
-      id: uuidv4(),
-      documentType: data.documentType,
-      documentNumber: generateDocumentNumber(data.documentType),
-      supplierInvoiceNumber: data.supplierInvoiceNumber,
-      status,
-      supplierId: data.supplierId,
-      supplierName: data.supplierName,
-      items: data.items,
-      subtotal,
-      tax: data.tax,
-      total,
-      notes: data.notes,
-      createdAt: new Date(),
-      paymentMethod: data.paymentMethod,
-      paymentDetails: data.paymentDetails,
-      orderRef: data.orderRef,
-      deliveryRef: data.deliveryRef,
-    };
-
-    setPurchases(prev => [...prev, newDocument]);
-    return newDocument;
-  }, [setPurchases, generateDocumentNumber]);
+  const createDocument = useCallback((data: CreateDocumentInput) => {
+    const doc = buildDocument(purchases, data);
+    setPurchases(prev => [...prev, doc]);
+    return doc;
+  }, [purchases, setPurchases]);
 
   // Función legacy para compatibilidad
   const addPurchase = useCallback((purchaseData: {
@@ -88,8 +37,6 @@ export function usePurchases() {
     notes?: string;
   }) => {
     const subtotal = purchaseData.items.reduce((sum, item) => sum + item.total, 0);
-    const total = subtotal + (purchaseData.tax || 0);
-
     const newPurchase: PurchaseDocument = {
       id: uuidv4(),
       documentType: 'invoice',
@@ -100,27 +47,25 @@ export function usePurchases() {
       items: purchaseData.items,
       subtotal,
       tax: purchaseData.tax,
-      total,
+      total: subtotal + (purchaseData.tax || 0),
       paymentMethod: purchaseData.paymentMethod,
       paymentDetails: purchaseData.paymentDetails,
       notes: purchaseData.notes,
-      createdAt: new Date()
+      createdAt: new Date(),
     };
-
     setPurchases(prev => [...prev, newPurchase]);
     return newPurchase;
   }, [setPurchases]);
 
   const getPurchasesByDate = useCallback((date: string) => {
-    return purchases.filter(purchase => {
-      const purchaseDate = new Date(purchase.createdAt).toDateString();
-      const targetDate = new Date(date).toDateString();
-      return purchaseDate === targetDate;
+    return purchases.filter(p => {
+      const purchaseDate = new Date(p.createdAt).toDateString();
+      return purchaseDate === new Date(date).toDateString();
     });
   }, [purchases]);
 
   const getPurchasesBySupplier = useCallback((supplierId: string) => {
-    return purchases.filter(purchase => purchase.supplierId === supplierId);
+    return purchases.filter(p => p.supplierId === supplierId);
   }, [purchases]);
 
   const updatePurchase = useCallback((purchaseId: string, purchaseData: {
@@ -141,101 +86,52 @@ export function usePurchases() {
     status?: DocumentStatus;
   }) => {
     const subtotal = purchaseData.items.reduce((sum, item) => sum + item.total, 0);
-    const total = subtotal + (purchaseData.tax || 0);
-
-    setPurchases(prev => prev.map(purchase =>
-      purchase.id === purchaseId
+    setPurchases(prev => prev.map(p =>
+      p.id === purchaseId
         ? {
-            ...purchase,
+            ...p,
             documentNumber: purchaseData.invoiceNumber,
             supplierId: purchaseData.supplierId,
             supplierName: purchaseData.supplierName,
             items: purchaseData.items,
             subtotal,
             tax: purchaseData.tax,
-            total,
+            total: subtotal + (purchaseData.tax || 0),
             paymentMethod: purchaseData.paymentMethod,
             paymentDetails: purchaseData.paymentDetails,
             notes: purchaseData.notes,
             ...(purchaseData.status !== undefined ? { status: purchaseData.status } : {}),
             updatedAt: new Date(),
           }
-        : purchase
+        : p,
     ));
   }, [setPurchases]);
 
   const deletePurchase = useCallback((purchaseId: string) => {
-    setPurchases(prev => prev.filter(purchase => purchase.id !== purchaseId));
+    setPurchases(prev => prev.filter(p => p.id !== purchaseId));
   }, [setPurchases]);
 
-  // Convertir Albarán a Factura
-  const convertDeliveryToInvoice = useCallback((deliveryId: string, paymentData: {
-    paymentMethod: PaymentMethod;
-    paymentDetails?: {
-      dueDate?: string;
-      bankId?: string;
-      bankName?: string;
-      isCashPayment?: boolean;
-    };
-  }) => {
-    const delivery = purchases.find(p => p.id === deliveryId);
-    if (!delivery || delivery.documentType !== 'delivery') {
-      throw new Error('Documento no encontrado o no es un albarán');
-    }
-
-    // Crear factura basada en el albarán
-    const invoice = createDocument({
-      documentType: 'invoice',
-      supplierId: delivery.supplierId,
-      supplierName: delivery.supplierName,
-      items: delivery.items,
-      tax: delivery.tax,
-      notes: delivery.notes,
-      paymentMethod: paymentData.paymentMethod,
-      paymentDetails: paymentData.paymentDetails,
-      orderRef: delivery.orderRef,
-      deliveryRef: delivery.id,
-    });
-
-    // Actualizar estado del albarán
-    setPurchases(prev => prev.map(p =>
-      p.id === deliveryId
-        ? { ...p, status: 'invoiced' as DocumentStatus, invoiceRef: invoice.id }
-        : p
-    ));
-
+  const convertDeliveryToInvoice = useCallback((
+    deliveryId: string,
+    paymentData: {
+      paymentMethod: PaymentMethod;
+      paymentDetails?: PurchaseDocument['paymentDetails'];
+    },
+  ) => {
+    const { updatedList, invoice } = convertDelivery(purchases, deliveryId, paymentData);
+    setPurchases(() => updatedList);
     return invoice;
-  }, [purchases, createDocument, setPurchases]);
+  }, [purchases, setPurchases]);
 
-  // Actualizar estado de un documento
   const updateDocumentStatus = useCallback((documentId: string, status: DocumentStatus) => {
     setPurchases(prev => prev.map(p =>
-      p.id === documentId
-        ? { ...p, status, updatedAt: new Date() }
-        : p
+      p.id === documentId ? { ...p, status, updatedAt: new Date() } : p,
     ));
   }, [setPurchases]);
 
-  // Marcar factura como pagada (total o saldo pendiente) — guarda bankId, paidAt y payment entry
   const markAsPaid = useCallback((purchaseId: string, bankId: string, bankName: string, amount: number) => {
     setPurchases(prev => prev.map(p =>
-      p.id === purchaseId
-        ? {
-            ...p,
-            status: 'completed' as DocumentStatus,
-            paymentDetails: {
-              ...p.paymentDetails,
-              bankId,
-              bankName,
-              paidAt: new Date().toISOString(),
-            },
-            payments: [
-              ...(p.payments || []),
-              { date: new Date().toISOString(), amount, bankId, bankName },
-            ],
-            updatedAt: new Date(),
-          }
-        : p
+      p.id === purchaseId ? applyPayment(p, bankId, bankName, amount) : p,
     ));
   }, [setPurchases]);
 
@@ -250,6 +146,9 @@ export function usePurchases() {
     convertDeliveryToInvoice,
     updateDocumentStatus,
     markAsPaid,
-    generateDocumentNumber,
+    generateDocumentNumber: useCallback(
+      (type: DocumentType) => generateDocumentNumber(purchases, type),
+      [purchases],
+    ),
   };
 }

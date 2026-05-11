@@ -12,6 +12,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Plus, Search, Edit2, Trash2, User, ShoppingBag, Phone, Mail, MapPin, CreditCard } from 'lucide-react';
 import { toast } from 'sonner';
+import { fmtMoneyInput } from '@/utils/formatters';
+import { fmtDate } from '@/utils/dates';
 
 const emptyForm = {
   name: '',
@@ -38,7 +40,6 @@ export default function Customers() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
   const [creditLimitStr, setCreditLimitStr] = useState('');
-  const fmtMoneyInput = (s: string) => { const raw = s.replace(/\D/g, ''); return raw === '' ? '' : raw.replace(/\B(?=(\d{3})+(?!\d))/g, '.'); };
 
   const filtered = useMemo(() => {
     const q = searchTerm.toLowerCase();
@@ -129,7 +130,6 @@ export default function Customers() {
   };
 
   const fmt = (n: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n);
-  const fmtDate = (d: Date | string) => new Date(d).toLocaleDateString('es-CO');
 
   const totalCustomers = customers.length;
   const activeCustomers = customers.filter(c => c.isActive).length;

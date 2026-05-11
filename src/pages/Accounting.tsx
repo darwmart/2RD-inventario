@@ -16,6 +16,7 @@ import { useExpenses } from '@/hooks/useExpenses';
 import { usePurchases } from '@/hooks/usePurchases';
 import { AccountingRecord } from '@/types';
 import { formatDateToKey } from '@/hooks/useExpenses';
+import { fmtDateTime } from '@/utils/dates';
 
 // ─── Tipo interno de movimiento unificado ────────────────────────────────────
 type Movement = {
@@ -336,7 +337,6 @@ export default function Accounting() {
 
   // ─── Helpers de UI ─────────────────────────────────────────────────────────
   const fmt = (n: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n);
-  const fmtDate = (d: Date) => d.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
   const typeConfig: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
     venta:    { label: 'Venta',    color: 'bg-green-100 text-green-700',  icon: <ArrowDownCircle className="h-3 w-3" /> },
@@ -524,7 +524,7 @@ export default function Accounting() {
                     return (
                       <TableRow key={m.id} className={!m.settled && m.direction === 'in' ? 'bg-amber-50' : ''}>
                         <TableCell className="text-xs text-gray-500 whitespace-nowrap">
-                          {fmtDate(m.date)}
+                          {fmtDateTime(m.date)}
                         </TableCell>
                         <TableCell>
                           <Badge className={`${cfg.color} gap-1 text-xs font-medium`}>
