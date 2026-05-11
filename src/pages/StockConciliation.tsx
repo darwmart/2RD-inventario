@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useInventory } from '@/hooks/useInventory';
+import { useProducts } from '@/hooks/queries/useProducts';
 import { useStockCount } from '@/hooks/useStockCount';
 import { StockCount, StockCountItem } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import NewCountDialog from '@/components/stockConciliation/NewCountDialog';
 import CountDetailDialog from '@/components/stockConciliation/CountDetailDialog';
 
 export default function StockConciliation() {
-  const { products, updateStock } = useInventory();
+  const { products, updateStock } = useProducts();
   const { stockCounts, createCount, completeCount, deleteCount } = useStockCount();
 
   const [isNewOpen, setIsNewOpen] = useState(false);

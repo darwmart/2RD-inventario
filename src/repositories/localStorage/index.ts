@@ -7,4 +7,5 @@ export { LocalStorageAdvisorRepository } from './LocalStorageAdvisorRepository';
 export { LocalStoragePaymentMethodRepository } from './LocalStoragePaymentMethodRepository';
 export { LocalStorageExpenseRepository } from './LocalStorageExpenseRepository';
 export { LocalStorageBankRepository } from './LocalStorageBankRepository';
-export { LocalStorageSettingsRepository } from './LocalStorageSettingsRepository';
+export { LocalStorageSettingsRepository }  from './LocalStorageSettingsRepository';
+export { LocalStoragePurchaseRepository } from './LocalStoragePurchaseRepository';

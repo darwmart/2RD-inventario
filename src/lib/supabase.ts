@@ -1,9 +1,11 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase: SupabaseClient = supabaseUrl
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : (null as unknown as SupabaseClient);
 
 // Función para subir imagen a Supabase Storage
 export async function uploadProductImage(file: File): Promise<string> {

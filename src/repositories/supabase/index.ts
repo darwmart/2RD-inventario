@@ -1,4 +1,10 @@
-// Implementaciones Supabase.
-// Para activar un módulo, cambia su instancia en src/infrastructure/container.ts.
-export { SupabaseProductRepository } from './SupabaseProductRepository';
-// export { SupabaseSaleRepository } from './SupabaseSaleRepository'; // próximamente
+export { SupabaseProductRepository }       from './SupabaseProductRepository';
+export { SupabaseCategoryRepository }      from './SupabaseCategoryRepository';
+export { SupabaseSupplierRepository }      from './SupabaseSupplierRepository';
+export { SupabaseAdvisorRepository }       from './SupabaseAdvisorRepository';
+export { SupabasePaymentMethodRepository } from './SupabasePaymentMethodRepository';
+export { SupabaseCustomerRepository }      from './SupabaseCustomerRepository';
+export { SupabaseExpenseRepository }       from './SupabaseExpenseRepository';
+export { SupabaseSaleRepository }          from './SupabaseSaleRepository';
+export { SupabaseBankRepository }          from './SupabaseBankRepository';
+export { SupabaseSettingsRepository }      from './SupabaseSettingsRepository';

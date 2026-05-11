@@ -1,6 +1,10 @@
 import { useState } from 'react';
-import { useSales } from '@/hooks/useSales';
 import { useSettings } from '@/hooks/useSettings';
+import { usePaymentMethods } from '@/hooks/queries/usePaymentMethods';
+import { useBankSettings } from '@/hooks/queries/useBankSettings';
+import { useCompanySettings } from '@/hooks/queries/useCompanySettings';
+import type { Bank } from '@/types/settings';
+import type { PaymentMethod } from '@/types/shared';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import PaymentMethodsSection from '@/components/settings/PaymentMethodsSection';
 import BanksSection from '@/components/settings/BanksSection';
@@ -12,28 +16,48 @@ import SampleDataSection from '@/components/settings/SampleDataSection';
 import SystemInfoSection from '@/components/settings/SystemInfoSection';
 
 const SECTIONS = [
-  { id: 'metodos-pago', name: 'Métodos de Pago', icon: '💳' },
-  { id: 'bancos', name: 'Bancos', icon: '🏦' },
-  { id: 'impresoras', name: 'Impresoras', icon: '🖨️' },
-  { id: 'general', name: 'Configuración General', icon: '⚙️' },
-  { id: 'tarjetas', name: 'Config. Tarjetas', icon: '💳' },
-  { id: 'etiquetas', name: 'Etiquetas Código', icon: '🏷️' },
-  { id: 'datos-prueba', name: 'Datos de Prueba', icon: '📦' },
-  { id: 'sistema', name: 'Info. Sistema', icon: 'ℹ️' },
+  { id: 'metodos-pago',  name: 'Métodos de Pago',       icon: '💳' },
+  { id: 'bancos',        name: 'Bancos',                 icon: '🏦' },
+  { id: 'impresoras',    name: 'Impresoras',             icon: '🖨️' },
+  { id: 'general',       name: 'Configuración General',  icon: '⚙️' },
+  { id: 'tarjetas',      name: 'Config. Tarjetas',       icon: '💳' },
+  { id: 'etiquetas',     name: 'Etiquetas Código',       icon: '🏷️' },
+  { id: 'datos-prueba',  name: 'Datos de Prueba',        icon: '📦' },
+  { id: 'sistema',       name: 'Info. Sistema',          icon: 'ℹ️' },
 ];
 
 export default function Settings() {
-  const { paymentMethods, addPaymentMethod, updatePaymentMethod, deletePaymentMethod } = useSales();
+  // ─── Hooks nuevos (Clean Architecture) ──────────────────────────────────────
+  const { paymentMethods, addPaymentMethod, updatePaymentMethod, deletePaymentMethod } =
+    usePaymentMethods();
+
+  const { banks, addBank, updateBank, deleteBank } = useBankSettings();
+
+  const { cardSettings, companyInfo, taxSettings,
+          updateCardSettings, updateCompanyInfo, updateTaxSettings } = useCompanySettings();
+
+  // ─── Hook legacy — solo para impresoras y diseños de etiquetas ──────────────
   const {
-    cardSettings, updateCardSettings,
-    companyInfo, updateCompanyInfo,
-    taxSettings, updateTaxSettings,
-    banks, addBank, updateBank, deleteBank,
     printers, addPrinter, updatePrinter, deletePrinter, setDefaultPrinter,
     labelDesigns, addLabelDesign, updateLabelDesign, deleteLabelDesign,
   } = useSettings();
 
   const [selectedSection, setSelectedSection] = useState('metodos-pago');
+
+  // ─── Adaptadores de firma ───────────────────────────────────────────────────
+  // BanksSection pasa Bank completo (con id); el hook nuevo espera Omit<Bank,'id'>
+  const handleAddBank = (bank: Bank) =>
+    addBank({ name: bank.name, isActive: bank.isActive, balance: bank.balance ?? 0, icon: bank.icon });
+
+  // PaymentMethodsSection pasa argumentos separados; el hook espera un objeto
+  const handleAddPaymentMethod = (
+    name: string,
+    type: PaymentMethod['type'],
+    bankId?: string,
+    commission?: number,
+    paymentPeriod?: PaymentMethod['paymentPeriod'],
+    paymentDays?: number,
+  ) => addPaymentMethod({ name, type, isActive: true, bankId, commission, paymentPeriod, paymentDays });
 
   return (
     <ScrollArea className="h-screen">
@@ -64,14 +88,14 @@ export default function Settings() {
             </div>
           </div>
 
-          {/* Content panel */}
+          {/* Panel de contenido */}
           <div className="flex-1 border rounded bg-white overflow-auto">
             <div className="p-6">
               {selectedSection === 'metodos-pago' && (
                 <PaymentMethodsSection
                   paymentMethods={paymentMethods}
                   banks={banks}
-                  onAdd={addPaymentMethod}
+                  onAdd={handleAddPaymentMethod}
                   onUpdate={updatePaymentMethod}
                   onDelete={deletePaymentMethod}
                 />
@@ -79,7 +103,7 @@ export default function Settings() {
               {selectedSection === 'bancos' && (
                 <BanksSection
                   banks={banks}
-                  onAdd={addBank}
+                  onAdd={handleAddBank}
                   onUpdate={updateBank}
                   onDelete={deleteBank}
                 />
@@ -117,7 +141,7 @@ export default function Settings() {
                 />
               )}
               {selectedSection === 'datos-prueba' && <SampleDataSection />}
-              {selectedSection === 'sistema' && <SystemInfoSection />}
+              {selectedSection === 'sistema'      && <SystemInfoSection />}
             </div>
           </div>
         </div>

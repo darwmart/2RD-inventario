@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { useInventory } from '@/hooks/useInventory';
+import { useProducts, useCategories, useSuppliers } from '@/hooks/queries/useProducts';
 import { usePurchases } from '@/hooks/usePurchases';
-import { useSettings } from '@/hooks/useSettings';
+import { useBankSettings } from '@/hooks/queries/useBankSettings';
+import { useCompanySettings } from '@/hooks/queries/useCompanySettings';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
@@ -15,9 +16,12 @@ const toDateKey = (d = new Date()) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 export default function Purchases() {
-  const { products, suppliers, categories, updateStock, addProduct, addCategory, addSupplier } = useInventory();
+  const { products, updateStock, addProduct } = useProducts();
+  const { categories, addCategory } = useCategories();
+  const { suppliers, addSupplier } = useSuppliers();
   const { purchases, addPurchase, updatePurchase, deletePurchase } = usePurchases();
-  const { banks, taxSettings, updateBankBalance } = useSettings();
+  const { banks, updateBankBalance } = useBankSettings();
+  const { taxSettings } = useCompanySettings();
   const [accountingRecords, setAccountingRecords] = useLocalStorage<AccountingRecord[]>('accountingRecords', []);
 
   const [isFormOpen, setIsFormOpen] = useState(false);

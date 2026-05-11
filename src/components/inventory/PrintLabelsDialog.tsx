@@ -8,7 +8,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Tag, Printer, Search } from 'lucide-react';
 import { Product, LabelDesign, LabelField } from '@/types';
 import { toast } from 'sonner';
-import { ean13Bars } from '@/utils/barcode';
+import { generateBarcodeSvg } from '@/utils/barcode';
+import BarcodeDisplay from '@/components/barcode/BarcodeDisplay';
 
 interface Category {
   id: string;
@@ -69,25 +70,17 @@ export default function PrintLabelsDialog({ open, products, categories, labelDes
           + `text-align:${f.align};overflow:hidden;`;
 
         if (f.key === 'ean-barras') {
-          const bits = ean13Bars(p.barcode);
-          if (!bits) {
+          const svgUri = generateBarcodeSvg(p.barcode || '', {
+            width: 2,
+            height: Math.round(f.height * 2.8),
+            fontSize: Math.max(Math.round(f.height * 0.55), 6),
+          });
+          if (!svgUri) {
             return `<div style="${baseStyle}display:flex;align-items:center;justify-content:center;">
-              <span style="font-size:5pt;font-family:monospace">${p.barcode || 'Sin EAN'}</span></div>`;
+              <span style="font-size:5pt;font-family:monospace">${p.barcode || 'Sin código'}</span></div>`;
           }
-          const bh = f.height * 0.72;
-          const mw = f.width / 95;
-          let rects = '';
-          for (let i = 0; i < bits.length; i++) {
-            if (bits[i] === '1') {
-              rects += `<rect x="${(i * mw).toFixed(4)}" y="0" width="${(mw + 0.01).toFixed(4)}" height="${bh.toFixed(3)}" fill="black"/>`;
-            }
-          }
-          const fs = Math.max(f.height * 0.2, 1.5);
-          const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${f.width}mm" height="${f.height}mm" viewBox="0 0 ${f.width} ${f.height}">`
-            + rects
-            + `<text x="${(f.width / 2).toFixed(2)}" y="${(bh + fs * 1.1).toFixed(2)}" text-anchor="middle" font-family="monospace" font-size="${fs.toFixed(2)}">${p.barcode}</text>`
-            + `</svg>`;
-          return `<div style="${baseStyle}">${svg}</div>`;
+          return `<div style="${baseStyle}display:flex;align-items:center;justify-content:center;">
+            <img src="${svgUri}" style="max-width:100%;max-height:100%;object-fit:contain;" /></div>`;
         }
 
         let content = '';
@@ -178,26 +171,13 @@ export default function PrintLabelsDialog({ open, products, categories, labelDes
               display: 'flex', alignItems: 'center', padding: '0 1px',
             }}>
               {f.key === 'ean-barras' ? (
-                <svg width="100%" height="100%">
-                  {previewProduct?.barcode && ean13Bars(previewProduct.barcode) ? (
-                    ean13Bars(previewProduct.barcode).split('').map((bit, i, arr) =>
-                      bit === '1' ? (
-                        <rect key={i}
-                          x={`${(i / arr.length * 100).toFixed(2)}%`}
-                          y="0" width={`${(1 / arr.length * 100).toFixed(2)}%`} height="75%"
-                          fill="black" />
-                      ) : null
-                    )
-                  ) : (
-                    [0, 4, 7, 11, 14, 18, 21, 26, 29, 33].map((x, i) => (
-                      <rect key={i} x={`${(x / 85 * 100).toFixed(1)}%`} width="1.5%" height="75%" fill="black" />
-                    ))
-                  )}
-                  <text x="50%" y="92%" textAnchor="middle"
-                    fontSize={Math.max(f.fontSize * sc / 8, 4)} fontFamily="monospace">
-                    {previewProduct?.barcode || '0000000000000'}
-                  </text>
-                </svg>
+                <BarcodeDisplay
+                  value={previewProduct?.barcode || ''}
+                  height={Math.round(f.height * sc * 0.72)}
+                  fontSize={Math.max(f.fontSize * sc / 6, 5)}
+                  displayValue={true}
+                  className="w-full max-h-full object-contain"
+                />
               ) : (
                 <span className="truncate w-full">{getFieldValue(f.key, previewProduct)}</span>
               )}

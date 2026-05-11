@@ -5,4 +5,5 @@ export { usePaymentMethods, paymentMethodKeys } from './usePaymentMethods';
 export { useCustomersQuery, customerKeys } from './useCustomersQuery';
 export { useExpensesData, expenseKeys } from './useExpensesData';
 export { useBankSettings, bankKeys } from './useBankSettings';
-export { useCompanySettings, settingsKeys } from './useCompanySettings';
+export { useCompanySettings, settingsKeys }  from './useCompanySettings';
+export { usePurchasesData, purchaseKeys }   from './usePurchasesData';

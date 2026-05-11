@@ -6,11 +6,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Product, Category, Supplier } from '@/types';
-import { Save, Package, Plus, FolderPlus, RefreshCw, CheckCircle, XCircle } from 'lucide-react';
+import { Save, Package, Plus, FolderPlus, RefreshCw, CheckCircle, XCircle, Camera } from 'lucide-react';
 import { toast } from 'sonner';
 import ImageUploader from '@/components/ImageUploader';
 import { fmtMoneyInput } from '@/utils/formatters';
 import { calcEan13Check, validateEan13 } from '@/utils/barcode';
+import BarcodeScanner from '@/components/barcode/BarcodeScanner';
 
 type ProductFormDialogProps = {
   open: boolean;
@@ -42,6 +43,8 @@ export default function ProductFormDialog({
   const [description, setDescription] = useState('');
   const [supplierId, setSupplierId] = useState('');
   const [hasIva, setHasIva] = useState(true);
+
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   // Estados para modal de crear categoría
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -373,6 +376,16 @@ export default function ProductFormDialog({
                         <XCircle className="absolute right-2 top-2.5 h-4 w-4 text-red-400 pointer-events-none" />
                       )}
                     </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsScannerOpen(true)}
+                      className="h-9 px-2 shrink-0"
+                      title="Escanear con cámara"
+                    >
+                      <Camera className="h-3.5 w-3.5" />
+                    </Button>
                     <Button
                       type="button"
                       variant="outline"
@@ -774,6 +787,15 @@ export default function ProductFormDialog({
           </div>
         </DialogContent>
       </Dialog>
+
+      <BarcodeScanner
+        open={isScannerOpen}
+        onDetected={(code) => {
+          setBarcode(code.replace(/\D/g, '').slice(0, 13));
+          setIsScannerOpen(false);
+        }}
+        onClose={() => setIsScannerOpen(false)}
+      />
     </Dialog>
   );
 }

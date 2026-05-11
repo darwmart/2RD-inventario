@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import { useInventory } from '@/hooks/useInventory';
+import { useProducts, useCategories, useSuppliers } from '@/hooks/queries/useProducts';
 import { usePurchases } from '@/hooks/usePurchases';
-import { useSettings } from '@/hooks/useSettings';
+import { useBankSettings } from '@/hooks/queries/useBankSettings';
+import { useCompanySettings } from '@/hooks/queries/useCompanySettings';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { PurchaseDocument, DocumentType, AccountingRecord, Supplier } from '@/types';
@@ -12,9 +13,12 @@ import PurchaseDocumentModal, { PurchaseDocumentFormData } from '@/components/pu
 import PayInvoiceDialog from '@/components/purchasesFactuSOL/PayInvoiceDialog';
 
 export default function PurchasesFactuSOL() {
-  const { products, suppliers, categories, updateStock, addSupplier, updateSupplier, addProduct, addCategory } = useInventory();
+  const { products, updateStock, addProduct } = useProducts();
+  const { categories, addCategory } = useCategories();
+  const { suppliers, addSupplier, updateSupplier } = useSuppliers();
   const { purchases, createDocument, updatePurchase, deletePurchase, convertDeliveryToInvoice, markAsPaid } = usePurchases();
-  const { banks, taxSettings, updateBankBalance } = useSettings();
+  const { banks, updateBankBalance } = useBankSettings();
+  const { taxSettings } = useCompanySettings();
   const [, setAccountingRecords] = useLocalStorage<AccountingRecord[]>('accountingRecords', []);
 
   const [activeTab, setActiveTab] = useState<DocumentType>('delivery');

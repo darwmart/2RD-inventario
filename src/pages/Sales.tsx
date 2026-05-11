@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useSalesData, useProducts, useAdvisors, usePaymentMethods } from '@/hooks/queries';
-import { useSettings } from '@/hooks/useSettings';
+import { useCompanySettings } from '@/hooks/queries/useCompanySettings';
+import { useBankSettings } from '@/hooks/queries/useBankSettings';
 import { useReturns } from '@/hooks/useReturns';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDailyDeposits } from '@/hooks/useDailyDeposits';
@@ -35,8 +36,9 @@ export default function Sales() {
   const { advisors } = useAdvisors();
   const { paymentMethods } = usePaymentMethods();
 
-  // ─── Datos (hooks legacy no migrados aún) ────────────────────────────────────
-  const { companyInfo, taxSettings, cardSettings, updateBankBalance, banks } = useSettings();
+  // ─── Configuración ───────────────────────────────────────────────────────────
+  const { companyInfo, taxSettings, cardSettings } = useCompanySettings();
+  const { banks, updateBankBalance } = useBankSettings();
   const { addReturn } = useReturns();
 
   // ─── Estado UI ───────────────────────────────────────────────────────────────

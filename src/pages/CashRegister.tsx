@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { useSales } from '@/hooks/useSales';
+import { useSalesData } from '@/hooks/queries/useSalesData';
+import { useAdvisors } from '@/hooks/queries/useAdvisors';
+import { usePaymentMethods } from '@/hooks/queries/usePaymentMethods';
 import { useExpenses } from '@/hooks/useExpenses';
-import { useSettings } from '@/hooks/useSettings';
+import { useBankSettings } from '@/hooks/queries/useBankSettings';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useCashRegisterSummary } from '@/hooks/useCashRegisterSummary';
@@ -20,9 +22,11 @@ const toDateKey = (d = new Date()) =>
 
 export default function CashRegister() {
   const { isAdmin } = useAuth();
-  const { sales, paymentMethods, getSalesByDate, advisors } = useSales();
+  const { sales, getSalesByDate } = useSalesData();
+  const { advisors } = useAdvisors();
+  const { paymentMethods } = usePaymentMethods();
   const { addExpense, getExpensesByDate } = useExpenses();
-  const { banks, updateBankBalance } = useSettings();
+  const { banks, updateBankBalance } = useBankSettings();
 
   const [selectedDate, setSelectedDate] = useState(() => toDateKey());
   const [cashSessions, setCashSessions] = useLocalStorage<CashRegisterSession[]>('cashSessions', []);

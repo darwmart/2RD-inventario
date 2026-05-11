@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
-import { useSales } from '@/hooks/useSales';
-import { useSettings } from '@/hooks/useSettings';
+import { useSalesData } from '@/hooks/queries/useSalesData';
+import { useBankSettings } from '@/hooks/queries/useBankSettings';
+import { useCompanySettings } from '@/hooks/queries/useCompanySettings';
 import { useExpenses } from '@/hooks/useExpenses';
 import { usePurchases } from '@/hooks/usePurchases';
 import { AccountingRecord } from '@/types';
@@ -13,8 +14,9 @@ import PeriodSummaryCards from '@/components/accounting/PeriodSummaryCards';
 import MovementsTable, { Movement } from '@/components/accounting/MovementsTable';
 
 export default function Accounting() {
-  const { sales } = useSales();
-  const { banks, cardSettings } = useSettings();
+  const { sales } = useSalesData();
+  const { banks } = useBankSettings();
+  const { cardSettings } = useCompanySettings();
   const { expenses } = useExpenses();
   const { purchases } = usePurchases();
   const [accountingRecords] = useLocalStorage<AccountingRecord[]>('accountingRecords', []);

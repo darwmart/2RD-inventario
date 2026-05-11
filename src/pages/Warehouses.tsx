@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useWarehouses } from '@/hooks/useWarehouses';
-import { useInventory } from '@/hooks/useInventory';
+import { useProducts } from '@/hooks/queries/useProducts';
 import { useAuth } from '@/contexts/AuthContext';
 import { ExternalWarehouse, WarehouseTransactionType } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,7 @@ import WarehouseList from '@/components/warehouses/WarehouseList';
 
 export default function Warehouses() {
   const { user, isAdmin } = useAuth();
-  const { products, updateStock } = useInventory();
+  const { products, updateStock } = useProducts();
   const { warehouses, transactions, addWarehouse, updateWarehouse, deleteWarehouse, addTransaction, deleteTransaction, getWarehouseStock } = useWarehouses();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);

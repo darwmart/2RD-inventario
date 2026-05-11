@@ -1,9 +1,9 @@
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Search, Package, Edit, Trash2 } from 'lucide-react';
 import { Product } from '@/types';
 import { VisibleColumns } from './ColumnConfigDialog';
+import BarcodeScanInput from '@/components/barcode/BarcodeScanInput';
 
 interface Category {
   id: string;
@@ -33,10 +33,11 @@ export default function ProductTable({
       <div className="px-4 py-3 border-b">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
+          <BarcodeScanInput
             placeholder="Buscar por código, descripción, código de barras..."
             value={searchTerm}
-            onChange={(e) => onSearchChange(e.target.value)}
+            onChange={(e) => onSearchChange(e.currentTarget.value)}
+            onScan={(code) => onSearchChange(code)}
             className="pl-9"
           />
         </div>
