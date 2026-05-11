@@ -16,8 +16,44 @@ export type Advisor = {
   name: string;
   email: string;
   phone: string;
+  document?: string;    // Cédula de ciudadanía
+  baseSalary?: number;  // Salario base configurado
   isActive: boolean;
   createdAt: Date;
+};
+
+export type LoanPayment = {
+  id: string;
+  loanId: string;
+  advisorId: string;
+  advisorName: string;
+  amount: number;
+  salaryPaymentId?: string;
+  date: string;
+  notes: string;
+};
+
+export type SalaryPayment = {
+  id: string;
+  advisorId: string;
+  advisorName: string;
+  advisorDocument?: string;
+  period: string;
+  baseSalary: number;
+  commissions: number;
+  transportAllowance: number;
+  healthDeduction: number;
+  pensionDeduction: number;
+  loanDeductions: { loanId: string; description: string; amount: number }[];
+  otherDeductions: number;
+  otherDeductionDesc: string;
+  grossPay: number;
+  totalDeductions: number;
+  netPay: number;
+  paymentMethod: string;
+  paymentDate: string;
+  notes: string;
+  createdAt: string;
 };
 
 export type Expense = {

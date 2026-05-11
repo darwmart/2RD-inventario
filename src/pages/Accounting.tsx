@@ -5,21 +5,23 @@ import { useSalesData } from '@/hooks/queries/useSalesData';
 import { useBankSettings } from '@/hooks/queries/useBankSettings';
 import { useCompanySettings } from '@/hooks/queries/useCompanySettings';
 import { useExpenses } from '@/hooks/useExpenses';
-import { usePurchases } from '@/hooks/usePurchases';
+import { usePurchasesData } from '@/hooks/queries/usePurchasesData';
 import { AccountingRecord } from '@/types';
 import { formatDateToKey } from '@/hooks/useExpenses';
 import BankBalancesGrid from '@/components/accounting/BankBalancesGrid';
 import AccountingFilters from '@/components/accounting/AccountingFilters';
 import PeriodSummaryCards from '@/components/accounting/PeriodSummaryCards';
 import MovementsTable, { Movement } from '@/components/accounting/MovementsTable';
+import CapitalInjectionsCard, { CapitalInjection } from '@/components/cashRegister/CapitalInjectionsCard';
 
 export default function Accounting() {
   const { sales } = useSalesData();
-  const { banks } = useBankSettings();
+  const { banks, updateBankBalance } = useBankSettings();
   const { cardSettings } = useCompanySettings();
   const { expenses } = useExpenses();
-  const { purchases } = usePurchases();
-  const [accountingRecords] = useLocalStorage<AccountingRecord[]>('accountingRecords', []);
+  const { purchases } = usePurchasesData();
+  const [accountingRecords, setAccountingRecords] = useLocalStorage<AccountingRecord[]>('accountingRecords', []);
+  const [capitalInjections, setCapitalInjections] = useLocalStorage<CapitalInjection[]>('capitalInjections', []);
 
   const [fechaInicio, setFechaInicio] = useState('');
   const [fechaFin, setFechaFin] = useState('');
@@ -168,6 +170,15 @@ export default function Accounting() {
     });
 
     accountingRecords.forEach(r => {
+      if (r.tipo === 'ingreso') {
+        list.push({
+          id: `ingreso-${r.id}`, date: new Date(r.fecha), type: 'ingreso',
+          description: r.descripcion || 'Ingreso de capital',
+          amount: r.monto, bank: r.banco, bankLabel: getBankLabel(r.banco),
+          direction: 'in', settled: true,
+        });
+        return;
+      }
       if (r.tipo !== 'traspaso') return;
       if (r.banco === 'caja-principal') {
         list.push({
@@ -231,9 +242,21 @@ export default function Accounting() {
     const compras       = filtered.filter(m => m.type === 'compra').reduce((s, m) => s + m.amount, 0);
     const traspasos     = filtered.filter(m => m.type === 'traspaso').reduce((s, m) => s + m.amount, 0);
     const comisiones    = filtered.filter(m => m.type === 'venta' && m.commissionAmt).reduce((s, m) => s + (m.commissionAmt ?? 0), 0);
+    const ingresos      = filtered.filter(m => m.type === 'ingreso').reduce((s, m) => s + m.amount, 0);
     const ventas = ventasSettled + ventasPending;
-    return { ventas, ventasSettled, ventasPending, abonos, gastos, compras, traspasos, comisiones, utilidad: ventas + abonos - gastos - compras };
+    return { ventas, ventasSettled, ventasPending, abonos, gastos, compras, traspasos, comisiones, ingresos };
   }, [filtered]);
+
+  const handleAddCapitalInjection = (injection: Omit<CapitalInjection, 'id' | 'fecha'>) => {
+    const fecha = new Date().toISOString();
+    setCapitalInjections([...capitalInjections, { ...injection, id: Date.now(), fecha }]);
+    updateBankBalance(injection.banco, injection.amount);
+    setAccountingRecords([...accountingRecords, {
+      id: Date.now() + 1, tipo: 'ingreso',
+      descripcion: `${injection.typeLabel} — ${injection.detail}`,
+      monto: injection.amount, banco: injection.banco, fecha,
+    }]);
+  };
 
   return (
     <ScrollArea className="h-screen p-6">
@@ -256,6 +279,12 @@ export default function Accounting() {
         <PeriodSummaryCards summary={summary} />
 
         <MovementsTable movements={filtered} />
+
+        <CapitalInjectionsCard
+          banks={banks}
+          injections={capitalInjections}
+          onAdd={handleAddCapitalInjection}
+        />
       </div>
     </ScrollArea>
   );

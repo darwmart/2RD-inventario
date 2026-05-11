@@ -9,6 +9,12 @@ export type CreateDocumentInput = {
   tax?: number;
   notes?: string;
   supplierInvoiceNumber?: string;
+  /** Sobreescribe la numeración automática (para compras directas con N° de factura del proveedor) */
+  documentNumber?: string;
+  /** Sobreescribe el estado inicial (por defecto 'pending') */
+  status?: DocumentStatus;
+  /** Bodega destino (opcional) */
+  warehouse?: string;
   paymentMethod?: PaymentMethod;
   paymentDetails?: PurchaseDocument['paymentDetails'];
   orderRef?: string;
@@ -29,9 +35,10 @@ export function buildDocument(purchases: PurchaseDocument[], data: CreateDocumen
   return {
     id: uuidv4(),
     documentType: data.documentType,
-    documentNumber: generateDocumentNumber(purchases, data.documentType),
+    documentNumber: data.documentNumber ?? generateDocumentNumber(purchases, data.documentType),
     supplierInvoiceNumber: data.supplierInvoiceNumber,
-    status: 'pending' as DocumentStatus,
+    warehouse: data.warehouse,
+    status: data.status ?? 'pending',
     supplierId: data.supplierId,
     supplierName: data.supplierName,
     items: data.items,

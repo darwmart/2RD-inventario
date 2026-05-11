@@ -7,7 +7,7 @@ import { fmtDateTime } from '@/utils/dates';
 export type Movement = {
   id: string;
   date: Date;
-  type: 'venta' | 'abono' | 'gasto' | 'compra' | 'traspaso' | 'apertura';
+  type: 'venta' | 'abono' | 'gasto' | 'compra' | 'traspaso' | 'apertura' | 'ingreso';
   description: string;
   amount: number;
   grossAmount?: number;
@@ -33,6 +33,7 @@ const TYPE_CONFIG: Record<string, { label: string; color: string; icon: React.Re
   compra:   { label: 'Compra',        color: 'bg-orange-100 text-orange-700', icon: <ShoppingBag className="h-3 w-3" /> },
   traspaso: { label: 'A Caja Fuerte', color: 'bg-purple-100 text-purple-700', icon: <ArrowRightLeft className="h-3 w-3" /> },
   apertura: { label: 'Apertura Caja', color: 'bg-indigo-100 text-indigo-700', icon: <ArrowRightLeft className="h-3 w-3" /> },
+  ingreso:  { label: 'Ingreso Capital', color: 'bg-emerald-100 text-emerald-700', icon: <ArrowDownCircle className="h-3 w-3" /> },
 };
 
 export default function MovementsTable({ movements }: Props) {

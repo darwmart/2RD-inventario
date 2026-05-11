@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Users, Mail, Phone } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Users, Mail, Phone, DollarSign } from 'lucide-react';
 import { Advisor } from '@/types';
 
 export interface AdvisorStats {
@@ -10,32 +11,43 @@ export interface AdvisorStats {
   monthlyRevenue: number;
   loansThisMonth: number;
   totalDebt: number;
+  pendingLoanBalance: number;
+  salariesPaid: number;
 }
 
 interface Props {
   advisor: Advisor;
   stats: AdvisorStats;
+  onPaySalary: (advisor: Advisor) => void;
 }
 
-export default function AdvisorCard({ advisor, stats }: Props) {
+const fmt = (n: number) =>
+  new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n);
+
+export default function AdvisorCard({ advisor, stats, onPaySalary }: Props) {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-            <Users className="h-6 w-6 text-blue-600" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+              <Users className="h-6 w-6 text-blue-600" />
+            </div>
+            <div>
+              <CardTitle className="text-lg">{advisor.name}</CardTitle>
+              <Badge variant={advisor.isActive ? 'default' : 'secondary'}>
+                {advisor.isActive ? 'Activo' : 'Inactivo'}
+              </Badge>
+            </div>
           </div>
-          <div>
-            <CardTitle className="text-lg">{advisor.name}</CardTitle>
-            <Badge variant={advisor.isActive ? 'default' : 'secondary'}>
-              {advisor.isActive ? 'Activo' : 'Inactivo'}
-            </Badge>
-          </div>
+          <Button size="sm" onClick={() => onPaySalary(advisor)} className="bg-green-600 hover:bg-green-700">
+            <DollarSign className="h-4 w-4 mr-1" />Pagar
+          </Button>
         </div>
       </CardHeader>
 
       <CardContent className="space-y-4">
-        <div className="space-y-2">
+        <div className="space-y-1">
           {advisor.email && (
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <Mail className="h-4 w-4" />{advisor.email}
@@ -49,13 +61,13 @@ export default function AdvisorCard({ advisor, stats }: Props) {
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <div className="text-center p-2 bg-gray-50 rounded">
-            <div className="font-bold text-lg text-blue-600">{stats.loansThisMonth}</div>
-            <div className="text-xs text-gray-600">Préstamos del Mes</div>
+          <div className="text-center p-2 bg-red-50 rounded border border-red-100">
+            <div className="font-bold text-base text-red-600">{fmt(stats.pendingLoanBalance)}</div>
+            <div className="text-xs text-gray-600">Deuda pendiente</div>
           </div>
-          <div className="text-center p-2 bg-gray-50 rounded">
-            <div className="font-bold text-lg text-red-600">${stats.totalDebt.toLocaleString('es-CO')}</div>
-            <div className="text-xs text-gray-600">Deuda Total</div>
+          <div className="text-center p-2 bg-green-50 rounded border border-green-100">
+            <div className="font-bold text-base text-green-600">{stats.salariesPaid}</div>
+            <div className="text-xs text-gray-600">Nóminas pagadas</div>
           </div>
         </div>
 
@@ -67,7 +79,7 @@ export default function AdvisorCard({ advisor, stats }: Props) {
               <div className="text-xs text-gray-600">Ventas</div>
             </div>
             <div className="text-center p-2 bg-blue-50 rounded">
-              <div className="font-bold text-blue-600">${stats.monthlyRevenue.toLocaleString('es-CO')}</div>
+              <div className="font-bold text-blue-600 text-sm">{fmt(stats.monthlyRevenue)}</div>
               <div className="text-xs text-gray-600">Ingresos</div>
             </div>
           </div>

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useReturns } from '@/hooks/useReturns';
-import { useSales } from '@/hooks/useSales';
+import { useAdvisors } from '@/hooks/queries/useAdvisors';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,7 +12,7 @@ import { fmt, fmtNum, inRange, printReport } from '@/utils/reportPrint';
 
 export default function ReturnsReportTab() {
   const { returns } = useReturns();
-  const { advisors } = useSales();
+  const { advisors } = useAdvisors();
 
   const [retFrom, setRetFrom] = useState('');
   const [retTo, setRetTo] = useState('');

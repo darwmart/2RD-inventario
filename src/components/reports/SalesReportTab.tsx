@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { useSales } from '@/hooks/useSales';
+import { useSalesData } from '@/hooks/queries/useSalesData';
+import { useAdvisors } from '@/hooks/queries/useAdvisors';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,7 +12,8 @@ import { fmtDate } from '@/utils/dates';
 import { fmt, fmtNum, inRange, printReport } from '@/utils/reportPrint';
 
 export default function SalesReportTab() {
-  const { sales, advisors } = useSales();
+  const { sales } = useSalesData();
+  const { advisors } = useAdvisors();
 
   const [salesFrom, setSalesFrom] = useState('');
   const [salesTo, setSalesTo] = useState('');

@@ -38,12 +38,19 @@ export function useCompanySettings() {
   });
 
   return {
-    cardSettings:   cardQuery.data,
-    companyInfo:    companyQuery.data,
-    taxSettings:    taxQuery.data,
-    isLoading:      cardQuery.isLoading || companyQuery.isLoading || taxQuery.isLoading,
-    updateCardSettings:   updateCard.mutate,
-    updateCompanyInfo:    updateCompany.mutate,
-    updateTaxSettings:    updateTax.mutate,
+    cardSettings: cardQuery.data ?? {
+      delayEnabled: false, debitCommission: 1.9, creditCommission: 2.9,
+      reteiva: 0.4, commissionsEnabled: false, reteivaEnabled: false,
+    } satisfies CardSettings,
+    companyInfo: companyQuery.data ?? {
+      name: '2Ruedas Shop', nit: '', address: '', phone: '', email: '',
+    } satisfies CompanyInfo,
+    taxSettings: taxQuery.data ?? {
+      ivaEnabled: true, ivaPercentage: 19,
+    } satisfies TaxSettings,
+    isLoading: cardQuery.isLoading || companyQuery.isLoading || taxQuery.isLoading,
+    updateCardSettings:  updateCard.mutate,
+    updateCompanyInfo:   updateCompany.mutate,
+    updateTaxSettings:   updateTax.mutate,
   };
 }

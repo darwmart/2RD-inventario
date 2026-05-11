@@ -46,6 +46,7 @@ export default function AccountingFilters({
                 <SelectItem value="gasto">Gastos</SelectItem>
                 <SelectItem value="compra">Compras</SelectItem>
                 <SelectItem value="traspaso">Traspasos</SelectItem>
+                <SelectItem value="ingreso">Ingresos Capital</SelectItem>
               </SelectContent>
             </Select>
           </div>

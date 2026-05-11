@@ -82,12 +82,29 @@ export default function CashRegister() {
 
   const handleSaveEditSession = (opening: number, closing: number, notes: string) => {
     if (!currentSession) return;
-    const difference = closing - expectedCash;
-    setCashSessions(cashSessions.map(s => s.id === currentSession.id
-      ? { ...s, openingAmount: opening, closingAmount: closing, difference, notes }
-      : s
-    ));
-    toast.success('Sesión de caja actualizada');
+
+    // Si cambió la base de apertura, ajustar Caja Fuerte por la diferencia
+    const openingDiff = opening - currentSession.openingAmount;
+    if (openingDiff !== 0) {
+      // La apertura debita de Caja Fuerte: si sube la base, debita más; si baja, devuelve
+      updateBankBalance('caja-principal', -openingDiff);
+    }
+
+    if (currentSession.status === 'open') {
+      // Solo actualizar la apertura, no tocar cierre ni diferencia
+      setCashSessions(cashSessions.map(s => s.id === currentSession.id
+        ? { ...s, openingAmount: opening }
+        : s
+      ));
+      toast.success('Base de apertura actualizada');
+    } else {
+      const difference = closing - expectedCash;
+      setCashSessions(cashSessions.map(s => s.id === currentSession.id
+        ? { ...s, openingAmount: opening, closingAmount: closing, difference, notes }
+        : s
+      ));
+      toast.success('Sesión de caja actualizada');
+    }
     setIsEditSessionDialog(false);
   };
 
@@ -152,6 +169,7 @@ export default function CashRegister() {
           }
         />
       </div>
+
     </ScrollArea>
   );
 }

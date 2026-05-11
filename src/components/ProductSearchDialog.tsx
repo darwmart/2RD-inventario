@@ -1,11 +1,12 @@
 import { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Product, Category } from '@/types';
-import { Search, Package } from 'lucide-react';
+import { Search, Package, Camera } from 'lucide-react';
+import BarcodeScanInput from '@/components/barcode/BarcodeScanInput';
+import BarcodeScanner from '@/components/barcode/BarcodeScanner';
 
 type ProductSearchDialogProps = {
   open: boolean;
@@ -28,6 +29,7 @@ export default function ProductSearchDialog({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   // Filtrar productos
   const filteredProducts = useMemo(() => {
@@ -132,13 +134,21 @@ export default function ProductSearchDialog({
                 </Select>
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
+                  <BarcodeScanInput
                     placeholder="Buscar por código, descripción, referencia..."
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-9"
+                    onChange={(e) => setSearchTerm(e.currentTarget.value)}
+                    onScan={(code) => setSearchTerm(code)}
+                    className="pl-9 pr-9"
                     autoFocus
                   />
+                  <button
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    title="Escanear con cámara"
+                    onClick={() => setIsScannerOpen(true)}
+                  >
+                    <Camera className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
             </div>
@@ -230,6 +240,12 @@ export default function ProductSearchDialog({
           </div>
         </div>
       </DialogContent>
+
+      <BarcodeScanner
+        open={isScannerOpen}
+        onDetected={(code) => { setSearchTerm(code); setIsScannerOpen(false); }}
+        onClose={() => setIsScannerOpen(false)}
+      />
     </Dialog>
   );
 }

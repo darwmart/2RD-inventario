@@ -18,6 +18,8 @@ import {
   LocalStorageBankRepository,
   LocalStorageSettingsRepository,
   LocalStoragePurchaseRepository,
+  LocalStoragePrinterRepository,
+  LocalStorageLabelDesignRepository,
 } from '@/repositories/localStorage';
 
 import {
@@ -31,6 +33,7 @@ import {
   SupabaseExpenseRepository,
   SupabaseBankRepository,
   SupabaseSettingsRepository,
+  SupabasePurchaseRepository,
 } from '@/repositories/supabase';
 
 import { InventoryService }  from '@/services/inventoryService';
@@ -85,8 +88,13 @@ const settingsRepository = USE_SUPABASE
   ? new SupabaseSettingsRepository()
   : new LocalStorageSettingsRepository();
 
-// Compras — aún sin repositorio Supabase (usa localStorage siempre)
-const purchaseRepository = new LocalStoragePurchaseRepository();
+const purchaseRepository = USE_SUPABASE
+  ? new SupabasePurchaseRepository()
+  : new LocalStoragePurchaseRepository();
+
+// Impresoras y diseños de etiqueta — solo localStorage por ahora
+const printerRepository     = new LocalStoragePrinterRepository();
+const labelDesignRepository = new LocalStorageLabelDesignRepository();
 
 // ─── SERVICIOS (singletons) ───────────────────────────────────────────────────
 
@@ -112,4 +120,6 @@ export const repositories = {
   expenses:       expenseRepository,
   banks:          bankRepository,
   settings:       settingsRepository,
+  printers:       printerRepository,
+  labelDesigns:   labelDesignRepository,
 };

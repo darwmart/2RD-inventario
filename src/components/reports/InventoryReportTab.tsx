@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useInventory } from '@/hooks/useInventory';
+import { useProducts, useCategories, useSuppliers } from '@/hooks/queries/useProducts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,7 +9,9 @@ import { Printer, Package } from 'lucide-react';
 import { fmt, fmtNum, printReport } from '@/utils/reportPrint';
 
 export default function InventoryReportTab() {
-  const { products, categories, suppliers } = useInventory();
+  const { products } = useProducts();
+  const { categories } = useCategories();
+  const { suppliers } = useSuppliers();
 
   const [invCat, setInvCat] = useState('all');
   const [invSupp, setInvSupp] = useState('all');

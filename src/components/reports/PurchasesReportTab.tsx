@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import { usePurchases } from '@/hooks/usePurchases';
-import { useInventory } from '@/hooks/useInventory';
+import { usePurchasesData } from '@/hooks/queries/usePurchasesData';
+import { useSuppliers } from '@/hooks/queries/useProducts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,8 +20,8 @@ const STATUS_CONFIG: Record<string, { label: string; cls: string }> = {
 };
 
 export default function PurchasesReportTab() {
-  const { purchases } = usePurchases();
-  const { suppliers } = useInventory();
+  const { purchases } = usePurchasesData();
+  const { suppliers } = useSuppliers();
 
   const [purFrom, setPurFrom] = useState('');
   const [purTo, setPurTo] = useState('');

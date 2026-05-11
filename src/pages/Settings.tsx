@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { useSettings } from '@/hooks/useSettings';
 import { usePaymentMethods } from '@/hooks/queries/usePaymentMethods';
 import { useBankSettings } from '@/hooks/queries/useBankSettings';
 import { useCompanySettings } from '@/hooks/queries/useCompanySettings';
-import type { Bank } from '@/types/settings';
+import { usePrinters } from '@/hooks/queries/usePrinters';
+import { useLabelDesigns } from '@/hooks/queries/useLabelDesigns';
+import type { Bank, Printer, LabelDesign } from '@/types/settings';
 import type { PaymentMethod } from '@/types/shared';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import PaymentMethodsSection from '@/components/settings/PaymentMethodsSection';
@@ -36,20 +37,24 @@ export default function Settings() {
   const { cardSettings, companyInfo, taxSettings,
           updateCardSettings, updateCompanyInfo, updateTaxSettings } = useCompanySettings();
 
-  // ─── Hook legacy — solo para impresoras y diseños de etiquetas ──────────────
-  const {
-    printers, addPrinter, updatePrinter, deletePrinter, setDefaultPrinter,
-    labelDesigns, addLabelDesign, updateLabelDesign, deleteLabelDesign,
-  } = useSettings();
+  const { printers, addPrinter, updatePrinter, deletePrinter, setDefaultPrinter } = usePrinters();
+  const { labelDesigns, addLabelDesign, updateLabelDesign, deleteLabelDesign } = useLabelDesigns();
 
   const [selectedSection, setSelectedSection] = useState('metodos-pago');
 
   // ─── Adaptadores de firma ───────────────────────────────────────────────────
-  // BanksSection pasa Bank completo (con id); el hook nuevo espera Omit<Bank,'id'>
   const handleAddBank = (bank: Bank) =>
     addBank({ name: bank.name, isActive: bank.isActive, balance: bank.balance ?? 0, icon: bank.icon });
 
-  // PaymentMethodsSection pasa argumentos separados; el hook espera un objeto
+  // PrintersSection pasa Printer completo (con id generado en el componente)
+  // El nuevo repositorio genera su propio id — descartamos el del componente
+  const handleAddPrinter = ({ id: _id, createdAt: _ca, ...data }: Printer) =>
+    addPrinter(data);
+
+  // LabelDesignerSection pasa LabelDesign completo con id y createdAt provisionales
+  const handleAddLabelDesign = ({ id: _id, createdAt: _ca, ...data }: LabelDesign) =>
+    addLabelDesign(data);
+
   const handleAddPaymentMethod = (
     name: string,
     type: PaymentMethod['type'],
@@ -111,7 +116,7 @@ export default function Settings() {
               {selectedSection === 'impresoras' && (
                 <PrintersSection
                   printers={printers}
-                  onAdd={addPrinter}
+                  onAdd={handleAddPrinter}
                   onUpdate={updatePrinter}
                   onDelete={deletePrinter}
                   onSetDefault={setDefaultPrinter}
@@ -135,7 +140,7 @@ export default function Settings() {
                 <LabelDesignerSection
                   labelDesigns={labelDesigns}
                   printers={printers}
-                  onAdd={addLabelDesign}
+                  onAdd={handleAddLabelDesign}
                   onUpdate={updateLabelDesign}
                   onDelete={deleteLabelDesign}
                 />

@@ -9,3 +9,5 @@ export type { IPaymentMethodRepository, CreatePaymentMethodInput } from './IPaym
 export type { IExpenseRepository, CreateExpenseInput } from './IExpenseRepository';
 export type { IBankRepository, CreateBankInput } from './IBankRepository';
 export type { ISettingsRepository } from './ISettingsRepository';
+export type { IPrinterRepository, CreatePrinterInput } from './IPrinterRepository';
+export type { ILabelDesignRepository, CreateLabelDesignInput } from './ILabelDesignRepository';

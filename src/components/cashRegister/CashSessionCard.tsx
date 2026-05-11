@@ -142,10 +142,11 @@ export default function CashSessionCard({
               )}
             </div>
 
-            {currentSession.status === 'closed' && isAdmin && (
+            {isAdmin && (
               <div className="flex gap-2 mt-2">
                 <Button variant="outline" size="sm" onClick={onEditSession}>
-                  <Pencil className="h-4 w-4 mr-2" />Modificar Cierre
+                  <Pencil className="h-4 w-4 mr-2" />
+                  {currentSession.status === 'open' ? 'Editar base de apertura' : 'Modificar Cierre'}
                 </Button>
               </div>
             )}

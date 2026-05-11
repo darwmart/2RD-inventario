@@ -9,7 +9,7 @@ export interface AccountingSummary {
   compras: number;
   traspasos: number;
   comisiones: number;
-  utilidad: number;
+  ingresos: number;
 }
 
 interface Props {
@@ -69,12 +69,11 @@ export default function PeriodSummaryCards({ summary }: Props) {
           <p className="text-base font-bold text-purple-600">{fmt(summary.traspasos)}</p>
         </CardContent>
       </Card>
-      <Card className={summary.utilidad < 0 ? 'border-red-300' : 'border-green-300'}>
+      <Card>
         <CardContent className="pt-3 pb-3">
-          <p className="text-xs text-gray-500">Utilidad neta</p>
-          <p className={`text-base font-bold ${summary.utilidad < 0 ? 'text-red-600' : 'text-green-700'}`}>
-            {fmt(summary.utilidad)}
-          </p>
+          <p className="text-xs text-gray-500">Ing. Capital</p>
+          <p className="text-base font-bold text-emerald-600">{fmt(summary.ingresos)}</p>
+          <p className="text-xs text-gray-400">no operacional</p>
         </CardContent>
       </Card>
     </div>

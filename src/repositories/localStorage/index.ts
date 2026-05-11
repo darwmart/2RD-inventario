@@ -9,3 +9,5 @@ export { LocalStorageExpenseRepository } from './LocalStorageExpenseRepository';
 export { LocalStorageBankRepository } from './LocalStorageBankRepository';
 export { LocalStorageSettingsRepository }  from './LocalStorageSettingsRepository';
 export { LocalStoragePurchaseRepository } from './LocalStoragePurchaseRepository';
+export { LocalStoragePrinterRepository } from './LocalStoragePrinterRepository';
+export { LocalStorageLabelDesignRepository } from './LocalStorageLabelDesignRepository';

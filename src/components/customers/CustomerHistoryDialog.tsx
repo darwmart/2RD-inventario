@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useSales } from '@/hooks/useSales';
+import { useSalesData } from '@/hooks/queries/useSalesData';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -26,7 +26,7 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default function CustomerHistoryDialog({ open, customer, onClose }: Props) {
-  const { sales } = useSales();
+  const { sales } = useSalesData();
 
   const customerSales = useMemo(() => {
     if (!customer) return [];

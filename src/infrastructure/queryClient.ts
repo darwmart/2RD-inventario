@@ -3,9 +3,7 @@ import { QueryClient } from '@tanstack/react-query';
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // localStorage es síncrono — datos siempre frescos en < 1 tick
       staleTime: 0,
-      // En producción con Supabase, cambiar a 5 * 60 * 1000 (5 min)
       gcTime: 10 * 60 * 1000,
       retry: 1,
       refetchOnWindowFocus: false,
@@ -16,23 +14,33 @@ export const queryClient = new QueryClient({
   },
 });
 
-// Escucha cambios de localStorage emitidos por los repositorios.
-// Esto permite que las queries se invaliden automáticamente cuando
-// algún repositorio escribe datos nuevos.
+// Mapa completo de claves localStorage → query keys de React Query.
+// Cada vez que un repositorio llama write() se emite 'ls-change' con la clave
+// y aquí invalidamos las queries correspondientes.
+const KEY_MAP: Record<string, string[][]> = {
+  products:        [['products']],
+  categories:      [['categories']],
+  suppliers:       [['suppliers']],
+  sales:           [['sales']],
+  customers:       [['customers']],
+  advisors:        [['advisors']],
+  paymentMethods:  [['paymentMethods']],
+  expenses:        [['expenses']],
+  banks:           [['banks']],
+  cardSettings:    [['settings', 'card']],
+  companyInfo:     [['settings', 'company']],
+  taxSettings:     [['settings', 'tax']],
+  purchases:       [['purchases']],
+  printers:        [['printers']],
+  labelDesigns:    [['labelDesigns']],
+};
+
 if (typeof window !== 'undefined') {
   window.addEventListener('ls-change', (e: Event) => {
     const key = (e as CustomEvent<string>).detail;
-    // Mapa de claves localStorage → query keys de React Query
-    const keyMap: Record<string, string[]> = {
-      products: ['products'],
-      categories: ['categories'],
-      suppliers: ['suppliers'],
-      sales: ['sales'],
-      customers: ['customers'],
-    };
-    const queryKeys = keyMap[key];
+    const queryKeys = KEY_MAP[key];
     if (queryKeys) {
-      queryKeys.forEach(qk => queryClient.invalidateQueries({ queryKey: [qk] }));
+      queryKeys.forEach(qk => queryClient.invalidateQueries({ queryKey: qk }));
     }
   });
 }

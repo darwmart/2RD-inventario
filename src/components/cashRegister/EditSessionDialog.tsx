@@ -22,6 +22,8 @@ export default function EditSessionDialog({ open, session, expectedCash, onClose
   const [editClosingAmount, setEditClosingAmount] = useState('');
   const [editClosingNotes, setEditClosingNotes] = useState('');
 
+  const isOpen = session?.status === 'open';
+
   useEffect(() => {
     if (!open || !session) return;
     setEditOpeningAmount(numToMoneyStr(session.openingAmount));
@@ -31,8 +33,12 @@ export default function EditSessionDialog({ open, session, expectedCash, onClose
 
   const handleSave = () => {
     const opening = parseMoney(editOpeningAmount);
-    const closing = parseMoney(editClosingAmount);
     if (opening < 0) { toast.error('Monto de apertura inválido'); return; }
+    if (isOpen) {
+      onSave(opening, session?.closingAmount ?? 0, session?.notes ?? '');
+      return;
+    }
+    const closing = parseMoney(editClosingAmount);
     if (closing < 0) { toast.error('Monto de cierre inválido'); return; }
     onSave(opening, closing, editClosingNotes);
   };
@@ -41,30 +47,67 @@ export default function EditSessionDialog({ open, session, expectedCash, onClose
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Modificar Caja — {session?.date}</DialogTitle>
+          <DialogTitle>
+            {isOpen ? 'Editar base de apertura' : 'Modificar Caja'} — {session?.date}
+          </DialogTitle>
         </DialogHeader>
+
         <div className="space-y-4 py-4">
           <div>
             <Label>Monto de apertura</Label>
-            <Input type="text" inputMode="numeric"
-              value={editOpeningAmount} onChange={(e) => setEditOpeningAmount(fmtMoneyInput(e.target.value))} />
+            <Input
+              type="text"
+              inputMode="numeric"
+              value={editOpeningAmount}
+              onChange={(e) => setEditOpeningAmount(fmtMoneyInput(e.target.value))}
+              autoFocus
+            />
+            {isOpen && (
+              <p className="text-xs text-gray-500 mt-1">
+                La diferencia con la base original se ajustará en Caja Fuerte automáticamente.
+              </p>
+            )}
           </div>
-          <div>
-            <Label>Monto de cierre (efectivo contado)</Label>
-            <Input type="text" inputMode="numeric"
-              value={editClosingAmount} onChange={(e) => setEditClosingAmount(fmtMoneyInput(e.target.value))} />
-          </div>
-          <div>
-            <Label>Notas</Label>
-            <Input value={editClosingNotes} onChange={(e) => setEditClosingNotes(e.target.value)}
-              placeholder="Observaciones del cierre" />
-          </div>
+
+          {!isOpen && (
+            <>
+              <div>
+                <Label>Monto de cierre (efectivo contado)</Label>
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  value={editClosingAmount}
+                  onChange={(e) => setEditClosingAmount(fmtMoneyInput(e.target.value))}
+                />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">
+                  Efectivo esperado: <strong>${expectedCash.toLocaleString('es-CO')}</strong>
+                </p>
+              </div>
+              <div>
+                <Label>Notas</Label>
+                <Input
+                  value={editClosingNotes}
+                  onChange={(e) => setEditClosingNotes(e.target.value)}
+                  placeholder="Observaciones del cierre"
+                />
+              </div>
+            </>
+          )}
+
           <div className="flex gap-2 pt-2">
             <Button onClick={handleSave} className="flex-1">Guardar cambios</Button>
-            <Button variant="outline" onClick={onReopen}
-              className="flex-1 text-orange-600 border-orange-300 hover:bg-orange-50">
-              <DoorOpen className="h-4 w-4 mr-2" />Reabrir caja
-            </Button>
+            {!isOpen && (
+              <Button
+                variant="outline"
+                onClick={onReopen}
+                className="flex-1 text-orange-600 border-orange-300 hover:bg-orange-50"
+              >
+                <DoorOpen className="h-4 w-4 mr-2" />Reabrir caja
+              </Button>
+            )}
+            <Button variant="ghost" onClick={onClose}>Cancelar</Button>
           </div>
         </div>
       </DialogContent>

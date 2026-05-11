@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useProducts, useCategories, useSuppliers } from '@/hooks/queries/useProducts';
-import { usePurchases } from '@/hooks/usePurchases';
+import { usePurchasesData } from '@/hooks/queries/usePurchasesData';
 import { useBankSettings } from '@/hooks/queries/useBankSettings';
 import { useCompanySettings } from '@/hooks/queries/useCompanySettings';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
@@ -19,7 +19,7 @@ export default function Purchases() {
   const { products, updateStock, addProduct } = useProducts();
   const { categories, addCategory } = useCategories();
   const { suppliers, addSupplier } = useSuppliers();
-  const { purchases, addPurchase, updatePurchase, deletePurchase } = usePurchases();
+  const { purchases, createDocumentAsync, updateDocument, deleteDocument } = usePurchasesData();
   const { banks, updateBankBalance } = useBankSettings();
   const { taxSettings } = useCompanySettings();
   const [accountingRecords, setAccountingRecords] = useLocalStorage<AccountingRecord[]>('accountingRecords', []);
@@ -29,7 +29,7 @@ export default function Purchases() {
   const [payingPurchase, setPayingPurchase] = useState<Purchase | null>(null);
   const [selectedDate, setSelectedDate] = useState(() => toDateKey());
 
-  const handleSave = (data: PurchaseFormData) => {
+  const handleSave = async (data: PurchaseFormData) => {
     const { cart, supplierId, supplierName, selectedMethod, invoiceNumber, notes, dueDate, tax, total } = data;
 
     let paymentDetails: Record<string, unknown> = {};
@@ -48,30 +48,59 @@ export default function Purchases() {
     }
 
     const paymentMethod = { id: selectedMethod.id, name: selectedMethod.name, type: 'electronic' as const, isActive: true };
+    const subtotal = cart.reduce((s, i) => s + i.total, 0);
 
     if (editingPurchase) {
+      // Revertir stock anterior
       editingPurchase.items.forEach(old => {
         const p = products.find(p => p.id === old.productId);
         if (p) updateStock(old.productId, p.stock - old.quantity, p.reservedStock ?? 0);
       });
+      // Aplicar stock nuevo
       cart.forEach(item => {
         const p = products.find(p => p.id === item.productId);
         if (p) updateStock(item.productId, p.stock + item.quantity, p.reservedStock ?? 0);
       });
+      // Revertir banco anterior
       const oldWasCredit = editingPurchase.paymentMethod?.id === 'credito';
       if (!oldWasCredit && editingPurchase.paymentDetails?.bankId)
         updateBankBalance(editingPurchase.paymentDetails.bankId as string, editingPurchase.total);
       else if (!oldWasCredit && editingPurchase.paymentDetails?.isCashPayment)
         updateBankBalance('efectivo', editingPurchase.total);
+      // Aplicar banco nuevo
       if (!isCredit) updateBankBalance((selectedMethod.bankId || 'efectivo') as string, -total);
-      updatePurchase(editingPurchase.id, { invoiceNumber, supplierId, supplierName, items: cart, paymentMethod, paymentDetails: paymentDetails as any, tax, notes });
+
+      updateDocument(editingPurchase.id, {
+        documentNumber: invoiceNumber,
+        supplierId,
+        supplierName,
+        items: cart,
+        subtotal,
+        tax,
+        total: subtotal + (tax || 0),
+        paymentMethod,
+        paymentDetails: paymentDetails as Purchase['paymentDetails'],
+        notes,
+      });
       toast.success(`Compra ${invoiceNumber} actualizada exitosamente`);
       setEditingPurchase(null);
       setIsFormOpen(false);
       return;
     }
 
-    const purchase = addPurchase({ invoiceNumber, supplierId, supplierName, items: cart, paymentMethod, paymentDetails: paymentDetails as any, tax, notes });
+    // Compra nueva
+    const purchase = await createDocumentAsync({
+      documentType: 'invoice',
+      documentNumber: invoiceNumber,
+      status: isCredit ? 'pending' : 'completed',
+      supplierId,
+      supplierName,
+      items: cart,
+      tax,
+      notes,
+      paymentMethod,
+      paymentDetails: paymentDetails as Purchase['paymentDetails'],
+    });
 
     cart.forEach(item => {
       const p = products.find(p => p.id === item.productId);
@@ -106,7 +135,7 @@ export default function Purchases() {
       const bankId = (purchase.paymentDetails?.bankId as string) || 'efectivo';
       updateBankBalance(bankId, purchase.total);
     }
-    deletePurchase(id);
+    deleteDocument(id);
     toast.success('Compra eliminada exitosamente');
   };
 
@@ -121,15 +150,10 @@ export default function Purchases() {
       proveedor: supplierLabel, factura: payingPurchase.documentNumber,
       monto: payingPurchase.total, banco: bankId, fecha: new Date().toISOString(),
     }]);
-    updatePurchase(payingPurchase.id, {
-      invoiceNumber: payingPurchase.documentNumber,
-      supplierId: payingPurchase.supplierId,
-      supplierName: supplierLabel,
-      items: payingPurchase.items,
+    updateDocument(payingPurchase.id, {
       paymentMethod: payingPurchase.paymentMethod ?? { id: 'credito', name: 'Crédito', type: 'credit' as const, isActive: true },
       paymentDetails: { bankId, bankName: bank?.name || '', paidAt: new Date().toISOString() },
-      tax: payingPurchase.tax,
-      notes: payingPurchase.notes,
+      status: 'completed',
     });
     toast.success(`Pago de $${payingPurchase.total.toLocaleString('es-CO')} registrado desde ${bank?.name || bankId}`);
     setPayingPurchase(null);

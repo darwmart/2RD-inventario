@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useProducts, useCategories, useSuppliers } from '@/hooks/queries/useProducts';
-import { usePurchases } from '@/hooks/usePurchases';
+import { usePurchasesData } from '@/hooks/queries/usePurchasesData';
 import { useBankSettings } from '@/hooks/queries/useBankSettings';
 import { useCompanySettings } from '@/hooks/queries/useCompanySettings';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
@@ -16,7 +16,7 @@ export default function PurchasesFactuSOL() {
   const { products, updateStock, addProduct } = useProducts();
   const { categories, addCategory } = useCategories();
   const { suppliers, addSupplier, updateSupplier } = useSuppliers();
-  const { purchases, createDocument, updatePurchase, deletePurchase, convertDeliveryToInvoice, markAsPaid } = usePurchases();
+  const { purchases, createDocument, updateDocument, deleteDocument, convertDeliveryToInvoice, markAsPaid } = usePurchasesData();
   const { banks, updateBankBalance } = useBankSettings();
   const { taxSettings } = useCompanySettings();
   const [, setAccountingRecords] = useLocalStorage<AccountingRecord[]>('accountingRecords', []);
@@ -89,16 +89,17 @@ export default function PurchasesFactuSOL() {
         if (paidAmt > 0 && newTotal > paidAmt) newStatus = 'partial';
         else if (paidAmt > 0 && newTotal <= paidAmt && editingDocument.status === 'partial') newStatus = 'completed';
       }
-      updatePurchase(editingDocument.id, {
-        invoiceNumber: editingDocument.documentNumber,
+      updateDocument(editingDocument.id, {
         supplierId: supplier.id,
         supplierName: getSupplierName(supplier),
         items: data.items,
+        subtotal,
         tax,
+        total: subtotal + tax,
         notes: data.notes,
         paymentMethod: editingDocument.paymentMethod || { id: 'efectivo', name: 'Efectivo', type: 'cash', isActive: true },
         paymentDetails: editingDocument.paymentDetails,
-        status: newStatus,
+        ...(newStatus !== undefined ? { status: newStatus } : {}),
       });
       toast.success(newStatus === 'partial' ? 'Documento actualizado — hay un saldo pendiente de pago' : 'Documento actualizado');
     } else {
@@ -136,7 +137,7 @@ export default function PurchasesFactuSOL() {
       if (doc.documentType === 'invoice' && doc.paymentDetails?.bankId) {
         updateBankBalance(doc.paymentDetails.bankId, doc.total);
       }
-      deletePurchase(selectedDocument.id);
+      deleteDocument(selectedDocument.id);
       setSelectedDocument(null);
       toast.success('Documento eliminado');
     }

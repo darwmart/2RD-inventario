@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import { useInventory } from '@/hooks/useInventory';
-import { useSales } from '@/hooks/useSales';
+import { useProducts } from '@/hooks/queries/useProducts';
+import { useSalesData } from '@/hooks/queries/useSalesData';
 import { useReturns } from '@/hooks/useReturns';
-import { usePurchases } from '@/hooks/usePurchases';
+import { usePurchasesData } from '@/hooks/queries/usePurchasesData';
 import { useWarehouses } from '@/hooks/useWarehouses';
 import { useStockCount } from '@/hooks/useStockCount';
 import { Button } from '@/components/ui/button';
@@ -14,10 +14,10 @@ import { fmtDate } from '@/utils/dates';
 import { fmt, fmtNum, txTypeLabel, printReport } from '@/utils/reportPrint';
 
 export default function TraceabilityTab() {
-  const { products } = useInventory();
-  const { sales } = useSales();
+  const { products } = useProducts();
+  const { sales } = useSalesData();
   const { returns } = useReturns();
-  const { purchases } = usePurchases();
+  const { purchases } = usePurchasesData();
   const { transactions } = useWarehouses();
   const { stockCounts } = useStockCount();
 

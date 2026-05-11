@@ -7,3 +7,5 @@ export { useExpensesData, expenseKeys } from './useExpensesData';
 export { useBankSettings, bankKeys } from './useBankSettings';
 export { useCompanySettings, settingsKeys }  from './useCompanySettings';
 export { usePurchasesData, purchaseKeys }   from './usePurchasesData';
+export { usePrinters, printerKeys }        from './usePrinters';
+export { useLabelDesigns, labelDesignKeys } from './useLabelDesigns';
