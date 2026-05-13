@@ -29,6 +29,22 @@ export function calculateItemIVA(
 }
 
 /**
+ * Devuelve el costo unitario con IVA incluido.
+ * Cuando el producto tiene IVA y está habilitado, el costo real de adquisición
+ * incluye el IVA pagado al proveedor → se usa para calcular rentabilidad correcta.
+ */
+export function costWithIva(
+  cost: number,
+  hasIva: boolean | undefined,
+  taxSettings: TaxSettings
+): number {
+  if (hasIva && taxSettings.ivaEnabled) {
+    return Math.round(cost * (1 + taxSettings.ivaPercentage / 100));
+  }
+  return cost;
+}
+
+/**
  * Calcula la comisión bancaria cuando el pago es con tarjeta.
  *
  * Detecta automáticamente si es débito o crédito por el nombre del método de pago.

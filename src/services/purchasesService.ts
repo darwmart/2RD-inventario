@@ -4,7 +4,6 @@ import type { IBankRepository } from '@/repositories/interfaces/IBankRepository'
 import type { IProductRepository } from '@/repositories/interfaces/IProductRepository';
 import {
   CreateDocumentInput,
-  buildDocument,
   applyPayment,
   convertDelivery,
   generateDocumentNumber,
@@ -31,19 +30,8 @@ export class PurchasesService {
   async createDocument(data: CreateDocumentInput): Promise<PurchaseDocument> {
     if (!data.supplierId) throw new Error('El proveedor es requerido');
     if (!data.items?.length) throw new Error('El documento debe tener al menos un artículo');
-
-    const all = await this.purchases.findAll();
-    const doc = buildDocument(all, data);
-    await this.purchases.create(data);
-
-    // Si es factura pagada al contado, actualiza stock y balance bancario
-    if (doc.documentType === 'invoice' && doc.paymentDetails?.isCashPayment) {
-      await this._applyStockEntries(doc);
-      if (doc.paymentDetails.bankId) {
-        await this.banks.updateBalance(doc.paymentDetails.bankId, -doc.total);
-      }
-    }
-
+    const doc = await this.purchases.create(data);
+    await this._applyStockEntries(doc);
     return doc;
   }
 
@@ -70,8 +58,6 @@ export class PurchasesService {
     const updated = applyPayment(purchase, bankId, bankName, amount);
     await this.purchases.update(id, updated);
     await this.banks.updateBalance(bankId, -amount);
-
-    await this._applyStockEntries(purchase);
     return updated;
   }
 

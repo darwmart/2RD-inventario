@@ -5,6 +5,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { Printer, Edit2, Trash2, RotateCcw } from 'lucide-react';
 import { CompanyInfo, Sale } from '@/types';
 import { printPOSInvoice } from '@/utils/printUtils';
+import { useCompanySettings } from '@/hooks/queries/useCompanySettings';
+import { costWithIva } from '@/utils/ivaUtils';
 
 export interface DepositEntry {
   key: string;
@@ -43,6 +45,8 @@ export default function SalesTable({
   deposits, salesOfDay, allSales, selectedDate, companyInfo,
   isAdmin, dailyTotals, onEdit, onDelete, onReturn,
 }: Props) {
+  const { taxSettings } = useCompanySettings();
+
   return (
     <Card>
       <ScrollArea className="h-[51rem] p-6">
@@ -101,7 +105,8 @@ export default function SalesTable({
               {/* Filas de ventas normales del día (una fila por item) */}
               {salesOfDay.flatMap(sale =>
                 sale.items.map((item, index) => {
-                  const rent = (item.total ?? 0) - ((item.cost ?? 0) * (item.quantity ?? 0));
+                  const unitCost = costWithIva(item.cost ?? 0, item.hasIva, taxSettings);
+                  const rent = (item.total ?? 0) - (unitCost * (item.quantity ?? 0));
                   const isFirstItem = index === 0;
                   return (
                     <TableRow key={`${sale.id}-${item.productId}`}>
@@ -109,7 +114,7 @@ export default function SalesTable({
                       <TableCell>{sale.advisorName}</TableCell>
                       <TableCell>{item.productName}</TableCell>
                       <TableCell>{item.quantity}</TableCell>
-                      <TableCell>${(item.cost ?? 0).toLocaleString('es-CO')}</TableCell>
+                      <TableCell>${unitCost.toLocaleString('es-CO')}</TableCell>
                       <TableCell>${(item.total ?? 0).toLocaleString('es-CO')}</TableCell>
                       <TableCell colSpan={2} className="text-green-600 font-bold">${rent.toLocaleString('es-CO')}</TableCell>
                       <TableCell>{sale.paymentMethod?.name ?? '-'}</TableCell>

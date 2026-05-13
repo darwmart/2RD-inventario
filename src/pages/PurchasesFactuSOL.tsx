@@ -113,11 +113,6 @@ export default function PurchasesFactuSOL() {
         notes: data.notes,
         supplierInvoiceNumber: data.supplierInvoiceNumber,
       });
-      data.items.forEach((item: any) => {
-        const product = products.find(p => p.id === item.productId);
-        if (product) updateStock(item.productId, product.stock + item.quantity, product.reservedStock ?? 0);
-      });
-      toast.success(`${activeTab === 'delivery' ? 'Albarán' : 'Factura (pendiente de pago)'} creado`);
     }
     setIsModalOpen(false);
     setEditingDocument(null);

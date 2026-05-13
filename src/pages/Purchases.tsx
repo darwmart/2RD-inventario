@@ -16,7 +16,7 @@ const toDateKey = (d = new Date()) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 export default function Purchases() {
-  const { products, updateStock, addProduct } = useProducts();
+  const { products, updateStock, addProductAsync } = useProducts();
   const { categories, addCategory } = useCategories();
   const { suppliers, addSupplier } = useSuppliers();
   const { purchases, createDocumentAsync, updateDocument, deleteDocument } = usePurchasesData();
@@ -102,11 +102,6 @@ export default function Purchases() {
       paymentDetails: paymentDetails as Purchase['paymentDetails'],
     });
 
-    cart.forEach(item => {
-      const p = products.find(p => p.id === item.productId);
-      if (p) updateStock(item.productId, p.stock + item.quantity, p.reservedStock ?? 0);
-    });
-
     if (!isCredit) {
       const bankId = (selectedMethod.bankId || 'efectivo') as string;
       setAccountingRecords(prev => [...prev, {
@@ -178,7 +173,7 @@ export default function Purchases() {
         purchases={purchases}
         onSave={handleSave}
         onClose={() => { setIsFormOpen(false); setEditingPurchase(null); }}
-        addProduct={addProduct}
+        addProduct={addProductAsync}
         onAddCategory={(name, description = '') => { addCategory(name, description); toast.success('Categoría creada exitosamente'); }}
         onAddSupplier={data => { addSupplier(data); toast.success('Proveedor creado exitosamente'); }}
       />

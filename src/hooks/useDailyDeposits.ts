@@ -1,6 +1,8 @@
 import { useEffect, useMemo } from 'react';
 import { Sale } from '@/types';
 import { DepositEntry } from '@/components/sales/SalesTable';
+import { useCompanySettings } from '@/hooks/queries/useCompanySettings';
+import { costWithIva } from '@/utils/ivaUtils';
 
 const toKey = (d: Date | string) => {
   const date = new Date(d);
@@ -15,6 +17,7 @@ export function useDailyDeposits(
   selectedDate: string,
   updateSale: (id: string, data: Partial<Sale>) => void
 ) {
+  const { taxSettings } = useCompanySettings();
   const depositsGroupedForDay = useMemo<DepositEntry[]>(() => {
     const map = new Map<string, DepositEntry>();
 
@@ -78,11 +81,12 @@ export function useDailyDeposits(
 
   const dailyTotals = useMemo(() => {
     const salesTotal = salesOfDay.reduce((sum, s) => sum + s.items.reduce((si, i) => si + (i.total ?? 0), 0), 0);
-    const costsTotal = salesOfDay.reduce((sum, s) => sum + s.items.reduce((si, i) => si + ((i.cost ?? 0) * (i.quantity ?? 0)), 0), 0);
+    const costsTotal = salesOfDay.reduce((sum, s) => sum + s.items.reduce((si, i) =>
+      si + costWithIva(i.cost ?? 0, i.hasIva, taxSettings) * (i.quantity ?? 0), 0), 0);
     const depositsTotal = depositsGroupedForDay.reduce((sum, e) => sum + (e.dayDepositSum ?? 0), 0);
     const totalVentas = salesTotal + depositsTotal;
     return { totalVentas, totalCostos: costsTotal, utilidad: totalVentas - costsTotal };
-  }, [salesOfDay, depositsGroupedForDay]);
+  }, [salesOfDay, depositsGroupedForDay, taxSettings]);
 
   return { depositsGroupedForDay, salesOfDay, dailyTotals };
 }

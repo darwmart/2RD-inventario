@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useSalesData } from '@/hooks/queries/useSalesData';
 import { useAdvisors } from '@/hooks/queries/useAdvisors';
+import { useCompanySettings } from '@/hooks/queries/useCompanySettings';
+import { costWithIva } from '@/utils/ivaUtils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,6 +16,7 @@ import { fmt, fmtNum, inRange, printReport } from '@/utils/reportPrint';
 export default function SalesReportTab() {
   const { sales } = useSalesData();
   const { advisors } = useAdvisors();
+  const { taxSettings } = useCompanySettings();
 
   const [salesFrom, setSalesFrom] = useState('');
   const [salesTo, setSalesTo] = useState('');
@@ -32,13 +35,14 @@ export default function SalesReportTab() {
 
   const salesTotals = useMemo(() => {
     const total = filteredSales.reduce((s, v) => s + v.total, 0);
-    const costo = filteredSales.reduce((s, v) => s + v.items.reduce((si, it) => si + it.cost * it.quantity, 0), 0);
+    const costo = filteredSales.reduce((s, v) => s + v.items.reduce((si, it) =>
+      si + costWithIva(it.cost, it.hasIva, taxSettings) * it.quantity, 0), 0);
     return { count: filteredSales.length, total, costo, utilidad: total - costo };
-  }, [filteredSales]);
+  }, [filteredSales, taxSettings]);
 
   function printSales() {
     const rows = filteredSales.map(s => {
-      const costo = s.items.reduce((si, it) => si + it.cost * it.quantity, 0);
+      const costo = s.items.reduce((si, it) => si + costWithIva(it.cost, it.hasIva, taxSettings) * it.quantity, 0);
       const utilidad = s.total - costo;
       return `<tr><td>${s.saleNumber}</td><td>${fmtDate(s.createdAt)}</td><td>${s.advisorName}</td><td>${s.customerName || '-'}</td><td>${s.paymentMethod?.name || '-'}</td><td style="text-align:right">${fmt(s.total)}</td><td style="text-align:right">${fmt(costo)}</td><td style="text-align:right;color:green">${fmt(utilidad)}</td><td>${s.status === 'returned' ? 'Devuelta' : 'Completada'}</td></tr>`;
     }).join('');
@@ -122,7 +126,7 @@ export default function SalesReportTab() {
             </tr></thead>
             <tbody>
               {filteredSales.map(s => {
-                const costo = s.items.reduce((si, it) => si + it.cost * it.quantity, 0);
+                const costo = s.items.reduce((si, it) => si + costWithIva(it.cost, it.hasIva, taxSettings) * it.quantity, 0);
                 const utilidad = s.total - costo;
                 return (
                   <tr key={s.id} className="border-b hover:bg-gray-50">

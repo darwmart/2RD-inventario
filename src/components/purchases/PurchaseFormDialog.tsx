@@ -44,7 +44,7 @@ interface Props {
   purchases: Purchase[];
   onSave: (data: PurchaseFormData) => void;
   onClose: () => void;
-  addProduct: (data: CreateProductInput) => Product;
+  addProduct: (data: CreateProductInput) => Promise<Product>;
   onAddCategory: (name: string, description: string) => void;
   onAddSupplier: (data: { name: string; contact: string; phone: string; email: string; address: string }) => void;
 }
@@ -184,14 +184,14 @@ export default function PurchaseFormDialog({
     resetForm();
   };
 
-  const handleCreateProduct = () => {
+  const handleCreateProduct = async () => {
     if (!newProductForm.name.trim() || !newProductForm.reference.trim()) {
       toast.error('El nombre y la referencia son requeridos'); return;
     }
     if (!newProductForm.categoryId || !newProductForm.supplierId) {
       toast.error('Selecciona una categoría y un proveedor'); return;
     }
-    const created = addProduct({
+    const created = await addProduct({
       name: newProductForm.name.trim(),
       barcode: newProductForm.barcode.trim(),
       reference: newProductForm.reference.trim(),
