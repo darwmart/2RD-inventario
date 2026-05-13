@@ -8,6 +8,7 @@ import { Advisor, LoanPayment, SalaryPayment } from '@/types';
 import AdvisorFormDialog from '@/components/advisors/AdvisorFormDialog';
 import AdvisorCard, { AdvisorStats } from '@/components/advisors/AdvisorCard';
 import SalaryPaymentDialog from '@/components/advisors/SalaryPaymentDialog';
+import SalaryHistoryDialog from '@/components/advisors/SalaryHistoryDialog';
 import { toast } from 'sonner';
 
 export default function Advisors() {
@@ -19,6 +20,7 @@ export default function Advisors() {
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [salaryAdvisor, setSalaryAdvisor] = useState<Advisor | null>(null);
+  const [historyAdvisor, setHistoryAdvisor] = useState<Advisor | null>(null);
 
   const getAdvisorStats = (advisor: Advisor): AdvisorStats => {
     const advisorSales  = sales.filter(s => s.advisorId === advisor.id && s.status === 'completed');
@@ -105,6 +107,7 @@ export default function Advisors() {
               advisor={advisor}
               stats={getAdvisorStats(advisor)}
               onPaySalary={setSalaryAdvisor}
+              onViewHistory={setHistoryAdvisor}
             />
           ))}
         </div>
@@ -115,6 +118,15 @@ export default function Advisors() {
         onClose={() => setIsFormOpen(false)}
         onSave={handleSave}
       />
+
+      {historyAdvisor && (
+        <SalaryHistoryDialog
+          open={!!historyAdvisor}
+          advisor={historyAdvisor}
+          payments={getSalariesByAdvisor(historyAdvisor.id)}
+          onClose={() => setHistoryAdvisor(null)}
+        />
+      )}
 
       {salaryAdvisor && (
         <SalaryPaymentDialog

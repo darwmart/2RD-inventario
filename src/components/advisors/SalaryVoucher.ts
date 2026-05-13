@@ -20,12 +20,22 @@ function periodLabel(period: string): string {
   return `${MONTHS[parseInt(m, 10) - 1]} de ${y}`;
 }
 
-export function printSalaryVoucher(payment: SalaryPayment, company: CompanyInfo) {
-  const totalLoanDed = payment.loanDeductions.reduce((s, d) => s + d.amount, 0);
+function fmtDate(dateStr: string) {
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' });
+}
 
+export function printSalaryVoucher(payment: SalaryPayment, company: CompanyInfo) {
   const loanRows = payment.loanDeductions
     .map(d => `<tr><td class="concept">Abono préstamo — ${d.description}</td><td class="amount red">${fmt(d.amount)}</td></tr>`)
     .join('');
+
+  const daysInfo = payment.daysWorked
+    ? `${payment.daysWorked} días (de 30) · ${fmtDate(payment.fromDate)} al ${fmtDate(payment.toDate)}`
+    : periodLabel(payment.period);
+
+  const baseSalaryLabel = payment.daysWorked && payment.baseSalaryMonthly
+    ? `Salario básico (${payment.daysWorked}/30 días)`
+    : 'Salario básico';
 
   const html = `<!DOCTYPE html>
 <html lang="es">
@@ -74,7 +84,7 @@ export function printSalaryVoucher(payment: SalaryPayment, company: CompanyInfo)
     <h2>COMPROBANTE DE PAGO DE SALARIO</h2>
     ${company.nit ? `<p>NIT: ${company.nit}</p>` : ''}
     ${company.address ? `<p>${company.address}${company.phone ? ' | Tel: ' + company.phone : ''}</p>` : ''}
-    <div class="period-badge">Período: ${periodLabel(payment.period)}</div>
+    <div class="period-badge">Período: ${daysInfo}</div>
   </div>
 
   <div class="info-grid">
@@ -108,7 +118,13 @@ export function printSalaryVoucher(payment: SalaryPayment, company: CompanyInfo)
   <table>
     <thead><tr><th>Concepto</th><th style="text-align:right;width:160px">Valor</th></tr></thead>
     <tbody>
-      <tr><td class="concept">Salario básico</td><td class="amount">${fmt(payment.baseSalary)}</td></tr>
+      <tr>
+        <td class="concept">
+          ${baseSalaryLabel}
+          ${payment.daysWorked && payment.baseSalaryMonthly ? `<span style="font-size:9pt;color:#666"> · Base mensual: ${fmt(payment.baseSalaryMonthly)}</span>` : ''}
+        </td>
+        <td class="amount">${fmt(payment.baseSalary)}</td>
+      </tr>
       ${payment.commissions > 0 ? `<tr><td class="concept">Comisiones por ventas</td><td class="amount">${fmt(payment.commissions)}</td></tr>` : ''}
       ${payment.transportAllowance > 0 ? `<tr><td class="concept">Auxilio de transporte</td><td class="amount">${fmt(payment.transportAllowance)}</td></tr>` : ''}
     </tbody>

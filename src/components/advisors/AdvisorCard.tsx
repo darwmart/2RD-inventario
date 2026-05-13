@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Users, Mail, Phone, DollarSign } from 'lucide-react';
+import { Users, Mail, Phone, DollarSign, History } from 'lucide-react';
 import { Advisor } from '@/types';
 
 export interface AdvisorStats {
@@ -19,12 +19,13 @@ interface Props {
   advisor: Advisor;
   stats: AdvisorStats;
   onPaySalary: (advisor: Advisor) => void;
+  onViewHistory: (advisor: Advisor) => void;
 }
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n);
 
-export default function AdvisorCard({ advisor, stats, onPaySalary }: Props) {
+export default function AdvisorCard({ advisor, stats, onPaySalary, onViewHistory }: Props) {
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -40,9 +41,14 @@ export default function AdvisorCard({ advisor, stats, onPaySalary }: Props) {
               </Badge>
             </div>
           </div>
-          <Button size="sm" onClick={() => onPaySalary(advisor)} className="bg-green-600 hover:bg-green-700">
-            <DollarSign className="h-4 w-4 mr-1" />Pagar
-          </Button>
+          <div className="flex gap-1">
+            <Button size="sm" onClick={() => onPaySalary(advisor)} className="bg-green-600 hover:bg-green-700">
+              <DollarSign className="h-4 w-4 mr-1" />Pagar
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => onViewHistory(advisor)} title="Historial de nóminas">
+              <History className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </CardHeader>
 

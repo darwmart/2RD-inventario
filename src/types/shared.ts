@@ -38,8 +38,12 @@ export type SalaryPayment = {
   advisorId: string;
   advisorName: string;
   advisorDocument?: string;
-  period: string;
-  baseSalary: number;
+  period: string;           // 'YYYY-MM' derivado de fromDate
+  fromDate: string;         // fecha inicio del período
+  toDate: string;           // fecha fin del período
+  daysWorked: number;       // días calculados (ley colombiana: mes = 30 días)
+  baseSalaryMonthly: number; // salario base mensual configurado
+  baseSalary: number;       // salario proporcional = baseSalaryMonthly * daysWorked / 30
   commissions: number;
   transportAllowance: number;
   healthDeduction: number;
