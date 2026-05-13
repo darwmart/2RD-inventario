@@ -29,7 +29,7 @@ interface LayoutProps {
 }
 
 const allNavigation = [
-  { name: 'Dashboard', href: '/', icon: BarChart3, adminOnly: false },
+  { name: 'Dashboard', href: '/', icon: BarChart3, adminOnly: true },
   { name: 'Contabilidad', href: '/accounting', icon: Banknote, adminOnly: true },
   { name: 'Inventario', href: '/inventory', icon: Package, adminOnly: false },
   { name: 'Ventas', href: '/sales', icon: ShoppingCart, adminOnly: false },

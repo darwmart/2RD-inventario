@@ -4,6 +4,7 @@ import { Search, Package, Edit, Trash2 } from 'lucide-react';
 import { Product } from '@/types';
 import { VisibleColumns } from './ColumnConfigDialog';
 import BarcodeScanInput from '@/components/barcode/BarcodeScanInput';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Category {
   id: string;
@@ -26,7 +27,8 @@ export default function ProductTable({
   products, categories, visibleColumns, selectedProductId,
   searchTerm, onSearchChange, onSelect, onEdit, onDelete,
 }: Props) {
-  const colCount = Object.values(visibleColumns).filter(Boolean).length + 1;
+  const { isAdmin } = useAuth();
+  const colCount = Object.values(visibleColumns).filter(Boolean).length + (isAdmin() ? 1 : 0);
 
   return (
     <div className="flex-1 flex flex-col border rounded bg-white">
@@ -57,7 +59,7 @@ export default function ProductTable({
               {visibleColumns.currentPrice && <TableHead className="text-right w-[100px]">P.Actual</TableHead>}
               {visibleColumns.discountPrice && <TableHead className="text-right w-[100px]">P.Descuento</TableHead>}
               {visibleColumns.wholesalePrice && <TableHead className="text-right w-[100px]">P.Mayorista</TableHead>}
-              <TableHead className="w-[100px]">Acciones</TableHead>
+              {isAdmin() && <TableHead className="w-[100px]">Acciones</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -83,7 +85,7 @@ export default function ProductTable({
                       selectedProductId === product.id ? 'bg-blue-50 hover:bg-blue-50' : ''
                     } ${isLowStock ? 'bg-yellow-50' : ''}`}
                     onClick={() => onSelect(product)}
-                    onDoubleClick={() => onEdit(product)}
+                    onDoubleClick={isAdmin() ? () => onEdit(product) : undefined}
                   >
                     {visibleColumns.code && (
                       <TableCell className="font-mono text-sm font-medium">{product.reference}</TableCell>
@@ -129,18 +131,20 @@ export default function ProductTable({
                         ${product.wholesalePrice.toLocaleString('es-CO')}
                       </TableCell>
                     )}
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0"
-                          onClick={(e) => { e.stopPropagation(); onEdit(product); }}>
-                          <Edit className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-600 hover:text-red-700"
-                          onClick={(e) => { e.stopPropagation(); onDelete(product); }}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </TableCell>
+                    {isAdmin() && (
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0"
+                            onClick={(e) => { e.stopPropagation(); onEdit(product); }}>
+                            <Edit className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-600 hover:text-red-700"
+                            onClick={(e) => { e.stopPropagation(); onDelete(product); }}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    )}
                   </TableRow>
                 );
               })

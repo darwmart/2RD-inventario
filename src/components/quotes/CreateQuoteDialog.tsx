@@ -9,6 +9,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Plus, Search, Minus, Trash2 } from 'lucide-react';
 import { Product, SaleItem, PaymentMethod } from '@/types';
 import { calculateItemIVA } from '@/utils/ivaUtils';
+import { fmtMoneyInput, parseMoney } from '@/utils/formatters';
+
+type CartItem = SaleItem & { unitPriceStr?: string };
 
 export interface CreateQuoteFormData {
   advisorId: string;
@@ -43,10 +46,11 @@ interface Props {
 export default function CreateQuoteDialog({ open, products, advisors, paymentMethods, taxSettings, onClose, onSave }: Props) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAdvisor, setSelectedAdvisor] = useState('');
-  const [cart, setCart] = useState<SaleItem[]>([]);
+  const [cart, setCart] = useState<CartItem[]>([]);
   const [quoteType, setQuoteType] = useState<'quote' | 'reserved'>('quote');
   const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState('');
   const [deposit, setDeposit] = useState<number>(0);
+  const [depositStr, setDepositStr] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [customerDocument, setCustomerDocument] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -78,6 +82,7 @@ export default function CreateQuoteDialog({ open, products, advisors, paymentMet
         productId: product.id, productName: product.name, description: product.description,
         cost: product.cost, quantity: 1, unitPrice: product.currentPrice,
         total: product.currentPrice, hasIva, ivaAmount,
+        unitPriceStr: product.currentPrice.toLocaleString('es-CO'),
       }]);
     }
   };
@@ -103,9 +108,21 @@ export default function CreateQuoteDialog({ open, products, advisors, paymentMet
     }));
   };
 
+  const updatePriceStr = (productId: string, raw: string) => {
+    const f = fmtMoneyInput(raw);
+    const price = parseMoney(f);
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+    setCart(cart.map(item => {
+      if (item.productId !== productId) return item;
+      const { hasIva, ivaAmount } = calculateItemIVA(product, price, item.quantity, taxSettings);
+      return { ...item, unitPriceStr: f, unitPrice: price, total: item.quantity * price, hasIva, ivaAmount };
+    }));
+  };
+
   const reset = () => {
     setCart([]); setSelectedAdvisor(''); setSelectedPaymentMethodId('');
-    setDeposit(0); setCustomerName(''); setCustomerDocument(''); setCustomerPhone('');
+    setDeposit(0); setDepositStr(''); setCustomerName(''); setCustomerDocument(''); setCustomerPhone('');
     setQuoteType('quote'); setSearchTerm('');
   };
 
@@ -173,7 +190,7 @@ export default function CreateQuoteDialog({ open, products, advisors, paymentMet
               </div>
               <div>
                 <Label>Abono</Label>
-                <Input type="number" value={deposit} onChange={e => setDeposit(parseFloat(e.target.value) || 0)} placeholder="0" />
+                <Input type="text" inputMode="numeric" value={depositStr} onChange={e => { const f = fmtMoneyInput(e.target.value); setDepositStr(f); setDeposit(parseMoney(f)); }} placeholder="0" />
               </div>
               <div>
                 <Label>Nombre del Cliente</Label>
@@ -238,7 +255,7 @@ export default function CreateQuoteDialog({ open, products, advisors, paymentMet
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Input type="number" value={item.unitPrice} onChange={e => updatePrice(item.productId, parseFloat(e.target.value) || 0)} className="w-20" />
+                          <Input type="text" inputMode="numeric" value={item.unitPriceStr ?? item.unitPrice.toLocaleString('es-CO')} onChange={e => updatePriceStr(item.productId, e.target.value)} className="w-20" />
                         </TableCell>
                         <TableCell>${item.total.toLocaleString('es-CO')}</TableCell>
                         <TableCell>

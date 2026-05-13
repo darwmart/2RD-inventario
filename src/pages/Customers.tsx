@@ -1,5 +1,7 @@
 import { useState, useMemo } from 'react';
+import { useConfirm } from '@/hooks/useConfirm';
 import { useCustomersQuery } from '@/hooks/queries';
+import { useAuth } from '@/contexts/AuthContext';
 import { Customer } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,9 +10,12 @@ import CustomerStatsCards from '@/components/customers/CustomerStatsCards';
 import CustomerTable from '@/components/customers/CustomerTable';
 import CustomerFormDialog, { CustomerFormData } from '@/components/customers/CustomerFormDialog';
 import CustomerHistoryDialog from '@/components/customers/CustomerHistoryDialog';
+import TableSkeleton from '@/components/ui/TableSkeleton';
 
 export default function Customers() {
-  const { customers, addCustomer, updateCustomer, deleteCustomer } = useCustomersQuery();
+  const { customers, addCustomer, updateCustomer, deleteCustomer, isLoading: customersLoading } = useCustomersQuery();
+  const { confirm, ConfirmDialog } = useConfirm();
+  const { isAdmin } = useAuth();
 
   const [searchTerm, setSearchTerm]         = useState('');
   const [isFormOpen, setIsFormOpen]         = useState(false);
@@ -47,8 +52,8 @@ export default function Customers() {
     setEditingCustomer(null);
   };
 
-  const handleDelete = (customer: Customer) => {
-    if (!confirm(`¿Eliminar al cliente "${customer.name}"?`)) return;
+  const handleDelete = async (customer: Customer) => {
+    if (!await confirm({ description: `¿Eliminar al cliente "${customer.name}"?`, confirmLabel: 'Eliminar' })) return;
     deleteCustomer(customer.id);
   };
 
@@ -59,9 +64,11 @@ export default function Customers() {
           <h1 className="text-3xl font-bold text-gray-900">Clientes</h1>
           <p className="text-gray-500 mt-1">Gestión de clientes y su historial de compras</p>
         </div>
-        <Button onClick={openNew} className="bg-blue-600 hover:bg-blue-700">
-          <Plus className="h-4 w-4 mr-2" /> Nuevo Cliente
-        </Button>
+        {isAdmin() && (
+          <Button onClick={openNew} className="bg-blue-600 hover:bg-blue-700">
+            <Plus className="h-4 w-4 mr-2" /> Nuevo Cliente
+          </Button>
+        )}
       </div>
 
       <CustomerStatsCards
@@ -80,12 +87,10 @@ export default function Customers() {
         />
       </div>
 
-      <CustomerTable
-        customers={filtered}
-        onEdit={openEdit}
-        onDelete={handleDelete}
-        onHistory={openHistory}
-      />
+      {customersLoading
+        ? <TableSkeleton rows={8} cols={5} />
+        : <CustomerTable customers={filtered} onEdit={openEdit} onDelete={handleDelete} onHistory={openHistory} />
+      }
 
       <CustomerFormDialog
         open={isFormOpen}
@@ -100,6 +105,7 @@ export default function Customers() {
         customer={selectedCustomer}
         onClose={() => setIsHistoryOpen(false)}
       />
+      {ConfirmDialog}
     </div>
   );
 }

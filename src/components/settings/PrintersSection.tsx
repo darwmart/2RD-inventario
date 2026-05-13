@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useConfirm } from '@/hooks/useConfirm';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +20,7 @@ interface Props {
 }
 
 export default function PrintersSection({ printers, onAdd, onUpdate, onDelete, onSetDefault }: Props) {
+  const { confirm, ConfirmDialog } = useConfirm();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPrinter, setEditingPrinter] = useState<PrinterType | null>(null);
   const [form, setForm] = useState({
@@ -60,11 +62,10 @@ export default function PrintersSection({ printers, onAdd, onUpdate, onDelete, o
     setIsDialogOpen(false);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('¿Estás seguro de que deseas eliminar esta impresora?')) {
-      onDelete(id);
-      toast.success('Impresora eliminada exitosamente');
-    }
+  const handleDelete = async (id: string) => {
+    if (!await confirm({ description: '¿Estás seguro de que deseas eliminar esta impresora?', confirmLabel: 'Eliminar' })) return;
+    onDelete(id);
+    toast.success('Impresora eliminada exitosamente');
   };
 
   return (
@@ -183,6 +184,7 @@ export default function PrintersSection({ printers, onAdd, onUpdate, onDelete, o
           <p className="text-sm text-gray-500 text-center py-8">No hay impresoras configuradas</p>
         )}
       </div>
+      {ConfirmDialog}
     </div>
   );
 }

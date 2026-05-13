@@ -1,4 +1,5 @@
 import { Edit2, Trash2 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Category {
   id: string;
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export default function CategorySidebar({ categories, selectedCategory, onSelect, onEdit, onDelete }: Props) {
+  const { isAdmin } = useAuth();
   return (
     <div className="w-64 border rounded bg-white p-4">
       <h3 className="text-sm font-semibold mb-3 text-gray-700">Sección/familia</h3>
@@ -36,22 +38,24 @@ export default function CategorySidebar({ categories, selectedCategory, onSelect
             onClick={() => onSelect(category.id)}
           >
             <span>📦 {category.name}</span>
-            <div className="hidden group-hover:flex gap-1">
-              <button
-                className="p-0.5 rounded hover:bg-blue-200 text-blue-600"
-                onClick={(e) => { e.stopPropagation(); onEdit(category); }}
-                title="Editar"
-              >
-                <Edit2 className="h-3 w-3" />
-              </button>
-              <button
-                className="p-0.5 rounded hover:bg-red-200 text-red-600"
-                onClick={(e) => { e.stopPropagation(); onDelete(category); }}
-                title="Eliminar"
-              >
-                <Trash2 className="h-3 w-3" />
-              </button>
-            </div>
+            {isAdmin() && (
+              <div className="hidden group-hover:flex gap-1">
+                <button
+                  className="p-0.5 rounded hover:bg-blue-200 text-blue-600"
+                  onClick={(e) => { e.stopPropagation(); onEdit(category); }}
+                  title="Editar"
+                >
+                  <Edit2 className="h-3 w-3" />
+                </button>
+                <button
+                  className="p-0.5 rounded hover:bg-red-200 text-red-600"
+                  onClick={(e) => { e.stopPropagation(); onDelete(category); }}
+                  title="Eliminar"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </div>
+            )}
           </div>
         ))}
       </div>

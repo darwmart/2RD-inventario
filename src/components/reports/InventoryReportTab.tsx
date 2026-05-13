@@ -5,8 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Printer, Package } from 'lucide-react';
+import { Printer, Package, Download } from 'lucide-react';
 import { fmt, fmtNum, printReport } from '@/utils/reportPrint';
+import { downloadCSV } from '@/utils/csvExport';
 
 export default function InventoryReportTab() {
   const { products } = useProducts();
@@ -37,6 +38,17 @@ export default function InventoryReportTab() {
     value: filteredInventory.reduce((s, p) => s + p.stock * p.cost, 0),
   }), [filteredInventory]);
 
+  function exportInventoryCSV() {
+    const headers = ['Referencia', 'Nombre', 'Código Barras', 'Categoría', 'Proveedor', 'Stock', 'Stock Mín.', 'Costo', 'Precio', 'Valor Total'];
+    const rows = filteredInventory.map(p => {
+      const cat = categories.find(c => c.id === p.categoryId)?.name || '';
+      const sup = suppliers.find(s => s.id === p.supplierId);
+      const supName = sup ? (sup.commercialName || sup.fiscalName) : '';
+      return [p.reference || '', p.name, p.barcode || '', cat, supName, p.stock, p.minStock, p.cost, p.currentPrice, Math.round(p.stock * p.cost)];
+    });
+    downloadCSV(`inventario_${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+  }
+
   function printInventory() {
     const rows = filteredInventory.map(p => {
       const cat = categories.find(c => c.id === p.categoryId)?.name || '-';
@@ -53,7 +65,10 @@ export default function InventoryReportTab() {
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-base"><Package className="h-4 w-4" />Inventario Actual</CardTitle>
-          <Button size="sm" variant="outline" onClick={printInventory}><Printer className="h-4 w-4 mr-1" />Imprimir</Button>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={exportInventoryCSV}><Download className="h-4 w-4 mr-1" />CSV</Button>
+            <Button size="sm" variant="outline" onClick={printInventory}><Printer className="h-4 w-4 mr-1" />Imprimir</Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">

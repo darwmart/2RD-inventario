@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useConfirm } from '@/hooks/useConfirm';
 import { useProducts, useCategories, useSuppliers } from '@/hooks/queries';
 import { useSettings } from '@/hooks/useSettings';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -6,6 +7,7 @@ import { Product } from '@/types';
 import ProductFormDialog from '@/components/ProductFormDialog';
 import { toast } from 'sonner';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
+import TableSkeleton from '@/components/ui/TableSkeleton';
 import CategorySidebar from '@/components/inventory/CategorySidebar';
 import ProductTable from '@/components/inventory/ProductTable';
 import ProductPreview from '@/components/inventory/ProductPreview';
@@ -21,7 +23,8 @@ const DEFAULT_COLUMNS: VisibleColumns = {
 };
 
 export default function Inventory() {
-  const { products, addProduct, updateProduct, deleteProduct } = useProducts();
+  const { products, addProduct, updateProduct, deleteProduct, isLoading: productsLoading } = useProducts();
+  const { confirm, ConfirmDialog } = useConfirm();
   const { categories, addCategory, updateCategory, deleteCategory } = useCategories();
   const { suppliers, addSupplier } = useSuppliers();
   const { labelDesigns } = useSettings();
@@ -55,13 +58,18 @@ export default function Inventory() {
     setEditingCategory(null);
   };
 
-  const handleDeleteCategory = (cat: { id: string; name: string }) => {
+  const handleDeleteCategory = async (cat: { id: string; name: string }) => {
     if (products.some(p => p.categoryId === cat.id)) {
       toast.error(`No puedes eliminar "${cat.name}" porque tiene artículos asignados`); return;
     }
-    if (!confirm(`¿Eliminar la categoría "${cat.name}"?`)) return;
+    if (!await confirm({ description: `¿Eliminar la categoría "${cat.name}"?`, confirmLabel: 'Eliminar' })) return;
     deleteCategory(cat.id);
     if (selectedCategory === cat.id) setSelectedCategory('all');
+  };
+
+  const handleDeleteProduct = async (p: { id: string }) => {
+    if (!await confirm({ description: '¿Estás seguro de eliminar este artículo?', confirmLabel: 'Eliminar' })) return;
+    deleteProduct(p.id);
   };
 
   return (
@@ -83,7 +91,7 @@ export default function Inventory() {
             onDelete={handleDeleteCategory}
           />
           <div className="flex-1 flex gap-4">
-            <ProductTable
+            {productsLoading ? <div className="flex-1"><TableSkeleton rows={10} cols={7} /></div> : <ProductTable
               products={filteredProducts}
               categories={categories}
               visibleColumns={visibleColumns}
@@ -92,8 +100,8 @@ export default function Inventory() {
               onSearchChange={setSearchTerm}
               onSelect={setSelectedProduct}
               onEdit={setEditingProduct}
-              onDelete={p => { if (confirm('¿Estás seguro de eliminar este artículo?')) deleteProduct(p.id); }}
-            />
+              onDelete={handleDeleteProduct}
+            />}
             {selectedProduct && <ProductPreview product={selectedProduct} />}
           </div>
         </div>
@@ -148,6 +156,7 @@ export default function Inventory() {
           onClose={() => setIsColumnConfigOpen(false)}
           onChange={setVisibleColumns}
         />
+        {ConfirmDialog}
       </div>
     </ScrollArea>
   );

@@ -2,6 +2,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, Edit, Trash2, Search, Building2 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Props {
   searchTerm: string;
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export default function SuppliersToolbar({ searchTerm, hasSelection, onSearchChange, onNew, onEdit, onDelete }: Props) {
+  const { isAdmin } = useAuth();
   return (
     <div className="mb-6">
       <div className="flex items-center justify-between mb-4">
@@ -33,17 +35,19 @@ export default function SuppliersToolbar({ searchTerm, hasSelection, onSearchCha
           />
         </div>
       </div>
-      <Card className="p-3">
-        <div className="flex items-center gap-2">
-          <Button size="sm" onClick={onNew}><Plus className="h-4 w-4 mr-1" />Nuevo</Button>
-          <Button size="sm" variant="outline" onClick={onEdit} disabled={!hasSelection}>
-            <Edit className="h-4 w-4 mr-1" />Editar
-          </Button>
-          <Button size="sm" variant="outline" onClick={onDelete} disabled={!hasSelection}>
-            <Trash2 className="h-4 w-4 mr-1" />Borrar
-          </Button>
-        </div>
-      </Card>
+      {isAdmin() && (
+        <Card className="p-3">
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={onNew}><Plus className="h-4 w-4 mr-1" />Nuevo</Button>
+            <Button size="sm" variant="outline" onClick={onEdit} disabled={!hasSelection}>
+              <Edit className="h-4 w-4 mr-1" />Editar
+            </Button>
+            <Button size="sm" variant="outline" onClick={onDelete} disabled={!hasSelection}>
+              <Trash2 className="h-4 w-4 mr-1" />Borrar
+            </Button>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

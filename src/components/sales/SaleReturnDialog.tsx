@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { PaymentMethod, Sale, SaleItem } from '@/types';
+import { fmtMoneyInput, parseMoney } from '@/utils/formatters';
 
 interface Props {
   sale: Sale | null;
@@ -13,14 +14,17 @@ interface Props {
 
 export default function SaleReturnDialog({ sale, paymentMethods, onClose, onConfirm }: Props) {
   const [returnItems, setReturnItems] = useState<{ [productId: string]: number }>({});
+  const [returnItemsStr, setReturnItemsStr] = useState<{ [productId: string]: string }>({});
   const [returnReason, setReturnReason] = useState('');
   const [returnPaymentMethodId, setReturnPaymentMethodId] = useState('');
 
   const handleOpen = () => {
     if (!sale) return;
     const initial: { [k: string]: number } = {};
-    sale.items.forEach(item => { initial[item.productId] = 0; });
+    const initialStr: { [k: string]: string } = {};
+    sale.items.forEach(item => { initial[item.productId] = 0; initialStr[item.productId] = ''; });
     setReturnItems(initial);
+    setReturnItemsStr(initialStr);
     setReturnReason('');
     setReturnPaymentMethodId('');
   };
@@ -58,11 +62,17 @@ export default function SaleReturnDialog({ sale, paymentMethods, onClose, onConf
                     <p className="text-xs text-gray-500">Vendido: {item.quantity} u. · ${item.unitPrice.toLocaleString('es-CO')}</p>
                   </div>
                   <input
-                    type="number"
-                    min={0}
-                    max={item.quantity}
-                    value={returnItems[item.productId] || 0}
-                    onChange={e => setReturnItems(prev => ({ ...prev, [item.productId]: Math.min(Number(e.target.value), item.quantity) }))}
+                    type="text"
+                    inputMode="numeric"
+                    value={returnItemsStr[item.productId] ?? ''}
+                    onChange={e => {
+                      const f = fmtMoneyInput(e.target.value);
+                      const parsed = parseMoney(f);
+                      const val = Math.min(parsed, item.quantity);
+                      const clampedF = val === parsed ? f : val.toLocaleString('es-CO');
+                      setReturnItemsStr(prev => ({ ...prev, [item.productId]: clampedF }));
+                      setReturnItems(prev => ({ ...prev, [item.productId]: val }));
+                    }}
                     className="w-16 border rounded p-1 text-center text-sm"
                   />
                 </div>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useConfirm } from '@/hooks/useConfirm';
 import { useSalesData } from '@/hooks/queries/useSalesData';
 import { useAdvisors } from '@/hooks/queries/useAdvisors';
 import { usePaymentMethods } from '@/hooks/queries/usePaymentMethods';
@@ -10,6 +11,7 @@ import { useCashRegisterSummary } from '@/hooks/useCashRegisterSummary';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { CashRegisterSession, AccountingRecord } from '@/types';
 import { toast } from 'sonner';
+import { printReport } from '@/utils/reportPrint';
 import CashRegisterHeader from '@/components/cashRegister/CashRegisterHeader';
 import CashSessionCard from '@/components/cashRegister/CashSessionCard';
 import EditSessionDialog from '@/components/cashRegister/EditSessionDialog';
@@ -22,6 +24,7 @@ const toDateKey = (d = new Date()) =>
 
 export default function CashRegister() {
   const { isAdmin } = useAuth();
+  const { confirm, ConfirmDialog } = useConfirm();
   const { sales, getSalesByDate } = useSalesData();
   const { advisors } = useAdvisors();
   const { paymentMethods } = usePaymentMethods();
@@ -108,9 +111,45 @@ export default function CashRegister() {
     setIsEditSessionDialog(false);
   };
 
-  const handleReopenSession = () => {
+  const handlePrintClosure = () => {
+    const fmt = (n: number) => `$${Math.round(n).toLocaleString('es-CO')}`;
+    const opening = currentSession?.openingAmount ?? 0;
+    const closing = currentSession?.closingAmount;
+    const difference = currentSession?.difference;
+    const status = currentSession?.status === 'closed' ? 'Cerrada' : currentSession ? 'Abierta' : 'Sin sesión';
+
+    const methodRows = Object.entries(summary.paymentBreakdown).map(([name, { count, amount }]) =>
+      `<tr><td>${name}</td><td style="text-align:right">${count}</td><td style="text-align:right">${fmt(amount)}</td></tr>`
+    ).join('');
+
+    const expenseRows = dailyExpenses.map(e =>
+      `<tr><td>${e.description}</td><td>${e.advisor}</td><td style="text-align:right">${fmt(e.amount)}</td></tr>`
+    ).join('');
+
+    const summaryHtml = `
+      <div class="summary">
+        <div class="scard"><b>${status}</b><span>Estado</span></div>
+        <div class="scard"><b>${fmt(opening)}</b><span>Base apertura</span></div>
+        <div class="scard"><b>${fmt(summary.totalSales)}</b><span>Total ventas</span></div>
+        <div class="scard"><b>${fmt(totalExpenses)}</b><span>Egresos</span></div>
+        <div class="scard"><b>${fmt(estimatedCloseCash)}</b><span>Efectivo estimado</span></div>
+        ${closing != null ? `<div class="scard"><b>${fmt(closing)}</b><span>Conteo real</span></div>` : ''}
+        ${difference != null ? `<div class="scard" style="color:${difference >= 0 ? 'green' : 'red'}"><b>${fmt(difference)}</b><span>Diferencia</span></div>` : ''}
+      </div>`;
+
+    const tableHtml = `
+      <h3 style="margin:16px 0 6px">Ventas por método de pago</h3>
+      <table><thead><tr><th>Método</th><th>Transacciones</th><th>Monto</th></tr></thead><tbody>${methodRows || '<tr><td colspan="3">Sin ventas</td></tr>'}</tbody></table>
+      ${dailyExpenses.length > 0 ? `<h3 style="margin:16px 0 6px">Egresos del día</h3><table><thead><tr><th>Descripción</th><th>Asesor</th><th>Monto</th></tr></thead><tbody>${expenseRows}</tbody></table>` : ''}
+      ${dailyTransfers > 0 ? `<p style="margin-top:12px"><b>Traspasos a Caja Fuerte:</b> ${fmt(dailyTransfers)}</p>` : ''}
+      ${currentSession?.notes ? `<p style="margin-top:8px"><b>Notas:</b> ${currentSession.notes}</p>` : ''}`;
+
+    printReport(`Cierre de Caja — ${selectedDate}`, tableHtml, summaryHtml);
+  };
+
+  const handleReopenSession = async () => {
     if (!currentSession) return;
-    if (!confirm('¿Estás seguro de reabrir esta caja? Se podrán registrar nuevos egresos.')) return;
+    if (!await confirm({ description: '¿Estás seguro de reabrir esta caja? Se podrán registrar nuevos egresos.', confirmLabel: 'Reabrir', destructive: false })) return;
     setCashSessions(cashSessions.map(s => s.id === currentSession.id
       ? { ...s, status: 'open', closingAmount: undefined, closingTime: undefined, difference: undefined, notes: undefined }
       : s
@@ -121,7 +160,7 @@ export default function CashRegister() {
 
   return (
     <ScrollArea className="h-screen p-6">
-      <CashRegisterHeader selectedDate={selectedDate} onDateChange={setSelectedDate} />
+      <CashRegisterHeader selectedDate={selectedDate} onDateChange={setSelectedDate} onPrintClosure={handlePrintClosure} />
 
       <CashSessionCard
         currentSession={currentSession}
@@ -170,6 +209,7 @@ export default function CashRegister() {
         />
       </div>
 
+      {ConfirmDialog}
     </ScrollArea>
   );
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAdvisors, useSalesData, useExpensesData } from '@/hooks/queries';
+import { useAuth } from '@/contexts/AuthContext';
 import { useSalaryPayments } from '@/hooks/useSalaryPayments';
 import { useLoanPayments } from '@/hooks/useLoanPayments';
 import { Users, Plus } from 'lucide-react';
@@ -12,6 +13,7 @@ import SalaryHistoryDialog from '@/components/advisors/SalaryHistoryDialog';
 import { toast } from 'sonner';
 
 export default function Advisors() {
+  const { isAdmin } = useAuth();
   const { advisors, addAdvisor }     = useAdvisors();
   const { sales }                    = useSalesData();
   const { expenses, getExpensesByAdvisorName } = useExpensesData();
@@ -88,9 +90,11 @@ export default function Advisors() {
           <h1 className="text-3xl font-bold text-gray-900">Asesores de Venta</h1>
           <p className="mt-2 text-gray-600">Gestiona el equipo de ventas y sus estadísticas</p>
         </div>
-        <Button onClick={() => setIsFormOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />Agregar Asesor
-        </Button>
+        {isAdmin() && (
+          <Button onClick={() => setIsFormOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />Agregar Asesor
+          </Button>
+        )}
       </div>
 
       {advisors.length === 0 ? (

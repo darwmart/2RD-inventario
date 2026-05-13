@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useConfirm } from '@/hooks/useConfirm';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -66,6 +67,7 @@ interface Props {
 }
 
 export default function LabelDesignerSection({ labelDesigns, printers, onAdd, onUpdate, onDelete }: Props) {
+  const { confirm, ConfirmDialog } = useConfirm();
   const [selectedDocumentType, setSelectedDocumentType] = useState('Etiquetas de artículos');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -119,12 +121,11 @@ export default function LabelDesignerSection({ labelDesigns, printers, onAdd, on
     setIsDialogOpen(false);
   };
 
-  const handleDelete = (labelId: string) => {
-    if (confirm('¿Estás seguro de que deseas eliminar este diseño?')) {
-      onDelete(labelId);
-      toast.success('Diseño eliminado exitosamente');
-      if (selectedId === labelId) setSelectedId(null);
-    }
+  const handleDelete = async (labelId: string) => {
+    if (!await confirm({ description: '¿Estás seguro de que deseas eliminar este diseño?', confirmLabel: 'Eliminar' })) return;
+    onDelete(labelId);
+    toast.success('Diseño eliminado exitosamente');
+    if (selectedId === labelId) setSelectedId(null);
   };
 
   const addField = (key: string) => {
@@ -568,6 +569,7 @@ export default function LabelDesignerSection({ labelDesigns, printers, onAdd, on
           </div>
         </DialogContent>
       </Dialog>
+      {ConfirmDialog}
     </div>
   );
 }

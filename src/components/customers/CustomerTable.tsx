@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Edit2, Trash2, ShoppingBag, Phone, Mail, MapPin } from 'lucide-react';
 import { Customer } from '@/types';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Props {
   customers: Customer[];
@@ -16,6 +17,7 @@ const fmt = (n: number) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n);
 
 export default function CustomerTable({ customers, onEdit, onDelete, onHistory }: Props) {
+  const { isAdmin } = useAuth();
   return (
     <Card>
       <CardContent className="p-0">
@@ -72,12 +74,16 @@ export default function CustomerTable({ customers, onEdit, onDelete, onHistory }
                       <Button variant="ghost" size="sm" onClick={() => onHistory(customer)} title="Ver historial">
                         <ShoppingBag className="h-4 w-4 text-blue-600" />
                       </Button>
-                      <Button variant="ghost" size="sm" onClick={() => onEdit(customer)}>
-                        <Edit2 className="h-4 w-4 text-gray-600" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => onDelete(customer)}>
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
+                      {isAdmin() && (
+                        <>
+                          <Button variant="ghost" size="sm" onClick={() => onEdit(customer)}>
+                            <Edit2 className="h-4 w-4 text-gray-600" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => onDelete(customer)}>
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

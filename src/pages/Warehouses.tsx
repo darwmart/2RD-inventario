@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useConfirm } from '@/hooks/useConfirm';
 import { useWarehouses } from '@/hooks/useWarehouses';
 import { useProducts } from '@/hooks/queries/useProducts';
 import { useAuth } from '@/contexts/AuthContext';
@@ -14,6 +15,7 @@ import WarehouseList from '@/components/warehouses/WarehouseList';
 
 export default function Warehouses() {
   const { user, isAdmin } = useAuth();
+  const { confirm, ConfirmDialog } = useConfirm();
   const { products, updateStock } = useProducts();
   const { warehouses, transactions, addWarehouse, updateWarehouse, deleteWarehouse, addTransaction, deleteTransaction, getWarehouseStock } = useWarehouses();
 
@@ -50,8 +52,8 @@ export default function Warehouses() {
     setWarehouseFormOpen(false);
   };
 
-  const handleDeleteWarehouse = (w: ExternalWarehouse) => {
-    if (!confirm(`¿Eliminar la bodega "${w.name}"? Se eliminarán todos sus movimientos.`)) return;
+  const handleDeleteWarehouse = async (w: ExternalWarehouse) => {
+    if (!await confirm({ description: `¿Eliminar la bodega "${w.name}"? Se eliminarán todos sus movimientos.`, confirmLabel: 'Eliminar' })) return;
     deleteWarehouse(w.id);
     if (selectedId === w.id) setSelectedId(null);
     toast.success('Bodega eliminada');
@@ -115,8 +117,8 @@ export default function Warehouses() {
     setTxDialogOpen(false);
   };
 
-  const handleDeleteTransaction = (txId: string) => {
-    if (!confirm('¿Eliminar este movimiento? El inventario principal NO se revertirá automáticamente.')) return;
+  const handleDeleteTransaction = async (txId: string) => {
+    if (!await confirm({ description: '¿Eliminar este movimiento? El inventario principal NO se revertirá automáticamente.', confirmLabel: 'Eliminar' })) return;
     deleteTransaction(txId);
     toast.success('Movimiento eliminado');
   };
@@ -192,6 +194,7 @@ export default function Warehouses() {
           onSubmit={handleSubmitTransaction}
         />
       )}
+      {ConfirmDialog}
     </div>
   );
 }

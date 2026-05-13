@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useConfirm } from '@/hooks/useConfirm';
 import { useProducts } from '@/hooks/queries/useProducts';
 import { useStockCount } from '@/hooks/useStockCount';
 import { StockCount, StockCountItem } from '@/types';
@@ -12,6 +13,7 @@ import CountDetailDialog from '@/components/stockConciliation/CountDetailDialog'
 export default function StockConciliation() {
   const { products, updateStock } = useProducts();
   const { stockCounts, createCount, completeCount, deleteCount } = useStockCount();
+  const { confirm, ConfirmDialog } = useConfirm();
 
   const [isNewOpen, setIsNewOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -23,8 +25,8 @@ export default function StockConciliation() {
     setIsNewOpen(false);
   };
 
-  const handleApplyCount = (count: StockCount) => {
-    if (!confirm('¿Aplicar este conteo? El stock del sistema se ajustará a las cantidades contadas.')) return;
+  const handleApplyCount = async (count: StockCount) => {
+    if (!await confirm({ description: '¿Aplicar este conteo? El stock del sistema se ajustará a las cantidades contadas.', confirmLabel: 'Aplicar', destructive: false })) return;
     count.items.forEach(item => {
       if (item.difference !== 0) updateStock(item.productId, item.countedStock);
     });
@@ -34,8 +36,8 @@ export default function StockConciliation() {
     setSelectedCount(null);
   };
 
-  const handleDelete = (id: string) => {
-    if (!confirm('¿Eliminar este conteo?')) return;
+  const handleDelete = async (id: string) => {
+    if (!await confirm({ description: '¿Eliminar este conteo?', confirmLabel: 'Eliminar' })) return;
     deleteCount(id);
     toast.success('Conteo eliminado');
   };
@@ -72,6 +74,7 @@ export default function StockConciliation() {
         onClose={() => setIsDetailOpen(false)}
         onApply={handleApplyCount}
       />
+      {ConfirmDialog}
     </div>
   );
 }

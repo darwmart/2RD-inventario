@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useConfirm } from '@/hooks/useConfirm';
 import { useSuppliers } from '@/hooks/queries';
 import SupplierFormDialog from '@/components/SupplierFormDialog';
 import SuppliersToolbar from '@/components/suppliers/SuppliersToolbar';
@@ -8,6 +9,7 @@ import { toast } from 'sonner';
 
 export default function Suppliers() {
   const { suppliers, addSupplier, updateSupplier, deleteSupplier } = useSuppliers();
+  const { confirm, ConfirmDialog } = useConfirm();
 
   const [searchTerm, setSearchTerm]       = useState('');
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
@@ -36,9 +38,9 @@ export default function Suppliers() {
     openEdit(selectedSupplier);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!selectedSupplier) { toast.error('Selecciona un proveedor para borrar'); return; }
-    if (!confirm(`¿Estás seguro de eliminar el proveedor "${selectedSupplier.fiscalName}"?`)) return;
+    if (!await confirm({ description: `¿Estás seguro de eliminar el proveedor "${selectedSupplier.fiscalName}"?`, confirmLabel: 'Eliminar' })) return;
     deleteSupplier(selectedSupplier.id);
     setSelectedSupplier(null);
   };
@@ -81,6 +83,7 @@ export default function Suppliers() {
         existingSuppliers={suppliers}
         onSave={handleSave}
       />
+      {ConfirmDialog}
     </div>
   );
 }

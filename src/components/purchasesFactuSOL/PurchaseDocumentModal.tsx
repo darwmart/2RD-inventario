@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Search, Package, FileText, Trash2 } from 'lucide-react';
+import { fmtMoneyInput, parseMoney } from '@/utils/formatters';
 import { PurchaseDocument, DocumentType, Product, Supplier } from '@/types';
 import { toast } from 'sonner';
 import SupplierFormDialog from '@/components/SupplierFormDialog';
@@ -75,6 +76,7 @@ export default function PurchaseDocumentModal({
       setWarehouse(editingDocument.warehouse || DEFAULT_WAREHOUSE);
       setItems(editingDocument.items.map((it: any) => ({
         ...it,
+        quantityStr: it.quantity > 0 ? it.quantity.toLocaleString('es-CO') : '',
         unitCostStr: it.unitCost ? Math.round(it.unitCost).toLocaleString('es-CO') : '',
       })));
       setNotes(editingDocument.notes || '');
@@ -115,6 +117,7 @@ export default function PurchaseDocumentModal({
         productId: product.id,
         productName: product.name,
         quantity: 1,
+        quantityStr: '1',
         unitCost: product.cost,
         unitCostStr: product.cost ? Math.round(product.cost).toLocaleString('es-CO') : '',
         total: product.cost,
@@ -131,6 +134,17 @@ export default function PurchaseDocumentModal({
       next[index].total = quantity * next[index].unitCost;
       setItems(next);
     }
+  };
+
+  const handleUpdateQuantityStr = (index: number, raw: string) => {
+    const f = fmtMoneyInput(raw);
+    const qty = parseMoney(f);
+    if (qty <= 0 && f !== '') return;
+    const next = [...items];
+    next[index].quantityStr = f;
+    next[index].quantity = qty || 0;
+    next[index].total = (qty || 0) * next[index].unitCost;
+    setItems(next);
   };
 
   const handleUpdatePrice = (index: number, priceStr: string) => {
@@ -277,8 +291,9 @@ export default function PurchaseDocumentModal({
                               <TableCell className="text-xs font-mono">{product?.reference}</TableCell>
                               <TableCell className="text-sm">{item.productName}</TableCell>
                               <TableCell>
-                                <Input type="number" value={item.quantity}
-                                  onChange={(e) => handleUpdateQuantity(index, parseInt(e.target.value) || 0)}
+                                <Input type="text" inputMode="numeric"
+                                  value={item.quantityStr ?? item.quantity.toLocaleString('es-CO')}
+                                  onChange={(e) => handleUpdateQuantityStr(index, e.target.value)}
                                   className="h-7 text-sm text-center" />
                               </TableCell>
                               <TableCell>

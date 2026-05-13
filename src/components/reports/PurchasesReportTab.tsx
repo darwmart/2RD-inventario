@@ -7,9 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Printer, ShoppingBag } from 'lucide-react';
+import { Printer, ShoppingBag, Download } from 'lucide-react';
 import { fmtDate } from '@/utils/dates';
 import { fmt, fmtNum, inRange, printReport } from '@/utils/reportPrint';
+import { downloadCSV } from '@/utils/csvExport';
 
 const STATUS_CONFIG: Record<string, { label: string; cls: string }> = {
   pending:   { label: 'Pendiente',  cls: 'border-yellow-400 text-yellow-700' },
@@ -43,6 +44,13 @@ export default function PurchasesReportTab() {
     pending: filteredPurchases.filter(p => p.status === 'pending' || p.status === 'partial').reduce((s, p) => s + p.total, 0),
   }), [filteredPurchases]);
 
+  function exportPurchasesCSV() {
+    const STATUS_LABEL: Record<string, string> = { pending: 'Pendiente', partial: 'Parcial', completed: 'Pagada', invoiced: 'Facturada', cancelled: 'Cancelada' };
+    const headers = ['Número', 'Fecha', 'Proveedor', 'Tipo', 'Estado', 'Subtotal', 'IVA', 'Total'];
+    const rows = filteredPurchases.map(p => [p.documentNumber, fmtDate(p.createdAt), p.supplierName, p.documentType === 'invoice' ? 'Factura' : 'Remisión', STATUS_LABEL[p.status] || p.status, p.subtotal, p.tax || 0, p.total]);
+    downloadCSV(`compras_${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+  }
+
   function printPurchases() {
     const rows = filteredPurchases.map(p => {
       const sc = STATUS_CONFIG[p.status] || { label: p.status, cls: '' };
@@ -57,7 +65,10 @@ export default function PurchasesReportTab() {
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-base"><ShoppingBag className="h-4 w-4" />Historial de Compras</CardTitle>
-          <Button size="sm" variant="outline" onClick={printPurchases}><Printer className="h-4 w-4 mr-1" />Imprimir</Button>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={exportPurchasesCSV}><Download className="h-4 w-4 mr-1" />CSV</Button>
+            <Button size="sm" variant="outline" onClick={printPurchases}><Printer className="h-4 w-4 mr-1" />Imprimir</Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">

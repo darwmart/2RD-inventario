@@ -26,21 +26,21 @@ import AdvisorCommissions from './pages/AdvisorCommissions';
 import Reports from './pages/Reports';
 
 function AppRoutes() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
 
   return (
     <Routes>
       {/* Ruta de login - redirige al dashboard si ya está autenticado */}
       <Route
         path="/login"
-        element={user ? <Navigate to="/" replace /> : <Login />}
+        element={user ? <Navigate to={isAdmin() ? '/' : '/sales'} replace /> : <Login />}
       />
 
       {/* Rutas protegidas - requieren autenticación */}
       <Route
         path="/"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute requireAdmin>
             <Layout>
               <Dashboard />
             </Layout>

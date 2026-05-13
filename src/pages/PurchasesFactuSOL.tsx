@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react';
+import { useConfirm } from '@/hooks/useConfirm';
 import { useProducts, useCategories, useSuppliers } from '@/hooks/queries/useProducts';
 import { usePurchasesData } from '@/hooks/queries/usePurchasesData';
 import { useBankSettings } from '@/hooks/queries/useBankSettings';
 import { useCompanySettings } from '@/hooks/queries/useCompanySettings';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import TableSkeleton from '@/components/ui/TableSkeleton';
 import { PurchaseDocument, DocumentType, AccountingRecord, Supplier } from '@/types';
 import { toast } from 'sonner';
 import SupplierFormDialog from '@/components/SupplierFormDialog';
@@ -16,11 +18,12 @@ export default function PurchasesFactuSOL() {
   const { products, updateStock, addProduct } = useProducts();
   const { categories, addCategory } = useCategories();
   const { suppliers, addSupplier, updateSupplier } = useSuppliers();
-  const { purchases, createDocument, updateDocument, deleteDocument, convertDeliveryToInvoice, markAsPaid } = usePurchasesData();
+  const { purchases, isLoading: purchasesLoading, createDocument, updateDocument, deleteDocument, convertDeliveryToInvoice, markAsPaid } = usePurchasesData();
   const { banks, updateBankBalance } = useBankSettings();
   const { taxSettings } = useCompanySettings();
   const [, setAccountingRecords] = useLocalStorage<AccountingRecord[]>('accountingRecords', []);
 
+  const { confirm, ConfirmDialog } = useConfirm();
   const [activeTab, setActiveTab] = useState<DocumentType>('delivery');
   const [searchTerm, setSearchTerm] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -118,9 +121,9 @@ export default function PurchasesFactuSOL() {
     setEditingDocument(null);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!selectedDocument) return;
-    if (!confirm('¿Estás seguro de eliminar este documento?')) return;
+    if (!await confirm({ description: '¿Estás seguro de eliminar este documento?', confirmLabel: 'Eliminar' })) return;
     const doc = purchases.find(p => p.id === selectedDocument.id);
     if (doc) {
       if (doc.documentType === 'delivery' || doc.documentType === 'invoice') {
@@ -169,7 +172,7 @@ export default function PurchasesFactuSOL() {
   return (
     <ScrollArea className="h-screen">
       <div className="p-6 max-w-[1400px] mx-auto">
-        <DocumentListView
+        {purchasesLoading ? <TableSkeleton rows={8} cols={6} /> : <DocumentListView
           activeTab={activeTab}
           onTabChange={setActiveTab}
           filteredDocuments={filteredDocuments}
@@ -191,7 +194,7 @@ export default function PurchasesFactuSOL() {
           onOpenPayment={(doc) => { setPayingInvoice(doc); setIsPaymentModalOpen(true); }}
           onOpenSupplier={() => { setEditingSupplier(null); setIsSupplierModalOpen(true); }}
           resolveSupplierName={resolveSupplierName}
-        />
+        />}
 
         <PurchaseDocumentModal
           open={isModalOpen}
@@ -217,6 +220,8 @@ export default function PurchasesFactuSOL() {
           onClose={() => { setIsPaymentModalOpen(false); setPayingInvoice(null); }}
           onConfirm={handleMarkAsPaid}
         />
+
+        {ConfirmDialog}
 
         <SupplierFormDialog
           open={isSupplierModalOpen}

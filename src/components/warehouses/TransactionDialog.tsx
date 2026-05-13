@@ -7,12 +7,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Search, X, Camera, Upload, ZoomIn, ChevronDown, ChevronUp, ArrowDownToLine, ArrowUpFromLine, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { Product, WarehouseTransactionItem, WarehouseTransactionType } from '@/types';
+import { fmtMoneyInput, parseMoney } from '@/utils/formatters';
 
 export type WarehouseStockMap = Record<string, { quantity: number; productName: string; barcode?: string; reference?: string }>;
 
 export interface TransactionItemRow extends WarehouseTransactionItem {
   key: string;
 }
+
+type TxRow = TransactionItemRow & { quantityStr?: string };
 
 interface Props {
   open: boolean;
@@ -127,7 +130,7 @@ function ImageCapture({ images, onChange }: { images: string[]; onChange: (imgs:
 
 // ── ItemRows ──────────────────────────────────────────────────────────────────
 function ItemRows({ items, maxQtyFn, onChange, onRemove, allowNegative = false }: {
-  items: TransactionItemRow[];
+  items: TxRow[];
   maxQtyFn: (productId: string) => number;
   onChange: (productId: string, field: string, value: string | number) => void;
   onRemove: (productId: string) => void;
@@ -145,9 +148,22 @@ function ItemRows({ items, maxQtyFn, onChange, onRemove, allowNegative = false }
             <div className="flex items-center gap-2 px-3 py-2">
               <span className="flex-1 text-sm font-medium text-gray-800 truncate">{item.productName}</span>
               <div className="flex items-center gap-1.5 flex-shrink-0">
-                <Input type="number" min={allowNegative ? -9999 : 1} max={maxQtyFn(item.productId)} value={item.quantity}
-                  onChange={e => onChange(item.productId, 'quantity', Number(e.target.value))}
-                  className="h-7 w-20 text-right text-sm" />
+                {allowNegative ? (
+                  <Input type="number" min={-9999} max={maxQtyFn(item.productId)} value={item.quantity}
+                    onChange={e => onChange(item.productId, 'quantity', Number(e.target.value))}
+                    className="h-7 w-20 text-right text-sm" />
+                ) : (
+                  <Input type="text" inputMode="numeric"
+                    value={item.quantityStr ?? item.quantity.toLocaleString('es-CO')}
+                    onChange={e => {
+                      const f = fmtMoneyInput(e.target.value);
+                      const q = Math.min(parseMoney(f) || 1, maxQtyFn(item.productId));
+                      const cf = parseMoney(f) <= maxQtyFn(item.productId) ? f : q.toLocaleString('es-CO');
+                      onChange(item.productId, 'quantityStr', cf);
+                      onChange(item.productId, 'quantity', q);
+                    }}
+                    className="h-7 w-20 text-right text-sm" />
+                )}
                 <button type="button"
                   onClick={() => setExpanded(p => ({ ...p, [item.productId]: !isExpanded }))}
                   className={`h-7 px-1.5 rounded border text-xs flex items-center gap-1 transition-colors ${hasVariants ? 'border-purple-300 text-purple-600 bg-purple-50' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
@@ -178,8 +194,8 @@ function ItemRows({ items, maxQtyFn, onChange, onRemove, allowNegative = false }
 
 // ── TransactionDialog ─────────────────────────────────────────────────────────
 export default function TransactionDialog({ open, txType, warehouseName, warehouseStock, products, preloadedInItems, onClose, onSubmit }: Props) {
-  const [txItems, setTxItems] = useState<TransactionItemRow[]>([]);
-  const [txInItems, setTxInItems] = useState<TransactionItemRow[]>([]);
+  const [txItems, setTxItems] = useState<TxRow[]>([]);
+  const [txInItems, setTxInItems] = useState<TxRow[]>([]);
   const [txNotes, setTxNotes] = useState('');
   const [txImages, setTxImages] = useState<string[]>([]);
   const [productSearch, setProductSearch] = useState('');
@@ -199,7 +215,7 @@ export default function TransactionDialog({ open, txType, warehouseName, warehou
 
   const makeItemRow = (productId: string, direction?: 'out' | 'in'): TransactionItemRow => {
     const p = products.find(pr => pr.id === productId)!;
-    return { key: productId + (direction ?? ''), productId, productName: p.name, barcode: p.barcode, reference: p.reference, quantity: 1, color: '', brand: '', size: '', direction };
+    return { key: productId + (direction ?? ''), productId, productName: p.name, barcode: p.barcode, reference: p.reference, quantity: 1, quantityStr: '1', color: '', brand: '', size: '', direction };
   };
 
   const addItemToTx = (productId: string) => {

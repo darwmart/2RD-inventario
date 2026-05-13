@@ -15,7 +15,7 @@ export default function ProtectedRoute({ children, requireAdmin = false }: Prote
 
   if (!user) return <Navigate to="/login" replace />;
 
-  if (requireAdmin && !isAdmin()) return <Navigate to="/" replace />;
+  if (requireAdmin && !isAdmin()) return <Navigate to="/sales" replace />;
 
   return <>{children}</>;
 }

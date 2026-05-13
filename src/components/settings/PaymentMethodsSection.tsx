@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useConfirm } from '@/hooks/useConfirm';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -36,6 +37,7 @@ function typeBadge(type: 'cash' | 'electronic' | 'credit'): 'default' | 'seconda
 }
 
 export default function PaymentMethodsSection({ paymentMethods, banks, onAdd, onUpdate, onDelete }: Props) {
+  const { confirm, ConfirmDialog } = useConfirm();
   const [isAdding, setIsAdding] = useState(false);
   const [newPM, setNewPM] = useState({ ...EMPTY_FORM });
   const [editingPM, setEditingPM] = useState<typeof EMPTY_FORM & { id: string } | null>(null);
@@ -70,11 +72,10 @@ export default function PaymentMethodsSection({ paymentMethods, banks, onAdd, on
     setEditingPM(null);
   };
 
-  const handleDelete = (id: string, name: string) => {
-    if (confirm(`¿Estás seguro de que deseas eliminar el método de pago "${name}"?`)) {
-      onDelete(id);
-      toast.success('Método de pago eliminado exitosamente');
-    }
+  const handleDelete = async (id: string, name: string) => {
+    if (!await confirm({ description: `¿Estás seguro de que deseas eliminar el método de pago "${name}"?`, confirmLabel: 'Eliminar' })) return;
+    onDelete(id);
+    toast.success('Método de pago eliminado exitosamente');
   };
 
   const periodLabel = (period: 'immediate' | 'weekly' | 'monthly') => {
@@ -272,6 +273,7 @@ export default function PaymentMethodsSection({ paymentMethods, banks, onAdd, on
           )}
         </DialogContent>
       </Dialog>
+      {ConfirmDialog}
     </div>
   );
 }

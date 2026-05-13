@@ -6,6 +6,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Search } from 'lucide-react';
 import { Product, StockCountItem } from '@/types';
+import { fmtMoneyInput, parseMoney } from '@/utils/formatters';
+
+type DraftItem = StockCountItem & { countedStr?: string };
 
 interface Props {
   open: boolean;
@@ -15,7 +18,7 @@ interface Props {
 }
 
 export default function NewCountDialog({ open, products, onClose, onSave }: Props) {
-  const [draftItems, setDraftItems] = useState<StockCountItem[]>([]);
+  const [draftItems, setDraftItems] = useState<DraftItem[]>([]);
   const [countNotes, setCountNotes] = useState('');
   const [productSearch, setProductSearch] = useState('');
 
@@ -29,6 +32,7 @@ export default function NewCountDialog({ open, products, onClose, onSave }: Prop
       systemStock: p.stock,
       countedStock: p.stock,
       difference: 0,
+      countedStr: p.stock > 0 ? p.stock.toLocaleString('es-CO') : '0',
     })));
     setCountNotes('');
     setProductSearch('');
@@ -44,11 +48,12 @@ export default function NewCountDialog({ open, products, onClose, onSave }: Prop
     );
   }, [draftItems, productSearch]);
 
-  const updateCounted = (productId: string, value: number) => {
+  const updateCountedStr = (productId: string, raw: string) => {
+    const f = fmtMoneyInput(raw);
+    const countedStock = Math.max(0, parseMoney(f));
     setDraftItems(prev => prev.map(item => {
       if (item.productId !== productId) return item;
-      const countedStock = Math.max(0, value);
-      return { ...item, countedStock, difference: countedStock - item.systemStock };
+      return { ...item, countedStr: f, countedStock, difference: countedStock - item.systemStock };
     }));
   };
 
@@ -116,10 +121,10 @@ export default function NewCountDialog({ open, products, onClose, onSave }: Prop
                     <TableCell className="text-center">{fmt(item.systemStock)}</TableCell>
                     <TableCell className="text-center">
                       <Input
-                        type="number"
-                        min={0}
-                        value={item.countedStock}
-                        onChange={e => updateCounted(item.productId, Number(e.target.value))}
+                        type="text"
+                        inputMode="numeric"
+                        value={item.countedStr ?? item.countedStock.toLocaleString('es-CO')}
+                        onChange={e => updateCountedStr(item.productId, e.target.value)}
                         className="w-20 text-center mx-auto h-7 text-sm"
                       />
                     </TableCell>

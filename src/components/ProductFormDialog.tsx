@@ -9,7 +9,7 @@ import { Product, Category, Supplier } from '@/types';
 import { Save, Package, Plus, FolderPlus, RefreshCw, CheckCircle, XCircle, Camera } from 'lucide-react';
 import { toast } from 'sonner';
 import ImageUploader from '@/components/ImageUploader';
-import { fmtMoneyInput } from '@/utils/formatters';
+import { fmtMoneyInput, parseMoney } from '@/utils/formatters';
 import { calcEan13Check, validateEan13 } from '@/utils/barcode';
 import BarcodeScanner from '@/components/barcode/BarcodeScanner';
 
@@ -69,7 +69,9 @@ export default function ProductFormDialog({
 
   // Información de stock
   const [stock, setStock] = useState(0);
+  const [stockStr, setStockStr] = useState('');
   const [minStock, setMinStock] = useState(1);
+  const [minStockStr, setMinStockStr] = useState('');
 
   // Otros
   const [image, setImage] = useState('');
@@ -150,7 +152,9 @@ export default function ProductFormDialog({
       setDiscountPrice(product.discountPrice);
       setWholesalePrice(product.wholesalePrice);
       setStock(product.stock);
+      setStockStr(product.stock > 0 ? product.stock.toLocaleString('es-CO') : '');
       setMinStock(product.minStock);
+      setMinStockStr(product.minStock > 0 ? product.minStock.toLocaleString('es-CO') : '');
       setImage(product.image || '');
     } else {
       resetForm();
@@ -176,7 +180,9 @@ export default function ProductFormDialog({
     setDiscountPrice(0);
     setWholesalePrice(0);
     setStock(0);
+    setStockStr('');
     setMinStock(1);
+    setMinStockStr('');
     setImage('');
   };
 
@@ -645,9 +651,10 @@ export default function ProductFormDialog({
                 <div>
                   <Label className="text-xs font-medium">Stock actual</Label>
                   <Input
-                    type="number"
-                    value={stock || ''}
-                    onChange={(e) => setStock(parseInt(e.target.value) || 0)}
+                    type="text"
+                    inputMode="numeric"
+                    value={stockStr}
+                    onChange={(e) => { const f = fmtMoneyInput(e.target.value); setStockStr(f); setStock(parseMoney(f)); }}
                     placeholder="0"
                     className="h-9"
                   />
@@ -655,9 +662,10 @@ export default function ProductFormDialog({
                 <div>
                   <Label className="text-xs font-medium">Stock mínimo</Label>
                   <Input
-                    type="number"
-                    value={minStock || ''}
-                    onChange={(e) => setMinStock(parseInt(e.target.value) || 1)}
+                    type="text"
+                    inputMode="numeric"
+                    value={minStockStr}
+                    onChange={(e) => { const f = fmtMoneyInput(e.target.value); setMinStockStr(f); setMinStock(parseMoney(f) || 1); }}
                     placeholder="1"
                     className="h-9"
                   />

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useConfirm } from '@/hooks/useConfirm';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +18,7 @@ interface Props {
 }
 
 export default function BanksSection({ banks, onAdd, onUpdate, onDelete }: Props) {
+  const { confirm, ConfirmDialog } = useConfirm();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingBank, setEditingBank] = useState<Bank | null>(null);
   const [form, setForm] = useState({ name: '' });
@@ -46,11 +48,10 @@ export default function BanksSection({ banks, onAdd, onUpdate, onDelete }: Props
     setIsDialogOpen(false);
   };
 
-  const handleDelete = (bankId: string) => {
-    if (confirm('¿Estás seguro de que deseas eliminar este banco?')) {
-      onDelete(bankId);
-      toast.success('Banco eliminado exitosamente');
-    }
+  const handleDelete = async (bankId: string) => {
+    if (!await confirm({ description: '¿Estás seguro de que deseas eliminar este banco?', confirmLabel: 'Eliminar' })) return;
+    onDelete(bankId);
+    toast.success('Banco eliminado exitosamente');
   };
 
   return (
@@ -129,6 +130,7 @@ export default function BanksSection({ banks, onAdd, onUpdate, onDelete }: Props
           <p className="text-sm text-gray-500 text-center py-8">No hay bancos configurados</p>
         )}
       </div>
+      {ConfirmDialog}
     </div>
   );
 }

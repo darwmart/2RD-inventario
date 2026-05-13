@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useConfirm } from '@/hooks/useConfirm';
 import { useSalesData, useProducts, useAdvisors, usePaymentMethods } from '@/hooks/queries';
 import { useCompanySettings } from '@/hooks/queries/useCompanySettings';
 import { useBankSettings } from '@/hooks/queries/useBankSettings';
@@ -14,13 +15,6 @@ import SalesTable from '@/components/sales/SalesTable';
 import SaleReturnDialog from '@/components/sales/SaleReturnDialog';
 import SalesPageHeader from '@/components/sales/SalesPageHeader';
 
-// TODO: Migrar a salesService cuando se implemente mapeo dinámico bankId por método de pago.
-// Este mapa usa IDs fijos de paymentMethods localStorage — será removido al migrar a Supabase.
-const PAYMENT_TO_BANK: Record<string, string | null> = {
-  '1': 'efectivo', '2': 'colpatria', '3': 'colpatria',
-  '4': 'bbva',     '5': 'nequi',     '6': 'daviplata',
-  '7': 'bbva',     '8': null,        '9': null, '10': null,
-};
 
 const toKey = (d: Date | string) => {
   const date = new Date(d);
@@ -29,6 +23,7 @@ const toKey = (d: Date | string) => {
 
 export default function Sales() {
   const { isAdmin } = useAuth();
+  const { confirm, ConfirmDialog } = useConfirm();
 
   // ─── Datos (nueva arquitectura) ──────────────────────────────────────────────
   const { products, updateStock } = useProducts();
@@ -120,11 +115,9 @@ export default function Sales() {
         customerPhone: customerPhone || undefined,
       });
 
-      // Actualiza balance del banco destino (pendiente de mover a salesService)
-      const mappedBankId = PAYMENT_TO_BANK[paymentMethod.id];
-      if (mappedBankId) {
-        const bankExists = banks.find(b => b.id === mappedBankId);
-        if (bankExists) updateBankBalance(mappedBankId, total);
+      const mappedBankId = paymentMethod.type === 'cash' ? 'efectivo' : (paymentMethod.bankId ?? null);
+      if (mappedBankId && banks.find(b => b.id === mappedBankId)) {
+        updateBankBalance(mappedBankId, total);
       }
 
       toast.success(`Venta ${sale.saleNumber} completada exitosamente`);
@@ -135,18 +128,16 @@ export default function Sales() {
     }
   };
 
-  const handleDelete = (sale: Sale) => {
-    if (!confirm(`¿Estás seguro de eliminar la venta ${sale.saleNumber}? Esta acción no se puede deshacer.`)) return;
+  const handleDelete = async (sale: Sale) => {
+    if (!await confirm({ description: `¿Estás seguro de eliminar la venta ${sale.saleNumber}? Esta acción no se puede deshacer.`, confirmLabel: 'Eliminar' })) return;
     // Restaura stock
     sale.items.forEach(item => {
       const p = products.find(p => p.id === item.productId);
       if (p) updateStock(item.productId, p.stock + item.quantity);
     });
-    // Revierte balance de banco
-    const mappedBankId = PAYMENT_TO_BANK[sale.paymentMethod.id];
-    if (mappedBankId) {
-      const bankExists = banks.find(b => b.id === mappedBankId);
-      if (bankExists) updateBankBalance(mappedBankId, -sale.total);
+    const mappedBankId = sale.paymentMethod.type === 'cash' ? 'efectivo' : (sale.paymentMethod.bankId ?? null);
+    if (mappedBankId && banks.find(b => b.id === mappedBankId)) {
+      updateBankBalance(mappedBankId, -sale.total);
     }
     deleteSale(sale.id);
     toast.success('Venta eliminada exitosamente');
@@ -213,6 +204,7 @@ export default function Sales() {
         onClose={() => setReturningSale(null)}
         onConfirm={handleConfirmReturn}
       />
+      {ConfirmDialog}
     </div>
   );
 }
