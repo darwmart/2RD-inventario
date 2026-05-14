@@ -2,13 +2,15 @@ import { useMemo, useState } from 'react';
 import { useConfirm } from '@/hooks/useConfirm';
 import { useProducts, useCategories, useSuppliers } from '@/hooks/queries';
 import { useSettings } from '@/hooks/useSettings';
+import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { Button } from '@/components/ui/button';
 import { Product } from '@/types';
 import ProductFormDialog from '@/components/ProductFormDialog';
 import { toast } from 'sonner';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import TableSkeleton from '@/components/ui/TableSkeleton';
-import CategorySidebar from '@/components/inventory/CategorySidebar';
 import ProductTable from '@/components/inventory/ProductTable';
 import ProductPreview from '@/components/inventory/ProductPreview';
 import CategoryFormDialog from '@/components/inventory/CategoryFormDialog';
@@ -16,6 +18,7 @@ import PrintLabelsDialog from '@/components/inventory/PrintLabelsDialog';
 import ColumnConfigDialog, { VisibleColumns } from '@/components/inventory/ColumnConfigDialog';
 import InventoryToolbar from '@/components/inventory/InventoryToolbar';
 import type { CreateProductInput } from '@/domain/inventory';
+import { Edit, Trash2 } from 'lucide-react';
 
 const DEFAULT_COLUMNS: VisibleColumns = {
   code: true, description: true, barcode: true, category: true, stock: true,
@@ -28,14 +31,16 @@ export default function Inventory() {
   const { categories, addCategory, updateCategory, deleteCategory } = useCategories();
   const { suppliers, addSupplier } = useSuppliers();
   const { labelDesigns } = useSettings();
+  const { isAdmin } = useAuth();
 
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm]       = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [isAddingProduct, setIsAddingProduct] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isAddingProduct, setIsAddingProduct]   = useState(false);
+  const [editingProduct, setEditingProduct]     = useState<Product | null>(null);
+  const [selectedProduct, setSelectedProduct]   = useState<Product | null>(null);
+  const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<{ id: string; name: string; description: string } | null>(null);
+  const [editingCategory, setEditingCategory]   = useState<{ id: string; name: string; description: string } | null>(null);
   const [isPrintLabelsOpen, setIsPrintLabelsOpen] = useState(false);
   const [isColumnConfigOpen, setIsColumnConfigOpen] = useState(false);
   const [visibleColumns, setVisibleColumns] = useLocalStorage('inventoryVisibleColumns', DEFAULT_COLUMNS);
@@ -72,9 +77,27 @@ export default function Inventory() {
     deleteProduct(p.id);
   };
 
+  const handleSelectProduct = (p: Product) => {
+    setSelectedProduct(p);
+    if (window.innerWidth < 768) setMobilePreviewOpen(true);
+  };
+
+  // Props compartidos para ProductTable en ambos layouts
+  const tableProps = {
+    categories,
+    visibleColumns,
+    selectedCategory,
+    onCategoryChange: setSelectedCategory,
+    searchTerm,
+    onSearchChange: setSearchTerm,
+    onSelect: handleSelectProduct,
+    onEdit: setEditingProduct,
+    onDelete: handleDeleteProduct,
+  };
+
   return (
     <ScrollArea className="h-screen">
-      <div className="p-6 max-w-[1400px] mx-auto">
+      <div className="p-2 md:p-6 max-w-[1400px] mx-auto">
         <InventoryToolbar
           onNewProduct={() => setIsAddingProduct(true)}
           onNewCategory={() => { setEditingCategory(null); setIsCategoryModalOpen(true); }}
@@ -82,30 +105,87 @@ export default function Inventory() {
           onColumnConfig={() => setIsColumnConfigOpen(true)}
         />
 
-        <div className="flex h-[calc(100vh-140px)] gap-4">
-          <CategorySidebar
-            categories={categories}
-            selectedCategory={selectedCategory}
-            onSelect={setSelectedCategory}
-            onEdit={cat => { setEditingCategory(cat); setIsCategoryModalOpen(true); }}
-            onDelete={handleDeleteCategory}
-          />
-          <div className="flex-1 flex gap-4">
-            {productsLoading ? <div className="flex-1"><TableSkeleton rows={10} cols={7} /></div> : <ProductTable
-              products={filteredProducts}
-              categories={categories}
-              visibleColumns={visibleColumns}
-              selectedProductId={selectedProduct?.id ?? null}
-              searchTerm={searchTerm}
-              onSearchChange={setSearchTerm}
-              onSelect={setSelectedProduct}
-              onEdit={setEditingProduct}
-              onDelete={handleDeleteProduct}
-            />}
-            {selectedProduct && <ProductPreview product={selectedProduct} />}
+        {/* ── LAYOUT MÓVIL ─────────────────────────────────── */}
+        <div className="md:hidden flex flex-col" style={{ minHeight: 'calc(100vh - 120px)' }}>
+          {productsLoading
+            ? <div className="p-4"><TableSkeleton rows={8} cols={2} /></div>
+            : <ProductTable
+                {...tableProps}
+                products={filteredProducts}
+                selectedProductId={selectedProduct?.id ?? null}
+              />
+          }
+        </div>
+
+        {/* ── LAYOUT DESKTOP ───────────────────────────────── */}
+        <div className="hidden md:flex h-[calc(100vh-140px)] gap-4">
+          <div className="flex-1 flex gap-4 min-w-0">
+            {productsLoading
+              ? <div className="flex-1"><TableSkeleton rows={10} cols={7} /></div>
+              : <ProductTable
+                  {...tableProps}
+                  products={filteredProducts}
+                  selectedProductId={selectedProduct?.id ?? null}
+                />
+            }
+            {selectedProduct && (
+              <div className="w-72 border rounded bg-white overflow-y-auto shrink-0 flex flex-col">
+                <div className="px-3 pt-2.5 pb-1.5 border-b shrink-0 flex items-center justify-between">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Vista previa</p>
+                  {isAdmin() && (
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0"
+                        onClick={() => setEditingProduct(selectedProduct)}>
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-500 hover:text-red-600"
+                        onClick={() => handleDeleteProduct(selectedProduct)}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                  <ProductPreview product={selectedProduct} />
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
+        {/* ── SHEET MÓVIL: detalle ─────────────────────────── */}
+        <Sheet open={mobilePreviewOpen} onOpenChange={setMobilePreviewOpen}>
+          <SheetContent side="bottom" className="h-[88dvh] p-0 rounded-t-2xl flex flex-col overflow-hidden">
+            {selectedProduct && (
+              <>
+                <div className="px-3 pt-3 pb-2 border-b shrink-0 flex items-center justify-between">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-gray-900 truncate text-sm">{selectedProduct.name}</p>
+                    <p className="text-xs text-gray-400 font-mono">{selectedProduct.reference}</p>
+                  </div>
+                  {isAdmin() && (
+                    <div className="flex gap-2 ml-3 shrink-0">
+                      <Button size="sm" variant="outline" className="h-8"
+                        onClick={() => { setMobilePreviewOpen(false); setEditingProduct(selectedProduct); }}>
+                        <Edit className="h-3.5 w-3.5 mr-1" /> Editar
+                      </Button>
+                      <Button size="sm" variant="ghost"
+                        className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                        onClick={() => { setMobilePreviewOpen(false); handleDeleteProduct(selectedProduct); }}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                  <ProductPreview product={selectedProduct} />
+                </div>
+              </>
+            )}
+          </SheetContent>
+        </Sheet>
+
+        {/* ── DIÁLOGOS ─────────────────────────────────────── */}
         <ProductFormDialog
           open={isAddingProduct}
           onOpenChange={setIsAddingProduct}
@@ -125,10 +205,7 @@ export default function Inventory() {
           suppliers={suppliers}
           existingProducts={products}
           onSave={(data: CreateProductInput) => {
-            if (editingProduct) {
-              updateProduct(editingProduct.id, data);
-              setEditingProduct(null);
-            }
+            if (editingProduct) { updateProduct(editingProduct.id, data); setEditingProduct(null); }
           }}
           onAddCategory={(name, description) => addCategory(name, description)}
         />

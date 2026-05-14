@@ -1,9 +1,12 @@
+import React from 'react';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/infrastructure/queryClient';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { RBACProvider } from './contexts/RBACContext';
+import { useSessionManager } from './lib/sessionManager';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
@@ -24,6 +27,11 @@ import Customers from './pages/Customers';
 import StockConciliation from './pages/StockConciliation';
 import AdvisorCommissions from './pages/AdvisorCommissions';
 import Reports from './pages/Reports';
+
+function SessionGuard({ children }: { children: React.ReactNode }) {
+  useSessionManager();
+  return <>{children}</>;
+}
 
 function AppRoutes() {
   const { user, isAdmin } = useAuth();
@@ -214,7 +222,11 @@ const App = () => (
       <Toaster />
       <BrowserRouter>
         <AuthProvider>
-          <AppRoutes />
+          <RBACProvider>
+            <SessionGuard>
+              <AppRoutes />
+            </SessionGuard>
+          </RBACProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

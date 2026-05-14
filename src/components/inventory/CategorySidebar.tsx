@@ -13,10 +13,45 @@ interface Props {
   onSelect: (id: string) => void;
   onEdit: (cat: Category) => void;
   onDelete: (cat: Category) => void;
+  /** 'sidebar' = panel vertical desktop (default) | 'chips' = fila horizontal mobile */
+  variant?: 'sidebar' | 'chips';
 }
 
-export default function CategorySidebar({ categories, selectedCategory, onSelect, onEdit, onDelete }: Props) {
+export default function CategorySidebar({
+  categories, selectedCategory, onSelect, onEdit, onDelete, variant = 'sidebar',
+}: Props) {
   const { isAdmin } = useAuth();
+
+  if (variant === 'chips') {
+    return (
+      <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+        <button
+          onClick={() => onSelect('all')}
+          className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+            selectedCategory === 'all'
+              ? 'bg-blue-600 text-white border-blue-600'
+              : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
+          }`}
+        >
+          Todas
+        </button>
+        {categories.map(cat => (
+          <button
+            key={cat.id}
+            onClick={() => onSelect(cat.id)}
+            className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+              selectedCategory === cat.id
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
+            }`}
+          >
+            {cat.name}
+          </button>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="w-64 border rounded bg-white p-4">
       <h3 className="text-sm font-semibold mb-3 text-gray-700">Sección/familia</h3>
