@@ -2,6 +2,7 @@ import { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { OfflineBanner, SyncStatusIndicator } from '@/components/OfflineBanner';
 import {
   Package,
   ShoppingCart,
@@ -112,7 +113,10 @@ export default function Layout({ children }: LayoutProps) {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-gray-900 truncate">{user?.name}</p>
-                  <p className="text-xs text-gray-500 capitalize">{user?.role === 'admin' ? 'Administrador' : 'Usuario'}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs text-gray-500 capitalize">{user?.role === 'admin' ? 'Administrador' : 'Usuario'}</p>
+                    <SyncStatusIndicator />
+                  </div>
                 </div>
               </div>
               <button
@@ -127,7 +131,8 @@ export default function Layout({ children }: LayoutProps) {
         </div>
 
         {/* Main content */}
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden flex flex-col">
+          <OfflineBanner />
           <main className="flex-1 relative overflow-y-auto focus:outline-none">
             {children}
           </main>

@@ -3,13 +3,21 @@ import { QueryClient } from '@tanstack/react-query';
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 0,
-      gcTime: 10 * 60 * 1000,
-      retry: 1,
+      staleTime: 1000 * 30,          // 30 segundos — reducir refetches innecesarios
+      gcTime: 10 * 60 * 1000,        // 10 minutos en memoria
+      retry: (failureCount, error) => {
+        // No reintentar en errores de autenticación o permisos
+        const msg = (error as Error).message ?? '';
+        if (msg.includes('JWT') || msg.includes('Unauthorized') || msg.includes('permission')) return false;
+        return failureCount < 2;
+      },
       refetchOnWindowFocus: false,
+      refetchOnReconnect: true,      // Refetch al recuperar conexión
+      networkMode: 'offlineFirst',   // React Query no cancela queries offline
     },
     mutations: {
       retry: 0,
+      networkMode: 'offlineFirst',
     },
   },
 });
