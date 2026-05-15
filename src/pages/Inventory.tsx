@@ -3,7 +3,6 @@ import { useConfirm } from '@/hooks/useConfirm';
 import { useProducts, useCategories, useSuppliers } from '@/hooks/queries';
 import { useSettings } from '@/hooks/useSettings';
 import { useAuth } from '@/contexts/AuthContext';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Product } from '@/types';
@@ -96,8 +95,8 @@ export default function Inventory() {
   };
 
   return (
-    <ScrollArea className="h-screen">
-      <div className="p-2 md:p-6 max-w-[1400px] mx-auto">
+    <div className="h-full flex flex-col overflow-hidden">
+      <div className="flex flex-col flex-1 min-h-0 p-2 md:pt-4 md:pr-6 md:pb-6 md:pl-px w-full max-w-[1600px] mx-auto">
         <InventoryToolbar
           onNewProduct={() => setIsAddingProduct(true)}
           onNewCategory={() => { setEditingCategory(null); setIsCategoryModalOpen(true); }}
@@ -106,7 +105,7 @@ export default function Inventory() {
         />
 
         {/* ── LAYOUT MÓVIL ─────────────────────────────────── */}
-        <div className="md:hidden flex flex-col" style={{ minHeight: 'calc(100vh - 120px)' }}>
+        <div className="md:hidden flex-1 min-h-0 flex flex-col overflow-hidden">
           {productsLoading
             ? <div className="p-4"><TableSkeleton rows={8} cols={2} /></div>
             : <ProductTable
@@ -118,8 +117,8 @@ export default function Inventory() {
         </div>
 
         {/* ── LAYOUT DESKTOP ───────────────────────────────── */}
-        <div className="hidden md:flex h-[calc(100vh-140px)] gap-4">
-          <div className="flex-1 flex gap-4 min-w-0">
+        <div className="hidden md:flex flex-1 min-h-0 gap-4">
+          <div className="flex-1 flex gap-4 min-w-0 min-h-0">
             {productsLoading
               ? <div className="flex-1"><TableSkeleton rows={10} cols={7} /></div>
               : <ProductTable
@@ -129,7 +128,7 @@ export default function Inventory() {
                 />
             }
             {selectedProduct && (
-              <div className="w-72 border rounded bg-white overflow-y-auto shrink-0 flex flex-col">
+              <div className="w-73 border rounded bg-white shrink-0 flex flex-col">
                 <div className="px-3 pt-2.5 pb-1.5 border-b shrink-0 flex items-center justify-between">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Vista previa</p>
                   {isAdmin() && (
@@ -145,9 +144,7 @@ export default function Inventory() {
                     </div>
                   )}
                 </div>
-                <div className="flex-1 overflow-y-auto">
-                  <ProductPreview product={selectedProduct} />
-                </div>
+                <ProductPreview product={selectedProduct} />
               </div>
             )}
           </div>
@@ -235,6 +232,6 @@ export default function Inventory() {
         />
         {ConfirmDialog}
       </div>
-    </ScrollArea>
+    </div>
   );
 }

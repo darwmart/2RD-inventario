@@ -1,17 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Search, Package, Edit, Trash2, ChevronRight, AlertTriangle, ChevronDown, X } from 'lucide-react';
+import { Search, Package, Edit, Trash2, ChevronRight, AlertTriangle, ChevronDown, X, ChevronLeft } from 'lucide-react';
 import { Product } from '@/types';
 import { VisibleColumns } from './ColumnConfigDialog';
 import BarcodeScanInput from '@/components/barcode/BarcodeScanInput';
 import { useAuth } from '@/contexts/AuthContext';
 
-interface Category {
-  id: string;
-  name: string;
-}
+const PAGE_SIZE = 20;
+
+interface Category { id: string; name: string }
 
 interface Props {
   products: Product[];
@@ -30,22 +29,104 @@ interface Props {
 const fmt = (n: number) =>
   n.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
+// ─── Paginación ───────────────────────────────────────────────
+function Pagination({
+  page, total, pageSize, onChange,
+}: { page: number; total: number; pageSize: number; onChange: (p: number) => void }) {
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  if (totalPages <= 1) return null;
+
+  const from = (page - 1) * pageSize + 1;
+  const to   = Math.min(page * pageSize, total);
+
+  // Genera el rango de botones visibles: siempre muestra hasta 5 páginas centradas en la actual
+  const pages: (number | '…')[] = [];
+  if (totalPages <= 7) {
+    for (let i = 1; i <= totalPages; i++) pages.push(i);
+  } else {
+    pages.push(1);
+    if (page > 3) pages.push('…');
+    for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) pages.push(i);
+    if (page < totalPages - 2) pages.push('…');
+    pages.push(totalPages);
+  }
+
+  return (
+    <div className="px-3 py-1.5 border-t bg-gray-50 shrink-0 flex items-center justify-between gap-2">
+      {/* Contador */}
+      <span className="text-xs text-gray-500 hidden sm:inline">
+        {from}–{to} de {total}
+      </span>
+      <span className="text-xs text-gray-500 sm:hidden">{from}–{to}/{total}</span>
+
+      {/* Botones */}
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => onChange(page - 1)}
+          disabled={page === 1}
+          className="h-7 w-7 flex items-center justify-center rounded border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        >
+          <ChevronLeft className="h-3.5 w-3.5" />
+        </button>
+
+        <div className="hidden sm:flex items-center gap-1">
+          {pages.map((p, i) =>
+            p === '…' ? (
+              <span key={`ellipsis-${i}`} className="w-7 text-center text-xs text-gray-400">…</span>
+            ) : (
+              <button
+                key={p}
+                onClick={() => onChange(p as number)}
+                className={`h-7 w-7 rounded border text-xs font-medium transition-colors ${
+                  p === page
+                    ? 'bg-blue-600 border-blue-600 text-white'
+                    : 'border-gray-200 text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                {p}
+              </button>
+            )
+          )}
+        </div>
+
+        {/* En móvil solo muestra "X / Y" */}
+        <span className="sm:hidden text-xs text-gray-600 px-2">{page}/{totalPages}</span>
+
+        <button
+          onClick={() => onChange(page + 1)}
+          disabled={page === totalPages}
+          className="h-7 w-7 flex items-center justify-center rounded border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        >
+          <ChevronRight className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Tabla de productos ───────────────────────────────────────
 export default function ProductTable({
   products, categories, visibleColumns, selectedProductId,
   searchTerm, selectedCategory, onSearchChange, onCategoryChange, onSelect, onEdit, onDelete,
 }: Props) {
   const { isAdmin } = useAuth();
-  const [catOpen, setCatOpen] = useState(false);
+  const [catOpen, setCatOpen]   = useState(false);
+  const [page, setPage]         = useState(1);
   const colCount = Object.values(visibleColumns).filter(Boolean).length + (isAdmin() ? 1 : 0);
+
+  // Resetear a página 1 cuando cambie el filtro
+  useEffect(() => { setPage(1); }, [products.length, searchTerm, selectedCategory]);
 
   const activeCategoryName = selectedCategory === 'all'
     ? null
     : categories.find(c => c.id === selectedCategory)?.name ?? null;
 
-  return (
-    <div className="flex-1 flex flex-col border rounded bg-white min-w-0">
+  const paginated = products.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-      {/* ── Barra de búsqueda + filtro de familia ─────────── */}
+  return (
+    <div className="flex-1 flex flex-col border rounded bg-white min-w-0 overflow-hidden">
+
+      {/* ── Barra búsqueda + filtro familia ───────────────── */}
       <div className="px-3 py-2 border-b shrink-0 flex gap-2">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
@@ -58,20 +139,15 @@ export default function ProductTable({
           />
         </div>
 
-        {/* Selector de familia */}
         <Popover open={catOpen} onOpenChange={setCatOpen}>
           <PopoverTrigger asChild>
-            <button
-              className={`shrink-0 h-9 px-2.5 border rounded-md flex items-center gap-1.5 text-sm transition-colors hover:bg-gray-50 ${
-                activeCategoryName ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600'
-              }`}
-            >
+            <button className={`shrink-0 h-9 px-2.5 border rounded-md flex items-center gap-1.5 text-sm transition-colors hover:bg-gray-50 ${
+              activeCategoryName ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600'
+            }`}>
               <span className="max-w-[90px] truncate hidden sm:inline">
                 {activeCategoryName ?? 'Familia'}
               </span>
-              <span className="sm:hidden">
-                {activeCategoryName ? '●' : '▤'}
-              </span>
+              <span className="sm:hidden">{activeCategoryName ? '●' : '▤'}</span>
               <ChevronDown className="h-3.5 w-3.5 opacity-60 shrink-0" />
             </button>
           </PopoverTrigger>
@@ -85,35 +161,30 @@ export default function ProductTable({
               <span>📋</span> Todas las familias
             </button>
             {categories.map(cat => (
-              <button
-                key={cat.id}
+              <button key={cat.id}
                 onClick={() => { onCategoryChange(cat.id); setCatOpen(false); }}
                 className={`w-full text-left px-3 py-2 text-sm rounded flex items-center gap-2 hover:bg-gray-100 ${
                   selectedCategory === cat.id ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'
                 }`}
               >
-                <span>📦</span>
-                <span className="truncate">{cat.name}</span>
+                <span>📦</span><span className="truncate">{cat.name}</span>
               </button>
             ))}
           </PopoverContent>
         </Popover>
 
-        {/* Botón limpiar familia activa */}
         {activeCategoryName && (
-          <button
-            onClick={() => onCategoryChange('all')}
+          <button onClick={() => onCategoryChange('all')}
             className="shrink-0 h-9 w-9 flex items-center justify-center rounded-md border border-blue-200 bg-blue-50 text-blue-500 hover:bg-blue-100 transition-colors"
-            title="Quitar filtro"
-          >
+            title="Quitar filtro">
             <X className="h-3.5 w-3.5" />
           </button>
         )}
       </div>
 
-      {/* ── Chip de familia activa (bajo la barra) ─────────── */}
+      {/* Chip familia activa */}
       {activeCategoryName && (
-        <div className="px-3 py-1 border-b bg-blue-50 flex items-center gap-2">
+        <div className="px-3 py-1 border-b bg-blue-50 shrink-0 flex items-center gap-2">
           <span className="text-xs text-blue-600">
             Familia: <strong>{activeCategoryName}</strong>
           </span>
@@ -122,22 +193,20 @@ export default function ProductTable({
       )}
 
       {/* ── VISTA MÓVIL: tarjetas ─────────────────────────── */}
-      <div className="md:hidden flex-1 overflow-y-auto divide-y">
-        {products.length === 0 ? (
+      <div className="md:hidden flex-1 divide-y overflow-hidden">
+        {paginated.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-14 gap-2 text-gray-400">
             <Package className="h-10 w-10" />
             <p className="text-sm">{searchTerm || activeCategoryName ? 'Sin resultados' : 'No hay artículos'}</p>
           </div>
         ) : (
-          products.map(product => {
+          paginated.map(product => {
             const isLowStock = product.stock <= product.minStock;
-            const isSelected = selectedProductId === product.id;
             return (
-              <div
-                key={product.id}
+              <div key={product.id}
                 onClick={() => onSelect(product)}
                 className={`flex items-center gap-2.5 px-3 py-2 active:bg-gray-50 cursor-pointer transition-colors ${
-                  isSelected ? 'bg-blue-50' : ''
+                  selectedProductId === product.id ? 'bg-blue-50' : ''
                 }`}
               >
                 <div className="shrink-0 h-10 w-10 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center">
@@ -167,25 +236,25 @@ export default function ProductTable({
       </div>
 
       {/* ── VISTA DESKTOP: tabla ──────────────────────────── */}
-      <div className="hidden md:flex flex-1 overflow-auto flex-col">
+      <div className="hidden md:block flex-1 overflow-hidden">
         <Table>
           <TableHeader className="sticky top-0 bg-gray-50 z-10">
             <TableRow>
-              {visibleColumns.code && <TableHead className="w-[100px]">Código</TableHead>}
-              {visibleColumns.description && <TableHead>Descripción</TableHead>}
-              {visibleColumns.barcode && <TableHead className="w-[120px]">C.Barras</TableHead>}
-              {visibleColumns.category && <TableHead className="w-[150px]">Familia</TableHead>}
-              {visibleColumns.stock && <TableHead className="text-right w-[80px]">Stock</TableHead>}
-              {visibleColumns.cost && <TableHead className="text-right w-[100px]">Costo</TableHead>}
+              {visibleColumns.code          && <TableHead className="w-[100px]">Código</TableHead>}
+              {visibleColumns.description   && <TableHead>Descripción</TableHead>}
+              {visibleColumns.barcode       && <TableHead className="w-[120px]">C.Barras</TableHead>}
+              {visibleColumns.category      && <TableHead className="w-[150px]">Familia</TableHead>}
+              {visibleColumns.stock         && <TableHead className="text-right w-[80px]">Stock</TableHead>}
+              {visibleColumns.cost          && <TableHead className="text-right w-[100px]">Costo</TableHead>}
               {visibleColumns.suggestedPrice && <TableHead className="text-right w-[100px]">P.Sugerido</TableHead>}
-              {visibleColumns.currentPrice && <TableHead className="text-right w-[100px]">P.Actual</TableHead>}
+              {visibleColumns.currentPrice  && <TableHead className="text-right w-[100px]">P.Actual</TableHead>}
               {visibleColumns.discountPrice && <TableHead className="text-right w-[100px]">P.Descuento</TableHead>}
               {visibleColumns.wholesalePrice && <TableHead className="text-right w-[100px]">P.Mayorista</TableHead>}
-              {isAdmin() && <TableHead className="w-[100px]">Acciones</TableHead>}
+              {isAdmin()                    && <TableHead className="w-[100px]">Acciones</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {products.length === 0 ? (
+            {paginated.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={colCount} className="text-center py-12">
                   <div className="flex flex-col items-center gap-2">
@@ -197,62 +266,35 @@ export default function ProductTable({
                 </TableCell>
               </TableRow>
             ) : (
-              products.map(product => {
-                const category = categories.find(c => c.id === product.categoryId);
+              paginated.map(product => {
+                const category   = categories.find(c => c.id === product.categoryId);
                 const isLowStock = product.stock <= product.minStock;
                 return (
-                  <TableRow
-                    key={product.id}
+                  <TableRow key={product.id}
                     className={`cursor-pointer hover:bg-gray-50 ${
                       selectedProductId === product.id ? 'bg-blue-50 hover:bg-blue-50' : ''
                     } ${isLowStock ? 'bg-yellow-50' : ''}`}
                     onClick={() => onSelect(product)}
                     onDoubleClick={isAdmin() ? () => onEdit(product) : undefined}
                   >
-                    {visibleColumns.code && (
-                      <TableCell className="font-mono text-sm font-medium">{product.reference}</TableCell>
-                    )}
-                    {visibleColumns.description && <TableCell>{product.name}</TableCell>}
-                    {visibleColumns.barcode && (
-                      <TableCell className="font-mono text-xs text-gray-600">
-                        {product.barcode || <span className="text-gray-400">-</span>}
-                      </TableCell>
-                    )}
-                    {visibleColumns.category && (
-                      <TableCell className="text-sm text-gray-600">{category?.name || '-'}</TableCell>
-                    )}
-                    {visibleColumns.stock && (
+                    {visibleColumns.code          && <TableCell className="font-mono text-sm font-medium">{product.reference}</TableCell>}
+                    {visibleColumns.description   && <TableCell>{product.name}</TableCell>}
+                    {visibleColumns.barcode       && <TableCell className="font-mono text-xs text-gray-600">{product.barcode || <span className="text-gray-400">-</span>}</TableCell>}
+                    {visibleColumns.category      && <TableCell className="text-sm text-gray-600">{category?.name || '-'}</TableCell>}
+                    {visibleColumns.stock         && (
                       <TableCell className="text-right font-mono text-sm">
                         <span className={isLowStock ? 'text-red-600 font-bold' : ''}>{product.stock}</span>
                       </TableCell>
                     )}
-                    {visibleColumns.cost && (
+                    {visibleColumns.cost          && (
                       <TableCell className="text-right font-mono text-sm">
-                        ${(product.hasIva ? product.cost * 1.19 : product.cost).toLocaleString('es-CO', {
-                          minimumFractionDigits: 2, maximumFractionDigits: 2,
-                        })}
+                        ${(product.hasIva ? product.cost * 1.19 : product.cost).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </TableCell>
                     )}
-                    {visibleColumns.suggestedPrice && (
-                      <TableCell className="text-right font-mono text-sm">
-                        ${product.suggestedPrice.toLocaleString('es-CO')}
-                      </TableCell>
-                    )}
-                    {visibleColumns.currentPrice && (
-                      <TableCell className="text-right font-mono text-sm font-medium">
-                        ${product.currentPrice.toLocaleString('es-CO')}
-                      </TableCell>
-                    )}
-                    {visibleColumns.discountPrice && (
-                      <TableCell className="text-right font-mono text-sm">
-                        ${product.discountPrice.toLocaleString('es-CO')}
-                      </TableCell>
-                    )}
-                    {visibleColumns.wholesalePrice && (
-                      <TableCell className="text-right font-mono text-sm">
-                        ${product.wholesalePrice.toLocaleString('es-CO')}
-                      </TableCell>
-                    )}
+                    {visibleColumns.suggestedPrice && <TableCell className="text-right font-mono text-sm">${product.suggestedPrice.toLocaleString('es-CO')}</TableCell>}
+                    {visibleColumns.currentPrice  && <TableCell className="text-right font-mono text-sm font-medium">${product.currentPrice.toLocaleString('es-CO')}</TableCell>}
+                    {visibleColumns.discountPrice && <TableCell className="text-right font-mono text-sm">${product.discountPrice.toLocaleString('es-CO')}</TableCell>}
+                    {visibleColumns.wholesalePrice && <TableCell className="text-right font-mono text-sm">${product.wholesalePrice.toLocaleString('es-CO')}</TableCell>}
                     {isAdmin() && (
                       <TableCell>
                         <div className="flex gap-1">
@@ -275,11 +317,13 @@ export default function ProductTable({
         </Table>
       </div>
 
-      <div className="px-3 py-1.5 border-t bg-gray-50 shrink-0">
-        <span className="text-xs text-gray-500">
-          {products.length} artículo(s)
-        </span>
-      </div>
+      {/* ── Paginación ────────────────────────────────────── */}
+      <Pagination
+        page={page}
+        total={products.length}
+        pageSize={PAGE_SIZE}
+        onChange={setPage}
+      />
     </div>
   );
 }

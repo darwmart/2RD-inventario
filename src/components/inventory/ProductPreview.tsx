@@ -13,9 +13,10 @@ export default function ProductPreview({ product }: Props) {
   const isLowStock = product.stock <= product.minStock;
 
   return (
-    <div className="w-full md:w-80 bg-white px-3 py-2 space-y-3 overflow-y-auto">
-      {/* Imagen — compacta en móvil */}
-      <div className="relative rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center h-36 md:h-48">
+    <div className="w-full md:w-80 bg-white px-3 py-2 space-y-2">
+
+      {/* Imagen */}
+      <div className="relative rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center h-56 md:h-48">
         {product.image ? (
           <img
             src={product.image}

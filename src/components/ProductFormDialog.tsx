@@ -131,7 +131,7 @@ export default function ProductFormDialog({
   // Cargar datos si estamos editando
   useEffect(() => {
     if (product) {
-      setReference(product.reference);
+      setReference(product.reference.toUpperCase());
       setBarcode(product.barcode);
       setCategoryId(product.categoryId);
       setName(product.name);
@@ -356,7 +356,7 @@ export default function ProductFormDialog({
                   <Label className="text-xs font-medium">Código de artículo *</Label>
                   <Input
                     value={reference}
-                    onChange={(e) => setReference(e.target.value)}
+                    onChange={(e) => setReference(e.target.value.toUpperCase())}
                     placeholder="Ej: ART-001"
                     className="h-9"
                   />
