@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Clock, Search, ShoppingCart, Printer } from 'lucide-react';
-import { printPOSInvoice } from '@/utils/printUtils';
+import { usePrintPOS } from '@/hooks/usePrintPOS';
 
 interface CompanyInfo {
   name: string;
@@ -27,11 +27,13 @@ interface Reservation {
   createdAt: string | Date;
   total: number;
   deposit?: number;
+  deposits?: { amount: number; method?: { name: string }; createdAt: Date }[];
   items: SaleItem[];
   paymentMethod?: PaymentMethod;
   customerName?: string;
   customerDocument?: string;
   customerPhone?: string;
+  type?: string;
 }
 
 interface Props {
@@ -43,6 +45,7 @@ interface Props {
 }
 
 export default function ReservedList({ reserved, companyInfo, onDeposit, onConvert, onCancel }: Props) {
+  const printPOS = usePrintPOS();
   const [search, setSearch] = useState('');
 
   const filtered = useMemo(() => {
@@ -113,7 +116,7 @@ export default function ReservedList({ reserved, companyInfo, onDeposit, onConve
                   </div>
 
                   <div className="flex gap-2 flex-wrap">
-                    <Button size="sm" variant="outline" onClick={() => printPOSInvoice(reservation as never, companyInfo as never)}>
+                    <Button size="sm" variant="outline" onClick={() => printPOS({ ...reservation, type: 'reserved' } as never, companyInfo as never)}>
                       <Printer className="h-4 w-4 mr-1" />Imprimir
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => onDeposit(reservation.id)}>Abonar</Button>

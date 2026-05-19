@@ -52,6 +52,41 @@ export type LabelField = {
   visible: boolean;
 };
 
+export type TitillaConfig = {
+  paperWidth: 58 | 80;
+  titleText: string;
+  showAddress: boolean;
+  showPhone: boolean;
+  showNit: boolean;
+  showAdvisor: boolean;
+  showCustomer: boolean;
+  showDiscount: boolean;
+  showIva: boolean;
+  showPaymentMethod: boolean;
+  footerText: string;
+  printerName?: string;
+};
+
+export const DEFAULT_TITILLA_CONFIG: TitillaConfig = {
+  paperWidth: 80,
+  titleText: 'FACTURA DE VENTA',
+  showAddress: true,
+  showPhone: true,
+  showNit: true,
+  showAdvisor: true,
+  showCustomer: true,
+  showDiscount: true,
+  showIva: false,
+  showPaymentMethod: true,
+  footerText: '¡Gracias por su compra!',
+  printerName: 'Generic / Text Only',
+};
+
+export function parseTitillaConfig(description: string): TitillaConfig {
+  try { return { ...DEFAULT_TITILLA_CONFIG, ...JSON.parse(description) }; }
+  catch { return { ...DEFAULT_TITILLA_CONFIG }; }
+}
+
 export type LabelDesign = {
   id: string;
   code: string;
@@ -68,5 +103,6 @@ export type LabelDesign = {
   horizontalSpacing: string;
   verticalSpacing: string;
   fields?: LabelField[];
+  isDefault?: boolean;
   createdAt: Date;
 };

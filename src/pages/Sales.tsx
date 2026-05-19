@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useDailyDeposits } from '@/hooks/useDailyDeposits';
 import { toast } from 'sonner';
 import { Sale, SaleItem } from '@/types';
-import { printPOSInvoice } from '@/utils/printUtils';
+import { usePrintPOS } from '@/hooks/usePrintPOS';
 import { calculateCardCommission } from '@/utils/ivaUtils';
 import SaleFormDialog, { SaleFormData } from '@/components/sales/SaleFormDialog';
 import SalesTable from '@/components/sales/SalesTable';
@@ -35,6 +35,7 @@ export default function Sales() {
   const { companyInfo, taxSettings, cardSettings } = useCompanySettings();
   const { banks, updateBankBalance } = useBankSettings();
   const { addReturn } = useReturns();
+  const printPOS = usePrintPOS();
 
   // ─── Estado UI ───────────────────────────────────────────────────────────────
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -121,7 +122,7 @@ export default function Sales() {
       }
 
       toast.success(`Venta ${sale.saleNumber} completada exitosamente`);
-      printPOSInvoice(sale, companyInfo);
+      printPOS(sale, companyInfo);
       setIsFormOpen(false);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al guardar la venta');

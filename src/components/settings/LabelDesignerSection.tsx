@@ -8,14 +8,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Barcode, Edit2, Trash2, Eye, Download, Upload, AlignLeft, AlignCenter, AlignRight, Move } from 'lucide-react';
+import { Plus, Barcode, Edit2, Trash2, Eye, Download, Upload, AlignLeft, AlignCenter, AlignRight, Move, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { LabelDesign, LabelField, Printer as PrinterType } from '@/types';
+import TitillaPOSDesigner, { parseTitillaConfig } from './TitillaPOSDesigner';
+import { generateReceiptHTML } from '@/utils/thermalPrint';
 
 const DOCUMENT_TYPES = [
-  'Etiquetas de artículos', 'Etiquetas de envío', 'Facturas de venta',
-  'Cotizaciones', 'Separados', 'Pagarés', 'Recibos',
-  'Traspaso entre almacenes', 'Anticipos', 'Etiquetas personalizadas',
+  'Etiquetas de artículos',
+  'Titilla POS',
+  'Tirilla Cotizaciones',
+  'Tirilla Separados',
 ];
 
 const ALL_LABEL_FIELDS: { key: string; label: string }[] = [
@@ -51,7 +54,7 @@ const DEFAULT_LABEL_FIELDS: LabelField[] = [
 const EMPTY_FORM = {
   code: '', name: '', description: '',
   documentType: 'Etiquetas de artículos',
-  printerName: 'Send To OneNote 2016',
+  printerName: 'Generic / Text Only',
   labelWidth: '75,00', labelHeight: '25,00',
   labelsPerRow: '3', labelsPerColumn: '9',
   topMargin: '12,00', leftMargin: '5,60',
@@ -100,7 +103,7 @@ export default function LabelDesignerSection({ labelDesigns, printers, onAdd, on
       setForm({
         ...EMPTY_FORM,
         documentType: selectedDocumentType,
-        printerName: printers.find(p => p.isDefault)?.name || 'Send To OneNote 2016',
+        printerName: printers.find(p => p.isDefault)?.name || 'Generic / Text Only',
       });
     }
     setSelectedFieldKey(null);
@@ -149,6 +152,32 @@ export default function LabelDesignerSection({ labelDesigns, printers, onAdd, on
     setLabelFields(prev => prev.map(f => f.key === key ? { ...f, ...updates } : f));
   };
 
+  const isTitilla = ['Titilla POS', 'Tirilla Cotizaciones', 'Tirilla Separados'].includes(selectedDocumentType);
+
+  const handleSetDefault = (designId: string) => {
+    // Quitar isDefault de todos los del mismo tipo, poner en el elegido
+    filteredDesigns.forEach(d => {
+      onUpdate(d.id, { isDefault: d.id === designId });
+    });
+    toast.success('Tirilla predeterminada actualizada');
+  };
+
+  const activeId = filteredDesigns.find(d => d.isDefault)?.id ?? filteredDesigns[0]?.id;
+  const editingDesign = editingId ? (labelDesigns.find(d => d.id === editingId) ?? null) : null;
+
+  const handleTitillaSave = (data: Partial<LabelDesign> & { id: string; createdAt: Date }) => {
+    if (editingId) {
+      onUpdate(editingId, data);
+      toast.success('Tirilla POS actualizada');
+    } else {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      onAdd(data as any);
+      toast.success('Tirilla POS creada');
+    }
+    setIsDialogOpen(false);
+    setEditingId(null);
+  };
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
@@ -175,39 +204,78 @@ export default function LabelDesignerSection({ labelDesigns, printers, onAdd, on
         <Table>
           <TableHeader>
             <TableRow className="bg-gray-50">
-              <TableHead className="w-12"></TableHead>
+              <TableHead className="w-10"></TableHead>
               <TableHead>Código</TableHead>
-              <TableHead>Descripción</TableHead>
+              <TableHead>Nombre</TableHead>
               <TableHead>Impresora</TableHead>
-              <TableHead className="text-center">Tamaño (mm)</TableHead>
-              <TableHead className="text-center">Etiq. por hoja</TableHead>
+              {isTitilla
+                ? <TableHead className="text-center w-32">Estado</TableHead>
+                : <>
+                    <TableHead className="text-center">Tamaño (mm)</TableHead>
+                    <TableHead className="text-center">Etiq. por hoja</TableHead>
+                  </>
+              }
+              {isTitilla && <TableHead className="w-10"></TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredDesigns.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-gray-500 py-8">
+                <TableCell colSpan={isTitilla ? 6 : 6} className="text-center text-gray-500 py-8">
                   No hay diseños para este tipo de documento
                 </TableCell>
               </TableRow>
             ) : (
-              filteredDesigns.map(design => (
-                <TableRow
-                  key={design.id}
-                  className={`cursor-pointer hover:bg-gray-50 ${selectedId === design.id ? 'bg-blue-50' : ''}`}
-                  onClick={() => setSelectedId(design.id)}
-                >
-                  <TableCell><div className="w-2 h-2 rounded-full bg-blue-500 mx-auto"></div></TableCell>
-                  <TableCell className="font-medium">{design.code}</TableCell>
-                  <TableCell>{design.name}</TableCell>
-                  <TableCell className="text-sm text-gray-600">{design.printerName}</TableCell>
-                  <TableCell className="text-center text-sm">{design.labelWidth} x {design.labelHeight}</TableCell>
-                  <TableCell className="text-center text-sm">
-                    {parseInt(design.labelsPerRow) * parseInt(design.labelsPerColumn)}
-                    <span className="text-gray-500 ml-1">({design.labelsPerRow}x{design.labelsPerColumn})</span>
-                  </TableCell>
-                </TableRow>
-              ))
+              filteredDesigns.map(design => {
+                const isActive = design.id === activeId;
+                return (
+                  <TableRow
+                    key={design.id}
+                    className={`cursor-pointer hover:bg-gray-50 ${selectedId === design.id ? 'bg-blue-50' : ''}`}
+                    onClick={() => setSelectedId(design.id)}
+                  >
+                    <TableCell>
+                      <div className={`w-2 h-2 rounded-full mx-auto ${isActive && isTitilla ? 'bg-green-500' : 'bg-blue-500'}`} />
+                    </TableCell>
+                    <TableCell className="font-medium">{design.code}</TableCell>
+                    <TableCell className="flex items-center gap-2">
+                      {design.name}
+                      {isTitilla && isActive && (
+                        <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500 shrink-0" />
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm text-gray-600">{design.printerName}</TableCell>
+                    {isTitilla
+                      ? <TableCell className="text-center">
+                          {isActive
+                            ? <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">En uso</span>
+                            : <span className="text-xs text-gray-400">—</span>
+                          }
+                        </TableCell>
+                      : <>
+                          <TableCell className="text-center text-sm">{design.labelWidth} x {design.labelHeight}</TableCell>
+                          <TableCell className="text-center text-sm">
+                            {parseInt(design.labelsPerRow) * parseInt(design.labelsPerColumn)}
+                            <span className="text-gray-500 ml-1">({design.labelsPerRow}x{design.labelsPerColumn})</span>
+                          </TableCell>
+                        </>
+                    }
+                    {isTitilla && (
+                      <TableCell onClick={e => e.stopPropagation()}>
+                        {!isActive && (
+                          <button
+                            title="Establecer como predeterminada"
+                            className="p-1 rounded hover:bg-gray-100"
+                            onClick={() => handleSetDefault(design.id)}
+                          >
+                            <Star className="h-4 w-4 text-gray-400 hover:text-yellow-500" />
+                          </button>
+                        )}
+                      </TableCell>
+                    )}
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
@@ -225,46 +293,102 @@ export default function LabelDesignerSection({ labelDesigns, printers, onAdd, on
         <Button size="sm" variant="outline" disabled><Upload className="h-4 w-4 mr-2" />Exportar</Button>
       </div>
 
-      {selectedId && (
-        <div className="mt-6 p-4 border rounded-lg bg-gray-50">
-          <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
-            <Eye className="h-4 w-4" />
-            Vista Previa - {filteredDesigns.find(d => d.id === selectedId)?.name}
-          </h4>
-          <div className="flex justify-center p-6 bg-white rounded border">
-            <div
-              className="border-2 border-black p-4 bg-white"
-              style={{
-                width: `${parseFloat(filteredDesigns.find(d => d.id === selectedId)?.labelWidth.replace(',', '.') || '75') * 3.78}px`,
-                height: `${parseFloat(filteredDesigns.find(d => d.id === selectedId)?.labelHeight.replace(',', '.') || '25') * 3.78}px`,
-                transition: 'all 0.3s ease',
-              }}
-            >
-              <p className="text-xs font-medium mb-1 truncate">Descripción del artículo</p>
-              <p className="text-xs mb-2 truncate">Ref: ABC123    P.V.P.:    10,00 €</p>
-              <div className="flex flex-col items-center justify-center" style={{ marginTop: 'auto' }}>
-                <svg width="140" height="30">
-                  <rect x="0" width="2" height="30" fill="black"/>
-                  <rect x="4" width="1" height="30" fill="black"/>
-                  <rect x="7" width="2" height="30" fill="black"/>
-                  <rect x="11" width="1" height="30" fill="black"/>
-                  <rect x="14" width="2" height="30" fill="black"/>
-                  <rect x="18" width="1" height="30" fill="black"/>
-                  <rect x="21" width="3" height="30" fill="black"/>
-                  <rect x="26" width="1" height="30" fill="black"/>
-                  <rect x="29" width="2" height="30" fill="black"/>
-                  <rect x="33" width="1" height="30" fill="black"/>
-                </svg>
-                <p className="text-xs mt-1 font-mono">1234567890</p>
+      {selectedId && (() => {
+        const sel = filteredDesigns.find(d => d.id === selectedId);
+        if (!sel) return null;
+
+        if (['Titilla POS', 'Tirilla Cotizaciones', 'Tirilla Separados'].includes(sel.documentType)) {
+          const cfg = parseTitillaConfig(sel.description ?? '{}');
+          const html = generateReceiptHTML({
+            companyName:    '2RUEDAS SHOP',
+            companyAddress: cfg.showAddress  ? 'Calle 10 #5-20 Local 3' : undefined,
+            companyPhone:   cfg.showPhone    ? '310 555 0000'           : undefined,
+            companyNit:     cfg.showNit      ? '900.123.456-7'          : undefined,
+            saleNumber:     'VTA-00123',
+            date:           '14/05/2026 10:30',
+            advisorName:    cfg.showAdvisor  ? 'Juan Pérez'             : '',
+            customerName:   cfg.showCustomer ? 'Carlos López'           : undefined,
+            items: [
+              { name: 'Llanta Michelin 80/90-17', quantity: 2, unitPrice: 85000, total: 170000 },
+              { name: 'Aceite 4T 10W40 1L',       quantity: 1, unitPrice: 32000, total:  32000 },
+            ],
+            subtotal:      202000,
+            discount:      cfg.showDiscount     ? 10000 : undefined,
+            iva:           cfg.showIva          ? 19240 : undefined,
+            total:         192000,
+            paymentMethod: cfg.showPaymentMethod ? 'Efectivo' : undefined,
+            footer:        cfg.footerText,
+            paperWidth:    cfg.paperWidth,
+          }, { noPrint: true });
+
+          return (
+            <div className="mt-6 p-4 border rounded-lg bg-gray-50">
+              <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                <Eye className="h-4 w-4" />
+                Vista Previa — {sel.name}
+              </h4>
+              <div className="flex justify-center p-4 bg-white rounded border">
+                <iframe
+                  srcDoc={html}
+                  title="Vista previa tirilla"
+                  className="shadow bg-white"
+                  style={{ width: cfg.paperWidth === 58 ? '220px' : '300px', height: '480px', border: 'none' }}
+                />
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <div className="mt-6 p-4 border rounded-lg bg-gray-50">
+            <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+              <Eye className="h-4 w-4" />
+              Vista Previa — {sel.name}
+            </h4>
+            <div className="flex justify-center p-6 bg-white rounded border">
+              <div
+                className="border-2 border-black p-4 bg-white"
+                style={{
+                  width: `${parseFloat(sel.labelWidth.replace(',', '.') || '75') * 3.78}px`,
+                  height: `${parseFloat(sel.labelHeight.replace(',', '.') || '25') * 3.78}px`,
+                  transition: 'all 0.3s ease',
+                }}
+              >
+                <p className="text-xs font-medium mb-1 truncate">Descripción del artículo</p>
+                <p className="text-xs mb-2 truncate">Ref: ABC123    P.V.P.:    10,00 €</p>
+                <div className="flex flex-col items-center justify-center" style={{ marginTop: 'auto' }}>
+                  <svg width="140" height="30">
+                    <rect x="0" width="2" height="30" fill="black"/>
+                    <rect x="4" width="1" height="30" fill="black"/>
+                    <rect x="7" width="2" height="30" fill="black"/>
+                    <rect x="11" width="1" height="30" fill="black"/>
+                    <rect x="14" width="2" height="30" fill="black"/>
+                    <rect x="18" width="1" height="30" fill="black"/>
+                    <rect x="21" width="3" height="30" fill="black"/>
+                    <rect x="26" width="1" height="30" fill="black"/>
+                    <rect x="29" width="2" height="30" fill="black"/>
+                    <rect x="33" width="1" height="30" fill="black"/>
+                  </svg>
+                  <p className="text-xs mt-1 font-mono">1234567890</p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Designer Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open) { setIsDialogOpen(false); setEditingId(null); } }}>
         <DialogContent className="max-w-[1150px] w-[95vw] p-0 flex flex-col" style={{ height: '90vh', maxHeight: '90vh' }}>
+          {isTitilla ? (
+            <TitillaPOSDesigner
+              design={editingDesign}
+              documentType={form.documentType}
+              printers={printers}
+              onSave={handleTitillaSave}
+              onClose={() => { setIsDialogOpen(false); setEditingId(null); }}
+            />
+          ) : (<>
           <DialogHeader className="px-4 pt-4 pb-2 border-b shrink-0">
             <DialogTitle className="flex items-center gap-2 text-base">
               <Barcode className="h-4 w-4" />
@@ -567,6 +691,7 @@ export default function LabelDesignerSection({ labelDesigns, printers, onAdd, on
               <Button size="sm" onClick={handleSave}>{editingId ? 'Guardar cambios' : 'Crear diseño'}</Button>
             </div>
           </div>
+          </>)}
         </DialogContent>
       </Dialog>
       {ConfirmDialog}

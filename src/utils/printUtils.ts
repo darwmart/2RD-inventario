@@ -1,33 +1,82 @@
-import { Sale, CompanyInfo } from '@/types';
+import { Sale, CompanyInfo, TitillaConfig } from '@/types';
+import { generateReceiptHTML, generatePlainTextReceiptHTML } from './thermalPrint';
+
+// Clave en localStorage para recordar si ya se mostró la guía de impresora
+const PRINTER_GUIDE_KEY = 'pos_printer_guide_shown';
+
+export function printPOSInvoice(sale: Sale, companyInfo: CompanyInfo, titillaConfig?: TitillaConfig) {
+  const receiptData = titillaConfig ? {
+    companyName:    companyInfo.name,
+    companyAddress: titillaConfig.showAddress        ? companyInfo.address         : undefined,
+    companyPhone:   titillaConfig.showPhone          ? companyInfo.phone           : undefined,
+    companyNit:     titillaConfig.showNit            ? companyInfo.nit             : undefined,
+    saleNumber:     sale.saleNumber,
+    date:           new Date(sale.createdAt).toLocaleString('es-CO'),
+    advisorName:    titillaConfig.showAdvisor        ? sale.advisorName            : '',
+    customerName:   titillaConfig.showCustomer       ? sale.customerName           : undefined,
+    items:          sale.items.map(i => ({ name: i.productName, quantity: i.quantity, unitPrice: i.unitPrice, total: i.total })),
+    subtotal:       sale.subtotal,
+    discount:       titillaConfig.showDiscount && sale.discount  ? sale.discount   : undefined,
+    iva:            titillaConfig.showIva      && sale.ivaTotal  ? sale.ivaTotal   : undefined,
+    total:          sale.total,
+    paymentMethod:  titillaConfig.showPaymentMethod  ? sale.paymentMethod?.name   : undefined,
+    footer:         titillaConfig.footerText,
+    paperWidth:     titillaConfig.paperWidth,
+    titleText:      titillaConfig.titleText,
+    saleType:       sale.type,
+    depositTotal:   sale.type === 'reserved' ? (sale.deposits ?? []).reduce((s, d) => s + d.amount, 0) : undefined,
+    deposits:       sale.type === 'reserved' && sale.deposits?.length
+      ? sale.deposits.map(d => ({
+          amount: d.amount,
+          method: d.method?.name,
+          date:   new Date(d.createdAt).toLocaleDateString('es-CO'),
+        }))
+      : undefined,
+  } : null;
+
+  const isTextOnly = /generic.*text|text.*only/i.test(titillaConfig?.printerName ?? '');
+
+  const html = receiptData
+    ? isTextOnly
+      ? generatePlainTextReceiptHTML(receiptData)
+      : generateReceiptHTML(receiptData, { noPrint: true })
+    : generatePOSHTML(sale, companyInfo);
+
+  printWithHiddenIframe(html, titillaConfig?.printerName);
+}
 
 /**
- * Imprime una factura en formato POS (ticket térmico)
- * @param sale - Datos de la venta a imprimir
- * @param companyInfo - Información de la empresa
+ * Imprime usando un iframe oculto dentro de la página actual.
+ * El navegador recuerda la impresora seleccionada por origen,
+ * por lo que basta con seleccionar la impresora correcta una sola vez.
  */
-export function printPOSInvoice(sale: Sale, companyInfo: CompanyInfo) {
-  // Crear ventana de impresión
-  const printWindow = window.open('', '_blank', 'width=300,height=600');
-
-  if (!printWindow) {
-    alert('Por favor, permite las ventanas emergentes para imprimir');
-    return;
+function printWithHiddenIframe(html: string, printerName?: string): void {
+  const guideShown = localStorage.getItem(PRINTER_GUIDE_KEY);
+  if (!guideShown && printerName) {
+    window.dispatchEvent(new CustomEvent('pos:printer-guide', { detail: { printerName } }));
+    localStorage.setItem(PRINTER_GUIDE_KEY, '1');
   }
 
-  // Generar HTML del ticket
-  const html = generatePOSHTML(sale, companyInfo);
+  const existing = document.getElementById('__pos_print_iframe__');
+  if (existing) existing.remove();
 
-  // Escribir el contenido en la ventana
-  printWindow.document.write(html);
-  printWindow.document.close();
+  const iframe = document.createElement('iframe');
+  iframe.id = '__pos_print_iframe__';
+  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;opacity:0;pointer-events:none;';
+  document.body.appendChild(iframe);
 
-  // Esperar a que se cargue y luego imprimir
-  printWindow.onload = () => {
-    setTimeout(() => {
-      printWindow.print();
-      printWindow.close();
-    }, 250);
-  };
+  const doc = iframe.contentDocument ?? iframe.contentWindow?.document;
+  if (!doc) { iframe.remove(); return; }
+
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  setTimeout(() => {
+    iframe.contentWindow?.focus();
+    iframe.contentWindow?.print();
+    setTimeout(() => iframe.remove(), 1500);
+  }, 350);
 }
 
 /**
@@ -43,7 +92,7 @@ function generatePOSHTML(sale: Sale, companyInfo: CompanyInfo): string {
       <style>
         @page {
           size: 80mm auto;
-          margin: 0;
+          margin: 0mm;
         }
 
         * {

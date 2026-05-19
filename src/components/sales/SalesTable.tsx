@@ -4,8 +4,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Printer, Edit2, Trash2, RotateCcw } from 'lucide-react';
 import { CompanyInfo, Sale } from '@/types';
-import { printPOSInvoice } from '@/utils/printUtils';
 import { useCompanySettings } from '@/hooks/queries/useCompanySettings';
+import { usePrintPOS } from '@/hooks/usePrintPOS';
 import { costWithIva } from '@/utils/ivaUtils';
 
 export interface DepositEntry {
@@ -46,6 +46,7 @@ export default function SalesTable({
   isAdmin, dailyTotals, onEdit, onDelete, onReturn,
 }: Props) {
   const { taxSettings } = useCompanySettings();
+  const printPOS = usePrintPOS();
 
   return (
     <Card>
@@ -92,7 +93,7 @@ export default function SalesTable({
                       <TableCell>{entry.paymentMethodName}</TableCell>
                       <TableCell>
                         {fullSale && (
-                          <Button size="sm" variant="outline" onClick={() => printPOSInvoice(fullSale, companyInfo)} title="Reimprimir factura">
+                          <Button size="sm" variant="outline" onClick={() => printPOS(fullSale, companyInfo)} title="Reimprimir factura">
                             <Printer className="h-4 w-4" />
                           </Button>
                         )}
@@ -121,7 +122,7 @@ export default function SalesTable({
                       <TableCell>
                         {isFirstItem && (
                           <div className="flex gap-1">
-                            <Button size="sm" variant="outline" onClick={() => printPOSInvoice(sale, companyInfo)} title="Reimprimir factura">
+                            <Button size="sm" variant="outline" onClick={() => printPOS(sale, companyInfo)} title="Reimprimir factura">
                               <Printer className="h-4 w-4" />
                             </Button>
                             {sale.status !== 'returned' && (

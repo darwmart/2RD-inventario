@@ -12,6 +12,12 @@ interface PrintItem {
   total: number;
 }
 
+interface DepositEntry {
+  amount: number;
+  method?: string;
+  date: string;
+}
+
 interface ReceiptData {
   companyName: string;
   companyAddress?: string;
@@ -29,10 +35,15 @@ interface ReceiptData {
   paymentMethod?: string;
   footer?: string;
   paperWidth?: PaperWidth;
+  titleText?: string;
+  // Separados / layaway
+  saleType?: 'sale' | 'quote' | 'reserved';
+  depositTotal?: number;
+  deposits?: DepositEntry[];
 }
 
 // ─── Generador de HTML para recibo ───────────────────────────
-export function generateReceiptHTML(data: ReceiptData): string {
+export function generateReceiptHTML(data: ReceiptData, opts?: { noPrint?: boolean }): string {
   const width = data.paperWidth ?? 80;
   const mmWidth = width === 58 ? '56mm' : '78mm';
   const colWidth = width === 58 ? '80px' : '100px';
@@ -72,8 +83,11 @@ export function generateReceiptHTML(data: ReceiptData): string {
     .totals td { padding: 1px 0; }
     .grand-total { font-size: ${width === 58 ? '12px' : '13px'}; font-weight: bold; }
     @media print {
-      body { width: ${mmWidth}; }
-      @page { margin: 0; size: ${mmWidth} auto; }
+      body { width: ${mmWidth}; margin: 0; padding: 2px; }
+      @page {
+        margin: 0mm;
+        size: ${mmWidth} auto;
+      }
     }
   </style>
 </head>
@@ -87,7 +101,7 @@ export function generateReceiptHTML(data: ReceiptData): string {
   <div class="separator"></div>
 
   <!-- Info del documento -->
-  <div class="bold center">FACTURA DE VENTA</div>
+  <div class="bold center">${data.titleText ?? 'FACTURA DE VENTA'}</div>
   <div>No: <span class="bold">${data.saleNumber}</span></div>
   <div>Fecha: ${data.date}</div>
   <div>Asesor: ${data.advisorName}</div>
@@ -135,7 +149,27 @@ export function generateReceiptHTML(data: ReceiptData): string {
       <td>Pago:</td>
       <td style="text-align:right">${data.paymentMethod}</td>
     </tr>` : ''}
+    ${data.saleType === 'reserved' ? `
+    <tr>
+      <td>Abonado:</td>
+      <td style="text-align:right">$ ${fmt(data.depositTotal ?? 0)}</td>
+    </tr>
+    <tr class="grand-total">
+      <td>SALDO:</td>
+      <td style="text-align:right">$ ${fmt(Math.max(0, data.total - (data.depositTotal ?? 0)))}</td>
+    </tr>` : ''}
   </table>
+
+  ${data.saleType === 'reserved' && data.deposits && data.deposits.length > 0 ? `
+  <div class="separator"></div>
+  <div class="bold" style="font-size:${width === 58 ? '8px' : '9px'}">Historial de abonos:</div>
+  <table class="totals" style="font-size:${width === 58 ? '8px' : '9px'}">
+    ${data.deposits.map(d => `
+    <tr>
+      <td>${d.date}${d.method ? ' · ' + d.method : ''}</td>
+      <td style="text-align:right">$ ${fmt(d.amount)}</td>
+    </tr>`).join('')}
+  </table>` : ''}
 
   <div class="separator"></div>
 
@@ -147,13 +181,144 @@ export function generateReceiptHTML(data: ReceiptData): string {
     ${new Date().toLocaleString('es-CO')}
   </div>
 
-  <script>
+  ${opts?.noPrint ? '' : `<script>
     window.onload = function() {
       window.print();
       setTimeout(function() { window.close(); }, 500);
     };
-  </script>
+  </script>`}
 </body>
+</html>`;
+}
+
+// ─── Generador de texto plano para Generic / Text Only ───────
+// Usa <pre> con columnas de ancho fijo. No depende de CSS layout.
+export function generatePlainTextReceiptHTML(data: ReceiptData): string {
+  const W = data.paperWidth === 58 ? 32 : 48;
+  const fmt = (n: number) => n.toLocaleString('es-CO', { minimumFractionDigits: 0 });
+
+  const ctr = (s: string) => {
+    const pad = Math.max(0, Math.floor((W - s.length) / 2));
+    return ' '.repeat(pad) + s;
+  };
+
+  const rjust = (left: string, right: string) => {
+    const spaces = Math.max(1, W - left.length - right.length);
+    return left + ' '.repeat(spaces) + right;
+  };
+
+  const wrap = (text: string, maxLen: number): string[] => {
+    const words = text.split(' ');
+    const result: string[] = [];
+    let line = '';
+    for (const w of words) {
+      if (!w) continue;
+      if ((line ? line + ' ' + w : w).length > maxLen) {
+        if (line) result.push(line);
+        line = w.length > maxLen ? w.substring(0, maxLen) : w;
+      } else {
+        line = line ? line + ' ' + w : w;
+      }
+    }
+    if (line) result.push(line);
+    return result.length ? result : [''];
+  };
+
+  const DIV  = '-'.repeat(W);
+  const DIV2 = '='.repeat(W);
+  const lines: string[] = [];
+
+  // Encabezado
+  lines.push(ctr(data.companyName));
+  if (data.companyAddress) lines.push(ctr(data.companyAddress));
+  if (data.companyPhone)   lines.push(ctr('Tel: ' + data.companyPhone));
+  if (data.companyNit)     lines.push(ctr('NIT: ' + data.companyNit));
+  lines.push(DIV2);
+
+  // Info documento
+  lines.push(ctr(data.titleText ?? 'FACTURA DE VENTA'));
+  lines.push('No: ' + data.saleNumber);
+  lines.push('Fecha: ' + data.date);
+  if (data.advisorName) lines.push('Asesor: ' + data.advisorName);
+  if (data.customerName) lines.push('Cliente: ' + data.customerName);
+  lines.push(DIV);
+
+  // Cabecera de ítems
+  const descW = W - 14;           // reserva 4 cant + 10 total
+  lines.push(
+    'Desc'.padEnd(descW) +
+    'Cant'.padStart(4) +
+    'Total'.padStart(10)
+  );
+  lines.push(DIV);
+
+  // Ítems
+  for (const item of data.items) {
+    const nameLines = wrap(item.name, descW);
+    const totalStr = fmt(item.total).padStart(10);
+    const qtyStr   = String(item.quantity).padStart(4);
+    // Primera línea: nombre + cant + total
+    lines.push(nameLines[0].padEnd(descW) + qtyStr + totalStr);
+    // Líneas adicionales del nombre (si es largo)
+    for (let i = 1; i < nameLines.length; i++) {
+      lines.push('  ' + nameLines[i]);
+    }
+  }
+  lines.push(DIV);
+
+  // Totales
+  lines.push(rjust('Subtotal:', '$ ' + fmt(data.subtotal)));
+  if (data.discount) lines.push(rjust('Descuento:', '- $ ' + fmt(data.discount)));
+  if (data.iva)      lines.push(rjust('IVA:', '$ ' + fmt(data.iva)));
+  lines.push(rjust('TOTAL:', '$ ' + fmt(data.total)));
+  if (data.paymentMethod) lines.push(rjust('Pago:', data.paymentMethod));
+
+  // Separados: abono y saldo
+  if (data.saleType === 'reserved') {
+    const abonado  = data.depositTotal ?? 0;
+    const saldo    = Math.max(0, data.total - abonado);
+    lines.push(rjust('Abonado:', '$ ' + fmt(abonado)));
+    lines.push(rjust('SALDO PENDIENTE:', '$ ' + fmt(saldo)));
+
+    if (data.deposits && data.deposits.length > 0) {
+      lines.push(DIV);
+      lines.push('Historial de abonos:');
+      for (const d of data.deposits) {
+        const label = d.date + (d.method ? ' ' + d.method : '');
+        lines.push(rjust(label, '$ ' + fmt(d.amount)));
+      }
+    }
+  }
+
+  lines.push(DIV2);
+
+  // Footer con salto de línea correcto
+  if (data.footer) {
+    for (const l of wrap(data.footer, W)) lines.push(ctr(l));
+  }
+
+  // Avance de papel para que el pie de página salga completamente del cabezal
+  for (let i = 0; i < 10; i++) lines.push('');
+
+  const ptSize = data.paperWidth === 58 ? '8pt' : '9pt';
+  const mmWidth = data.paperWidth === 58 ? '56mm' : '78mm';
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Recibo ${data.saleNumber}</title>
+  <style>
+    * { margin: 0; padding: 0; }
+    body { font-family: 'Courier New', monospace; font-size: ${ptSize}; }
+    pre { white-space: pre; }
+    @media print {
+      @page { size: ${mmWidth} auto; margin: 2mm 1mm; }
+      body { width: ${mmWidth}; }
+    }
+  </style>
+</head>
+<body><pre>${lines.join('\n')}</pre></body>
 </html>`;
 }
 

@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { FileText, Clock, ShoppingCart, Printer } from 'lucide-react';
-import { printPOSInvoice } from '@/utils/printUtils';
+import { usePrintPOS } from '@/hooks/usePrintPOS';
 
 interface CompanyInfo {
   name: string;
@@ -21,6 +21,7 @@ interface Quote {
   createdAt: string | Date;
   total: number;
   items: SaleItem[];
+  type?: string;
 }
 
 interface Props {
@@ -31,6 +32,7 @@ interface Props {
 }
 
 export default function QuotesList({ quotes, companyInfo, onConvert, onCancel }: Props) {
+  const printPOS = usePrintPOS();
   return (
     <Card>
       <CardHeader>
@@ -61,7 +63,7 @@ export default function QuotesList({ quotes, companyInfo, onConvert, onCancel }:
                   {quote.items.length} productos - Total: ${quote.total.toLocaleString('es-CO')}
                 </div>
                 <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={() => printPOSInvoice(quote as never, companyInfo as never)}>
+                  <Button size="sm" variant="outline" onClick={() => printPOS({ ...quote, type: 'quote' } as never, companyInfo as never)}>
                     <Printer className="h-4 w-4 mr-1" />Imprimir
                   </Button>
                   <Button size="sm" onClick={() => onConvert(quote.id)} className="flex-1">

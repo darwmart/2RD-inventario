@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Toaster } from '@/components/ui/sonner';
+import { toast } from 'sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/infrastructure/queryClient';
@@ -30,6 +31,19 @@ import Reports from './pages/Reports';
 
 function SessionGuard({ children }: { children: React.ReactNode }) {
   useSessionManager();
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const name = (e as CustomEvent<{ printerName: string }>).detail.printerName;
+      toast.info(
+        `Primera impresión: selecciona "${name}" en el diálogo y el navegador la recordará para siempre.`,
+        { duration: 8000 }
+      );
+    };
+    window.addEventListener('pos:printer-guide', handler);
+    return () => window.removeEventListener('pos:printer-guide', handler);
+  }, []);
+
   return <>{children}</>;
 }
 
