@@ -15,7 +15,7 @@ export function printPOSInvoice(sale: Sale, companyInfo: CompanyInfo, titillaCon
     advisorName:    titillaConfig.showAdvisor        ? sale.advisorName            : '',
     customerName:   titillaConfig.showCustomer       ? sale.customerName           : undefined,
     items:          sale.items.map(i => ({ name: i.productName, quantity: i.quantity, unitPrice: i.unitPrice, total: i.total })),
-    subtotal:       sale.subtotal,
+    subtotal:       sale.subtotal - (sale.ivaTotal ?? 0),
     discount:       titillaConfig.showDiscount && sale.discount  ? sale.discount   : undefined,
     iva:            titillaConfig.showIva      && sale.ivaTotal  ? sale.ivaTotal   : undefined,
     total:          sale.total,

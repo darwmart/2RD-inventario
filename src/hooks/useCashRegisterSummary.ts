@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { Sale, CashRegisterSession, AccountingRecord, PaymentMethod } from '@/types';
 
-const toKey = (d: Date | string) => {
+const toKey = (d: Date | string): string => {
+  if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
   const date = new Date(d);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 };

@@ -70,9 +70,9 @@ export default function SaleFormDialog({ open, editingSale, products, advisors, 
     setCustomerName(''); setCustomerDocument(''); setCustomerPhone(''); setCustomerEmail('');
   };
 
-  const subtotal = Math.round(cart.reduce((sum, item) => sum + item.total, 0));
   const totalIVA = Math.round(cart.reduce((sum, item) => sum + (item.ivaAmount || 0), 0));
-  const total = Math.round(subtotal - discount);
+  const subtotal = Math.round(cart.reduce((sum, item) => sum + item.total, 0) - totalIVA);
+  const total = Math.round(subtotal + totalIVA - discount);
 
   const addToCart = (product: Product, quantity = 1) => {
     if (product.stock < quantity) { toast.error(`Stock insuficiente. Solo hay ${product.stock} unidades disponibles.`); return; }

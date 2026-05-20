@@ -12,6 +12,14 @@ dist
 dist-ssr
 *.local
 
+# Variables de entorno (credenciales)
+.env
+.env.local
+.env.*.local
+
+# Migraciones combinadas (generadas localmente)
+supabase/all_migrations.sql
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

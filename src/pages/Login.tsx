@@ -90,10 +90,6 @@ export default function Login() {
           </Button>
         </form>
 
-        <div className="mt-6 pt-5 border-t border-gray-100 space-y-1 text-xs text-gray-400 text-center">
-          <p><span className="font-medium">Admin:</span> admin / admin123</p>
-          <p><span className="font-medium">Usuario:</span> usuario / user123</p>
-        </div>
       </div>
     </div>
   );

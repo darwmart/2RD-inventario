@@ -63,8 +63,8 @@ export default function CreateQuoteDialog({ open, products, advisors, paymentMet
     ).slice(0, 8),
   [products, searchTerm]);
 
-  const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
-  const totalIVA = cart.reduce((sum, item) => sum + (item.ivaAmount || 0), 0);
+  const totalIVA = Math.round(cart.reduce((sum, item) => sum + (item.ivaAmount || 0), 0));
+  const subtotal = Math.round(cart.reduce((sum, item) => sum + item.total, 0) - totalIVA);
 
   const addToCart = (product: Product) => {
     const idx = cart.findIndex(item => item.productId === product.id);
@@ -284,7 +284,7 @@ export default function CreateQuoteDialog({ open, products, advisors, paymentMet
             )}
             <div className="flex justify-between items-center font-bold text-lg pt-2 border-t">
               <span>Total:</span>
-              <span>${subtotal.toLocaleString('es-CO')}</span>
+              <span>${(subtotal + totalIVA).toLocaleString('es-CO')}</span>
             </div>
             <div className="flex gap-2 pt-2">
               <Button variant="outline" onClick={handleClose}>Cancelar</Button>

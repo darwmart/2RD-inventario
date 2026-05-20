@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { v4 as uuidv4 } from 'uuid';
 import type { Bank } from '@/types/settings';
 import type { IBankRepository, CreateBankInput } from '../interfaces/IBankRepository';
 
@@ -16,6 +17,7 @@ function toBank(row: Row): Bank {
 
 function toRow(data: Partial<Bank> & Partial<CreateBankInput>): Row {
   const row: Row = {};
+  if (data.id       !== undefined) row.id        = data.id;
   if (data.name     !== undefined) row.name      = data.name;
   if (data.icon     !== undefined) row.icon      = data.icon     ?? null;
   if (data.isActive !== undefined) row.is_active = data.isActive;
@@ -40,9 +42,10 @@ export class SupabaseBankRepository implements IBankRepository {
     return data ? toBank(data) : null;
   }
 
-  async create(data: CreateBankInput): Promise<Bank> {
+  async create(data: CreateBankInput & { id?: string }): Promise<Bank> {
+    const row = toRow({ ...data, id: data.id ?? uuidv4() });
     const { data: inserted, error } = await supabase
-      .from(this.table).insert(toRow(data)).select().single();
+      .from(this.table).insert(row).select().single();
     if (error) throw new Error(error.message);
     return toBank(inserted);
   }

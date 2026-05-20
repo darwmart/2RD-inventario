@@ -43,6 +43,22 @@ export default function Quotes() {
     if (bankId && banks.find(b => b.id === bankId)) updateBankBalance(bankId, amount);
   };
 
+  const handleCancelSale = (id: string) => {
+    const sale = sales.find(s => s.id === id);
+    if (sale?.type === 'reserved') {
+      const depositsToReverse = sale.deposits && sale.deposits.length > 0
+        ? sale.deposits
+        : (sale.deposit ?? 0) > 0
+          ? [{ amount: sale.deposit as number, method: sale.paymentMethod }]
+          : [];
+      depositsToReverse.forEach(d => {
+        const bankId = PAYMENT_TO_BANK[d.method?.id ?? ''];
+        if (bankId && banks.find(b => b.id === bankId)) updateBankBalance(bankId, -d.amount);
+      });
+    }
+    cancelSale(id);
+  };
+
   const handleCreate = async (data: CreateQuoteFormData) => {
     if (data.items.length === 0) { toast.error('Agrega productos para crear la cotización'); return; }
     if (!data.advisorId) { toast.error('Selecciona un asesor'); return; }
@@ -63,6 +79,7 @@ export default function Quotes() {
     try {
       await addSaleAsync({
         advisorId: data.advisorId,
+        advisorName: advisors.find(a => a.id === data.advisorId)?.name ?? '',
         items: data.items,
         paymentMethod: method,
         type: data.type,
@@ -121,14 +138,14 @@ export default function Quotes() {
             quotes={quotes}
             companyInfo={companyInfo}
             onConvert={convertToSale}
-            onCancel={cancelSale}
+            onCancel={handleCancelSale}
           />
           <ReservedList
             reserved={reserved}
             companyInfo={companyInfo}
             onDeposit={id => { setDepositSaleId(id); setDepositDialogOpen(true); }}
             onConvert={convertToSale}
-            onCancel={cancelSale}
+            onCancel={handleCancelSale}
           />
         </div>
 

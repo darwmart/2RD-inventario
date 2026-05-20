@@ -3,7 +3,7 @@ import { useConfirm } from '@/hooks/useConfirm';
 import { useSalesData } from '@/hooks/queries/useSalesData';
 import { useAdvisors } from '@/hooks/queries/useAdvisors';
 import { usePaymentMethods } from '@/hooks/queries/usePaymentMethods';
-import { useExpenses } from '@/hooks/useExpenses';
+import { useExpensesData } from '@/hooks/queries/useExpensesData';
 import { useBankSettings } from '@/hooks/queries/useBankSettings';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
@@ -28,7 +28,7 @@ export default function CashRegister() {
   const { sales, getSalesByDate } = useSalesData();
   const { advisors } = useAdvisors();
   const { paymentMethods } = usePaymentMethods();
-  const { addExpense, getExpensesByDate } = useExpenses();
+  const { addExpense, getExpensesByDate } = useExpensesData();
   const { banks, updateBankBalance } = useBankSettings();
 
   const [selectedDate, setSelectedDate] = useState(() => toDateKey());
@@ -53,7 +53,7 @@ export default function CashRegister() {
     setAccountingRecords([...accountingRecords, {
       id: Date.now(), tipo: 'traspaso',
       descripcion: `Apertura de caja - ${selectedDate}`, monto: amount,
-      banco: 'caja-principal', fecha: new Date().toISOString(),
+      banco: 'caja-principal', fecha: selectedDate,
     }]);
     toast.success(`Caja abierta con $${amount.toLocaleString('es-CO')} — debitado de Caja Fuerte`);
   };
@@ -76,7 +76,7 @@ export default function CashRegister() {
     setAccountingRecords([...accountingRecords, {
       id: Date.now(), tipo: 'traspaso',
       descripcion: description || 'Traspaso de efectivo a Caja Fuerte', monto: amount,
-      banco: 'efectivo', fecha: new Date().toISOString(),
+      banco: 'efectivo', fecha: selectedDate,
     }]);
     updateBankBalance('caja-principal', amount);
     updateBankBalance('efectivo', -amount);
@@ -204,7 +204,7 @@ export default function CashRegister() {
           dailyExpenses={dailyExpenses}
           totalExpenses={totalExpenses}
           onAddExpense={(advisorId, advisorName, type, amount, description) =>
-            addExpense(advisorId, advisorName, type, amount, description)
+            addExpense({ advisorId, advisorName, type, amount, description })
           }
         />
       </div>

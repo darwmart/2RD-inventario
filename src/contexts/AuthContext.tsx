@@ -23,9 +23,6 @@ type AuthContextType = {
   canEdit: () => boolean;
 };
 
-// ─── Usuarios fallback (cuando Supabase no está configurado) ─────────────────
-// Reemplaza por gestión de roles en Supabase: tabla profiles(id, role)
-// o user_metadata al crear usuarios con supabase.auth.admin.createUser
 const FALLBACK_USERS: Array<AuthUser & { password: string; email: string }> = [
   { id: '1', username: 'admin',   email: 'admin@2rd.local',   password: 'admin123', name: 'Administrador', role: 'admin' },
   { id: '2', username: 'usuario', email: 'user@2rd.local',    password: 'user123',  name: 'Usuario',       role: 'user' },
