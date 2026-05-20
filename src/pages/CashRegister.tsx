@@ -28,7 +28,7 @@ export default function CashRegister() {
   const { sales, getSalesByDate } = useSalesData();
   const { advisors } = useAdvisors();
   const { paymentMethods } = usePaymentMethods();
-  const { addExpense, getExpensesByDate } = useExpensesData();
+  const { addExpense, deleteExpense, getExpensesByDate } = useExpensesData();
   const { banks, updateBankBalance } = useBankSettings();
 
   const [selectedDate, setSelectedDate] = useState(() => toDateKey());
@@ -203,9 +203,11 @@ export default function CashRegister() {
           advisors={advisors}
           dailyExpenses={dailyExpenses}
           totalExpenses={totalExpenses}
+          isAdmin={isAdmin()}
           onAddExpense={(advisorId, advisorName, type, amount, description) =>
             addExpense({ advisorId, advisorName, type, amount, description })
           }
+          onDeleteExpense={deleteExpense}
         />
       </div>
 

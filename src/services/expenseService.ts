@@ -40,4 +40,8 @@ export class ExpenseService {
   async getByAdvisorName(name: string): Promise<Expense[]> {
     return this.expenses.findByAdvisorName(name);
   }
+
+  async remove(id: string): Promise<void> {
+    return this.expenses.delete(id);
+  }
 }

@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Trash2 } from 'lucide-react';
 import { CashRegisterSession } from '@/types';
 import { fmtMoneyInput, parseMoney } from '@/utils/formatters';
 import { toast } from 'sonner';
@@ -26,10 +27,12 @@ interface Props {
   advisors: Advisor[];
   dailyExpenses: Expense[];
   totalExpenses: number;
+  isAdmin: boolean;
   onAddExpense: (advisorId: string, advisorName: string, type: 'gasto' | 'prestamo', amount: number, description: string) => void;
+  onDeleteExpense: (id: string) => void;
 }
 
-export default function ExpensesCard({ currentSession, advisors, dailyExpenses, totalExpenses, onAddExpense }: Props) {
+export default function ExpensesCard({ currentSession, advisors, dailyExpenses, totalExpenses, isAdmin, onAddExpense, onDeleteExpense }: Props) {
   const [advisorInput, setAdvisorInput] = useState('');
   const [expenseType, setExpenseType] = useState<'gasto' | 'prestamo'>('gasto');
   const [expenseAmount, setExpenseAmount] = useState('');
@@ -120,13 +123,28 @@ export default function ExpensesCard({ currentSession, advisors, dailyExpenses, 
             <p className="text-gray-500 text-center">No hay egresos registrados</p>
           ) : (
             filteredExpenses.map(e => (
-              <div key={e.id} className="p-3 border rounded-lg flex justify-between">
-                <div>
+              <div key={e.id} className="p-3 border rounded-lg flex justify-between items-start gap-2">
+                <div className="flex-1">
                   <p className="font-medium">{e.type.toUpperCase()}</p>
                   <p className="text-xs text-gray-600">{e.advisor}</p>
                   <p className="text-xs">{e.description}</p>
                 </div>
-                <div className="text-right font-bold text-red-600">-${e.amount.toLocaleString('es-CO')}</div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-red-600">-${e.amount.toLocaleString('es-CO')}</span>
+                  {isAdmin && (
+                    <button
+                      onClick={() => {
+                        if (confirm(`¿Eliminar este ${e.type} de $${e.amount.toLocaleString('es-CO')}? El monto se restablecerá.`)) {
+                          onDeleteExpense(e.id);
+                        }
+                      }}
+                      className="text-gray-400 hover:text-red-600 transition-colors p-1 rounded"
+                      title="Eliminar egreso"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
               </div>
             ))
           )}

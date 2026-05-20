@@ -24,12 +24,22 @@ export function useExpensesData() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => expenseService.remove(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: expenseKeys.all });
+      toast.success('Egreso eliminado y monto restablecido');
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const expenses = query.data ?? [];
 
   return {
     expenses,
     isLoading: query.isLoading,
     addExpense: addMutation.mutate,
+    deleteExpense: deleteMutation.mutate,
 
     // Derivados síncronos sobre datos ya cargados
     getExpensesByDate: (dateKey: string) =>
