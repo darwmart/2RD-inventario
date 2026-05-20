@@ -43,7 +43,7 @@ interface Props {
   onAddCategory: (name: string, description: string) => void;
 }
 
-const DEFAULT_WAREHOUSE = '[01] HELMETS BOUTIQUE';
+const DEFAULT_WAREHOUSE = 'Bodega Principal';
 
 export default function PurchaseDocumentModal({
   open, editingDocument, activeTab, products, suppliers, categories, taxSettings,
