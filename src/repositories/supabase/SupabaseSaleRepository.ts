@@ -124,7 +124,7 @@ function toSaleRow(sale: Sale): Record<string, unknown> {
     deposit:           sale.deposit          ?? 0,
     status:            sale.status,
     type:              sale.type,
-    created_at:        new Date().toISOString(),
+    created_at:        sale.createdAt ? new Date(sale.createdAt).toISOString() : new Date().toISOString(),
   };
 }
 

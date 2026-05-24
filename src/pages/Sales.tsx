@@ -104,6 +104,9 @@ export default function Sales() {
     );
 
     try {
+      const today = toKey(new Date());
+      const saleDate = selectedDate !== today ? new Date(`${selectedDate}T12:00:00`) : undefined;
+
       const sale = await addSaleAsync({
         advisorId,
         advisorName: advisors.find(a => a.id === advisorId)?.name ?? 'Desconocido',
@@ -114,6 +117,7 @@ export default function Sales() {
         customerName: customerName || undefined,
         customerDocument: customerDocument || undefined,
         customerPhone: customerPhone || undefined,
+        createdAt: saleDate,
       });
 
       const mappedBankId = paymentMethod.type === 'cash' ? 'efectivo' : (paymentMethod.bankId ?? null);

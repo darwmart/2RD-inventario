@@ -16,6 +16,7 @@ export type CreateSaleInput = {
   commission?: number;
   commissionAmount?: number;
   reteivaAmount?: number;
+  createdAt?: Date;
 };
 
 export function buildSale(data: CreateSaleInput): Sale {
@@ -48,7 +49,7 @@ export function buildSale(data: CreateSaleInput): Sale {
     deposits,
     status: data.type === 'sale' ? 'completed' : 'pending',
     type: data.type,
-    createdAt: new Date(),
+    createdAt: data.createdAt ?? new Date(),
   };
 }
 
