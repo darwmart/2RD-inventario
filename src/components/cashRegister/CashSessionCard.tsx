@@ -46,7 +46,7 @@ export default function CashSessionCard({
 
   const handleOpen = () => {
     const amount = parseMoney(openingAmount);
-    if (amount <= 0) { toast.error('Ingresa un monto válido'); return; }
+    if (amount < 0) { toast.error('Ingresa un monto válido'); return; }
     onOpen(amount);
     setOpeningAmount('');
     setIsOpeningDialog(false);
