@@ -52,10 +52,10 @@ export function generateReceiptHTML(data: ReceiptData, opts?: { noPrint?: boolea
 
   const itemsHTML = data.items.map(item => `
     <tr>
-      <td style="padding:1px 0">${item.name}</td>
-      <td style="text-align:center;width:30px">${item.quantity}</td>
-      <td style="text-align:right;width:${colWidth}">${fmt(item.unitPrice)}</td>
-      <td style="text-align:right;width:${colWidth}">${fmt(item.total)}</td>
+      <td style="padding:2px 2px 2px 0; word-break:break-word; white-space:normal;">${item.name}</td>
+      <td style="text-align:center; white-space:nowrap; padding:2px 3px;">${item.quantity}</td>
+      <td style="text-align:right; white-space:nowrap; padding:2px 3px;">${fmt(item.unitPrice)}</td>
+      <td style="text-align:right; white-space:nowrap; padding:2px 0 2px 3px;">${fmt(item.total)}</td>
     </tr>
   `).join('');
 
@@ -78,16 +78,18 @@ export function generateReceiptHTML(data: ReceiptData, opts?: { noPrint?: boolea
     .bold { font-weight: bold; }
     .large { font-size: ${width === 58 ? '12px' : '14px'}; }
     .separator { border-top: 1px dashed #000; margin: 4px 0; }
-    table { width: 100%; border-collapse: collapse; }
-    th { font-weight: bold; border-bottom: 1px dashed #000; padding: 2px 0; font-size: ${width === 58 ? '8px' : '9px'}; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    col.desc  { width: 48%; }
+    col.qty   { width: 10%; }
+    col.price { width: 21%; }
+    col.total { width: 21%; }
+    th { font-weight: bold; border-bottom: 1px dashed #000; padding: 2px 3px; font-size: ${width === 58 ? '8px' : '9px'}; white-space: nowrap; }
     .totals td { padding: 1px 0; }
+    .totals { table-layout: auto; }
     .grand-total { font-size: ${width === 58 ? '12px' : '13px'}; font-weight: bold; }
     @media print {
       body { width: ${mmWidth}; margin: 0; padding: 2px; }
-      @page {
-        margin: 0mm;
-        size: ${mmWidth} auto;
-      }
+      @page { margin: 2mm 1mm; size: ${mmWidth} auto; }
     }
   </style>
 </head>
@@ -111,12 +113,18 @@ export function generateReceiptHTML(data: ReceiptData, opts?: { noPrint?: boolea
 
   <!-- Items -->
   <table>
+    <colgroup>
+      <col class="desc">
+      <col class="qty">
+      <col class="price">
+      <col class="total">
+    </colgroup>
     <thead>
       <tr>
         <th style="text-align:left">Descripción</th>
-        <th style="text-align:center;width:30px">Cant</th>
-        <th style="text-align:right;width:${colWidth}">Precio</th>
-        <th style="text-align:right;width:${colWidth}">Total</th>
+        <th style="text-align:center">Cant</th>
+        <th style="text-align:right">Precio</th>
+        <th style="text-align:right">Total</th>
       </tr>
     </thead>
     <tbody>${itemsHTML}</tbody>
@@ -176,9 +184,6 @@ export function generateReceiptHTML(data: ReceiptData, opts?: { noPrint?: boolea
   <!-- Footer -->
   <div class="center" style="margin-top:4px">
     ${data.footer ?? '¡Gracias por su compra!'}
-  </div>
-  <div class="center" style="margin-top:8px;font-size:8px">
-    ${new Date().toLocaleString('es-CO')}
   </div>
 
   ${opts?.noPrint ? '' : `<script>
@@ -244,21 +249,23 @@ export function generatePlainTextReceiptHTML(data: ReceiptData): string {
   lines.push(DIV);
 
   // Cabecera de ítems
-  const descW = W - 14;           // reserva 4 cant + 10 total
+  const descW = W - 20;           // reserva 3 cant + 8 precio + 9 total
   lines.push(
     'Desc'.padEnd(descW) +
-    'Cant'.padStart(4) +
-    'Total'.padStart(10)
+    'Cnt'.padStart(3) +
+    'Precio'.padStart(8) +
+    'Total'.padStart(9)
   );
   lines.push(DIV);
 
   // Ítems
   for (const item of data.items) {
     const nameLines = wrap(item.name, descW);
-    const totalStr = fmt(item.total).padStart(10);
-    const qtyStr   = String(item.quantity).padStart(4);
-    // Primera línea: nombre + cant + total
-    lines.push(nameLines[0].padEnd(descW) + qtyStr + totalStr);
+    const totalStr  = fmt(item.total).padStart(9);
+    const priceStr  = fmt(item.unitPrice).padStart(8);
+    const qtyStr    = String(item.quantity).padStart(3);
+    // Primera línea: nombre + cant + precio + total
+    lines.push(nameLines[0].padEnd(descW) + qtyStr + priceStr + totalStr);
     // Líneas adicionales del nombre (si es largo)
     for (let i = 1; i < nameLines.length; i++) {
       lines.push('  ' + nameLines[i]);
