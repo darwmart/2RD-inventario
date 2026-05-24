@@ -9,3 +9,4 @@ export { SupabaseSaleRepository }          from './SupabaseSaleRepository';
 export { SupabaseBankRepository }          from './SupabaseBankRepository';
 export { SupabaseSettingsRepository }      from './SupabaseSettingsRepository';
 export { SupabasePurchaseRepository }      from './SupabasePurchaseRepository';
+export { SupabaseLabelDesignRepository }   from './SupabaseLabelDesignRepository';
