@@ -65,6 +65,7 @@ export type TitillaConfig = {
   showPaymentMethod: boolean;
   footerText: string;
   footer2Text: string;
+  useTextMode: boolean;
   printerName?: string;
 };
 
@@ -81,6 +82,7 @@ export const DEFAULT_TITILLA_CONFIG: TitillaConfig = {
   showPaymentMethod: true,
   footerText: '¡Gracias por su compra!',
   footer2Text: '',
+  useTextMode: true,
   printerName: 'Generic / Text Only',
 };
 

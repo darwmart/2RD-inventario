@@ -35,7 +35,8 @@ export function printPOSInvoice(sale: Sale, companyInfo: CompanyInfo, titillaCon
       : undefined,
   } : null;
 
-  const isTextOnly = /generic.*text|text.*only/i.test(titillaConfig?.printerName ?? '');
+  const isTextOnly = titillaConfig?.useTextMode !== false &&
+    (titillaConfig?.useTextMode === true || /generic.*text|text.*only/i.test(titillaConfig?.printerName ?? ''));
 
   const html = receiptData
     ? isTextOnly

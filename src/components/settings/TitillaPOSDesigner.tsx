@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { generateReceiptHTML } from '@/utils/thermalPrint';
+import { generateReceiptHTML, generatePlainTextReceiptHTML } from '@/utils/thermalPrint';
 import { LabelDesign, Printer as PrinterType, TitillaConfig, DEFAULT_TITILLA_CONFIG, parseTitillaConfig } from '@/types';
 
 export type { TitillaConfig };
@@ -57,26 +57,31 @@ export default function TitillaPOSDesigner({ design, documentType, printers, onS
   const set = <K extends keyof TitillaConfig>(key: K, val: TitillaConfig[K]) =>
     setConfig(c => ({ ...c, [key]: val }));
 
-  // Preview HTML generado con datos de muestra
-  const previewHtml = useMemo(() => generateReceiptHTML({
+  const receiptSample = useMemo(() => ({
     companyName:    SAMPLE.companyName,
-    companyAddress: config.showAddress  ? 'Calle 10 #5-20 Local 3' : undefined,
-    companyPhone:   config.showPhone    ? '310 555 0000'            : undefined,
-    companyNit:     config.showNit      ? '900.123.456-7'           : undefined,
+    companyAddress: config.showAddress       ? 'Calle 10 #5-20 Local 3' : undefined,
+    companyPhone:   config.showPhone         ? '310 555 0000'            : undefined,
+    companyNit:     config.showNit           ? '900.123.456-7'           : undefined,
     saleNumber:     SAMPLE.saleNumber,
     date:           SAMPLE.date,
-    advisorName:    config.showAdvisor  ? 'Juan Pérez'              : '',
-    customerName:   config.showCustomer ? 'Carlos López'            : undefined,
+    advisorName:    config.showAdvisor       ? 'Juan Pérez'              : '',
+    customerName:   config.showCustomer      ? 'Carlos López'            : undefined,
     items:          SAMPLE.items,
     subtotal:       SAMPLE.subtotal,
-    discount:       config.showDiscount    ? 10000                  : undefined,
-    iva:            config.showIva         ? 19240                  : undefined,
+    discount:       config.showDiscount      ? 10000                     : undefined,
+    iva:            config.showIva           ? 19240                     : undefined,
     total:          SAMPLE.total,
-    paymentMethod:  config.showPaymentMethod ? 'Efectivo'           : undefined,
+    paymentMethod:  config.showPaymentMethod ? 'Efectivo'                : undefined,
     footer:         config.footerText,
-    footer2:        config.footer2Text,
+    footer2:        config.footer2Text || undefined,
     paperWidth:     config.paperWidth,
-  }, { noPrint: true }), [config]);
+  }), [config]);
+
+  const previewHtml = useMemo(() =>
+    config.useTextMode
+      ? generatePlainTextReceiptHTML(receiptSample)
+      : generateReceiptHTML(receiptSample, { noPrint: true }),
+  [config.useTextMode, receiptSample]);
 
   const handleSave = () => {
     onSave({
@@ -158,6 +163,13 @@ export default function TitillaPOSDesigner({ design, documentType, printers, onS
             <ToggleRow label="Descuento"       checked={config.showDiscount} onCheckedChange={v => set('showDiscount', v)} />
             <ToggleRow label="IVA"             checked={config.showIva}      onCheckedChange={v => set('showIva',      v)} />
             <ToggleRow label="Método de pago"  checked={config.showPaymentMethod} onCheckedChange={v => set('showPaymentMethod', v)} />
+
+            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide pt-3 pb-0.5">Modo de impresión</p>
+            <ToggleRow
+              label="Texto plano (recomendado)"
+              checked={config.useTextMode}
+              onCheckedChange={v => set('useTextMode', v)}
+            />
 
             <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide pt-3 pb-0.5">Pie de página</p>
             <div className="py-1">
