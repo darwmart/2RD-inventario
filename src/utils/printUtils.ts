@@ -21,6 +21,7 @@ export function printPOSInvoice(sale: Sale, companyInfo: CompanyInfo, titillaCon
     total:          sale.total,
     paymentMethod:  titillaConfig.showPaymentMethod  ? sale.paymentMethod?.name   : undefined,
     footer:         titillaConfig.footerText,
+    footer2:        titillaConfig.footer2Text || undefined,
     paperWidth:     titillaConfig.paperWidth,
     titleText:      titillaConfig.titleText,
     saleType:       sale.type,

@@ -34,6 +34,7 @@ interface ReceiptData {
   total: number;
   paymentMethod?: string;
   footer?: string;
+  footer2?: string;
   paperWidth?: PaperWidth;
   titleText?: string;
   // Separados / layaway
@@ -185,6 +186,7 @@ export function generateReceiptHTML(data: ReceiptData, opts?: { noPrint?: boolea
   <div class="center" style="margin-top:4px">
     ${data.footer ?? '¡Gracias por su compra!'}
   </div>
+  ${data.footer2 ? `<div class="center" style="margin-top:4px">${data.footer2}</div>` : ''}
 
   ${opts?.noPrint ? '' : `<script>
     window.onload = function() {
@@ -299,9 +301,12 @@ export function generatePlainTextReceiptHTML(data: ReceiptData): string {
 
   lines.push(DIV2);
 
-  // Footer con salto de línea correcto
   if (data.footer) {
     for (const l of wrap(data.footer, W)) lines.push(ctr(l));
+  }
+  if (data.footer2) {
+    lines.push('');
+    for (const l of wrap(data.footer2, W)) lines.push(ctr(l));
   }
 
   // Avance de papel para que el pie de página salga completamente del cabezal

@@ -74,6 +74,7 @@ export default function TitillaPOSDesigner({ design, documentType, printers, onS
     total:          SAMPLE.total,
     paymentMethod:  config.showPaymentMethod ? 'Efectivo'           : undefined,
     footer:         config.footerText,
+    footer2:        config.footer2Text,
     paperWidth:     config.paperWidth,
   }, { noPrint: true }), [config]);
 
@@ -159,12 +160,22 @@ export default function TitillaPOSDesigner({ design, documentType, printers, onS
             <ToggleRow label="Método de pago"  checked={config.showPaymentMethod} onCheckedChange={v => set('showPaymentMethod', v)} />
 
             <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide pt-3 pb-0.5">Pie de página</p>
-            <div className="py-2">
+            <div className="py-1">
+              <Label className="text-[10px] text-gray-500">Línea 1</Label>
               <Input
-                className="text-xs h-8"
+                className="text-xs h-8 mt-0.5"
                 value={config.footerText}
                 onChange={e => set('footerText', e.target.value)}
-                placeholder="Texto del pie..."
+                placeholder="¡Gracias por su compra!"
+              />
+            </div>
+            <div className="py-1">
+              <Label className="text-[10px] text-gray-500">Línea 2</Label>
+              <Input
+                className="text-xs h-8 mt-0.5"
+                value={config.footer2Text}
+                onChange={e => set('footer2Text', e.target.value)}
+                placeholder="Texto adicional..."
               />
             </div>
 
