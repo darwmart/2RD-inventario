@@ -89,16 +89,16 @@ export default function ProductPreview({ product }: Props) {
               <p className="text-sm font-bold text-emerald-700">{fmt(product.currentPrice)}</p>
             </div>
           )}
-          {product.wholesalePrice > 0 && product.wholesalePrice !== product.suggestedPrice && (
+          {product.discountPrice > 0 && product.discountPrice !== product.suggestedPrice && (
             <div className="bg-purple-50 border border-purple-100 rounded-lg px-2 py-1.5">
-              <p className="text-xs text-purple-700 font-medium mb-0.5">Por mayor</p>
-              <p className="text-sm font-bold text-purple-700">{fmt(product.wholesalePrice)}</p>
+              <p className="text-xs text-purple-700 font-medium mb-0.5">Descuento</p>
+              <p className="text-sm font-bold text-purple-700">{fmt(product.discountPrice)}</p>
             </div>
           )}
-          {product.discountPrice > 0 && product.discountPrice !== product.suggestedPrice && (
+          {product.wholesalePrice > 0 && product.wholesalePrice !== product.suggestedPrice && (
             <div className="bg-gray-50 border border-gray-100 rounded-lg px-2 py-1.5">
-              <p className="text-xs text-gray-500 font-medium mb-0.5">Descuento</p>
-              <p className="text-sm font-bold text-gray-600">{fmt(product.discountPrice)}</p>
+              <p className="text-xs text-gray-500 font-medium mb-0.5">Por mayor</p>
+              <p className="text-sm font-bold text-gray-600">{fmt(product.wholesalePrice)}</p>
             </div>
           )}
         </div>
