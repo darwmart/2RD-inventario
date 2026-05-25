@@ -80,13 +80,13 @@ export default function ProductPreview({ product }: Props) {
           {product.hasIva && <p className="text-xs opacity-70">IVA no incluido</p>}
         </div>
         <div className="grid grid-cols-2 gap-1.5">
-          {product.discountPrice > 0 && product.discountPrice !== product.suggestedPrice && (
+          {product.currentPrice > 0 && product.currentPrice !== product.suggestedPrice && (
             <div className="bg-emerald-50 border border-emerald-100 rounded-lg px-2 py-1.5">
               <div className="flex items-center gap-1 mb-0.5">
                 <Tag className="h-3 w-3 text-emerald-600" />
-                <p className="text-xs text-emerald-700 font-medium">Descuento</p>
+                <p className="text-xs text-emerald-700 font-medium">P. de venta</p>
               </div>
-              <p className="text-sm font-bold text-emerald-700">{fmt(product.discountPrice)}</p>
+              <p className="text-sm font-bold text-emerald-700">{fmt(product.currentPrice)}</p>
             </div>
           )}
           {product.wholesalePrice > 0 && product.wholesalePrice !== product.suggestedPrice && (
@@ -95,10 +95,10 @@ export default function ProductPreview({ product }: Props) {
               <p className="text-sm font-bold text-purple-700">{fmt(product.wholesalePrice)}</p>
             </div>
           )}
-          {product.currentPrice > 0 && product.currentPrice !== product.suggestedPrice && (
+          {product.discountPrice > 0 && product.discountPrice !== product.suggestedPrice && (
             <div className="bg-gray-50 border border-gray-100 rounded-lg px-2 py-1.5">
-              <p className="text-xs text-gray-500 font-medium mb-0.5">P. de venta</p>
-              <p className="text-sm font-bold text-gray-600">{fmt(product.currentPrice)}</p>
+              <p className="text-xs text-gray-500 font-medium mb-0.5">Descuento</p>
+              <p className="text-sm font-bold text-gray-600">{fmt(product.discountPrice)}</p>
             </div>
           )}
         </div>

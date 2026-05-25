@@ -208,13 +208,13 @@ function ProductCard({ product, onClose }: { product: Product; onClose: () => vo
 
           {/* Grilla de precios alternativos */}
           <div className="grid grid-cols-2 gap-2">
-            {product.discountPrice > 0 && product.discountPrice !== product.suggestedPrice && (
+            {product.currentPrice > 0 && product.currentPrice !== product.suggestedPrice && (
               <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3">
                 <div className="flex items-center gap-1 mb-1">
                   <Tag className="h-3 w-3 text-emerald-600" />
-                  <p className="text-xs text-emerald-700 font-medium">Descuento</p>
+                  <p className="text-xs text-emerald-700 font-medium">P. de venta</p>
                 </div>
-                <p className="text-base font-bold text-emerald-700">{fmt(product.discountPrice)}</p>
+                <p className="text-base font-bold text-emerald-700">{fmt(product.currentPrice)}</p>
               </div>
             )}
 
@@ -225,10 +225,10 @@ function ProductCard({ product, onClose }: { product: Product; onClose: () => vo
               </div>
             )}
 
-            {product.currentPrice > 0 && product.currentPrice !== product.suggestedPrice && (
+            {product.discountPrice > 0 && product.discountPrice !== product.suggestedPrice && (
               <div className="bg-gray-50 border border-gray-100 rounded-xl p-3">
-                <p className="text-xs text-gray-500 font-medium mb-1">P. de venta</p>
-                <p className="text-base font-bold text-gray-600">{fmt(product.currentPrice)}</p>
+                <p className="text-xs text-gray-500 font-medium mb-1">Descuento</p>
+                <p className="text-base font-bold text-gray-600">{fmt(product.discountPrice)}</p>
               </div>
             )}
           </div>
