@@ -185,7 +185,7 @@ export default function SaleFormDialog({ open, editingSale, products, advisors, 
                     <div className="text-xs text-gray-600">{product.reference}</div>
                     <div className="flex justify-between items-center mt-2">
                       <Badge variant="secondary">{product.stock} unid.</Badge>
-                      <span className="text-sm font-bold">${product.currentPrice.toLocaleString('es-CO')}</span>
+                      <span className="text-sm font-bold">${product.suggestedPrice.toLocaleString('es-CO')}</span>
                     </div>
                   </CardContent>
                 </Card>

@@ -199,8 +199,8 @@ function ProductCard({ product, onClose }: { product: Product; onClose: () => vo
 
           {/* Precio principal */}
           <div className="bg-blue-600 rounded-xl p-3 text-white">
-            <p className="text-xs opacity-80">Precio de venta</p>
-            <p className="text-3xl font-bold">{fmt(product.currentPrice)}</p>
+            <p className="text-xs opacity-80">Precio sugerido</p>
+            <p className="text-3xl font-bold">{fmt(product.suggestedPrice)}</p>
             {product.hasIva && (
               <p className="text-xs opacity-70 mt-0.5">IVA no incluido</p>
             )}
@@ -208,7 +208,7 @@ function ProductCard({ product, onClose }: { product: Product; onClose: () => vo
 
           {/* Grilla de precios alternativos */}
           <div className="grid grid-cols-2 gap-2">
-            {product.discountPrice > 0 && product.discountPrice !== product.currentPrice && (
+            {product.discountPrice > 0 && product.discountPrice !== product.suggestedPrice && (
               <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3">
                 <div className="flex items-center gap-1 mb-1">
                   <Tag className="h-3 w-3 text-emerald-600" />
@@ -218,17 +218,17 @@ function ProductCard({ product, onClose }: { product: Product; onClose: () => vo
               </div>
             )}
 
-            {product.wholesalePrice > 0 && product.wholesalePrice !== product.currentPrice && (
+            {product.wholesalePrice > 0 && product.wholesalePrice !== product.suggestedPrice && (
               <div className="bg-purple-50 border border-purple-100 rounded-xl p-3">
                 <p className="text-xs text-purple-700 font-medium mb-1">Por mayor</p>
                 <p className="text-base font-bold text-purple-700">{fmt(product.wholesalePrice)}</p>
               </div>
             )}
 
-            {product.suggestedPrice > 0 && product.suggestedPrice !== product.currentPrice && (
+            {product.currentPrice > 0 && product.currentPrice !== product.suggestedPrice && (
               <div className="bg-gray-50 border border-gray-100 rounded-xl p-3">
-                <p className="text-xs text-gray-500 font-medium mb-1">Sugerido</p>
-                <p className="text-base font-bold text-gray-600">{fmt(product.suggestedPrice)}</p>
+                <p className="text-xs text-gray-500 font-medium mb-1">P. de venta</p>
+                <p className="text-base font-bold text-gray-600">{fmt(product.currentPrice)}</p>
               </div>
             )}
           </div>

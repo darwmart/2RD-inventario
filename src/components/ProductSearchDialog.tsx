@@ -163,7 +163,7 @@ export default function ProductSearchDialog({
                     <TableHead>Familia</TableHead>
                     <TableHead className="text-right">Stock</TableHead>
                     <TableHead className="text-right">Costo</TableHead>
-                    <TableHead className="text-right">Precio</TableHead>
+                    <TableHead className="text-right">P.Sugerido</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -206,7 +206,7 @@ export default function ProductSearchDialog({
                             ${product.cost.toLocaleString('es-CO')}
                           </TableCell>
                           <TableCell className="text-right font-mono text-sm font-medium">
-                            ${product.currentPrice.toLocaleString('es-CO')}
+                            ${product.suggestedPrice.toLocaleString('es-CO')}
                           </TableCell>
                         </TableRow>
                       );

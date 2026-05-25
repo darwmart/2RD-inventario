@@ -246,8 +246,8 @@ export default function ProductTable({
               {visibleColumns.category      && <TableHead className="w-[150px]">Familia</TableHead>}
               {visibleColumns.stock         && <TableHead className="text-right w-[80px]">Stock</TableHead>}
               {visibleColumns.cost          && <TableHead className="text-right w-[100px]">Costo</TableHead>}
+              {visibleColumns.currentPrice  && <TableHead className="text-right w-[100px]">P.Venta</TableHead>}
               {visibleColumns.suggestedPrice && <TableHead className="text-right w-[100px]">P.Sugerido</TableHead>}
-              {visibleColumns.currentPrice  && <TableHead className="text-right w-[100px]">P.Actual</TableHead>}
               {visibleColumns.discountPrice && <TableHead className="text-right w-[100px]">P.Descuento</TableHead>}
               {visibleColumns.wholesalePrice && <TableHead className="text-right w-[100px]">P.Mayorista</TableHead>}
               {isAdmin()                    && <TableHead className="w-[100px]">Acciones</TableHead>}
@@ -291,8 +291,8 @@ export default function ProductTable({
                         ${(product.hasIva ? product.cost * 1.19 : product.cost).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </TableCell>
                     )}
-                    {visibleColumns.suggestedPrice && <TableCell className="text-right font-mono text-sm">${product.suggestedPrice.toLocaleString('es-CO')}</TableCell>}
                     {visibleColumns.currentPrice  && <TableCell className="text-right font-mono text-sm font-medium">${product.currentPrice.toLocaleString('es-CO')}</TableCell>}
+                    {visibleColumns.suggestedPrice && <TableCell className="text-right font-mono text-sm">${product.suggestedPrice.toLocaleString('es-CO')}</TableCell>}
                     {visibleColumns.discountPrice && <TableCell className="text-right font-mono text-sm">${product.discountPrice.toLocaleString('es-CO')}</TableCell>}
                     {visibleColumns.wholesalePrice && <TableCell className="text-right font-mono text-sm">${product.wholesalePrice.toLocaleString('es-CO')}</TableCell>}
                     {isAdmin() && (
