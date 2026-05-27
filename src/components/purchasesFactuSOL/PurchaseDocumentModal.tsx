@@ -19,6 +19,8 @@ export interface PurchaseDocumentFormData {
   supplierName: string;
   warehouse: string;
   supplierInvoiceNumber: string;
+  /** Fecha del documento en formato YYYY-MM-DD */
+  documentDate: string;
   items: any[];
   notes: string;
 }
@@ -54,8 +56,14 @@ export default function PurchaseDocumentModal({
   const [supplierName, setSupplierName] = useState('');
   const [supplierInvoiceNumber, setSupplierInvoiceNumber] = useState('');
   const [warehouse, setWarehouse] = useState(DEFAULT_WAREHOUSE);
+  const [documentDate, setDocumentDate] = useState('');
   const [items, setItems] = useState<any[]>([]);
   const [notes, setNotes] = useState('');
+
+  const todayStr = (() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  })();
 
   const [isSupplierSearchOpen, setIsSupplierSearchOpen] = useState(false);
   const [isSupplierFormOpen, setIsSupplierFormOpen] = useState(false);
@@ -74,6 +82,8 @@ export default function PurchaseDocumentModal({
       }
       setSupplierInvoiceNumber(editingDocument.supplierInvoiceNumber || '');
       setWarehouse(editingDocument.warehouse || DEFAULT_WAREHOUSE);
+      const d = editingDocument.documentDate ?? editingDocument.createdAt;
+      setDocumentDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
       setItems(editingDocument.items.map((it: any) => ({
         ...it,
         quantityStr: it.quantity > 0 ? it.quantity.toLocaleString('es-CO') : '',
@@ -86,6 +96,7 @@ export default function PurchaseDocumentModal({
       setSupplierName('');
       setSupplierInvoiceNumber('');
       setWarehouse(DEFAULT_WAREHOUSE);
+      setDocumentDate(todayStr);
       setItems([]);
       setNotes('');
     }
@@ -183,7 +194,7 @@ export default function PurchaseDocumentModal({
     if (items.length === 0) { toast.error('Agrega al menos un artículo'); return; }
     const supplier = suppliers.find(s => s.id === supplierId);
     if (!supplier) { toast.error('Proveedor no válido'); return; }
-    onSave({ supplierId, supplierName: supplier.commercialName || supplier.fiscalName || supplierName, warehouse, supplierInvoiceNumber, items, notes });
+    onSave({ supplierId, supplierName: supplier.commercialName || supplier.fiscalName || supplierName, warehouse, supplierInvoiceNumber, documentDate: documentDate || todayStr, items, notes });
   };
 
   const modalTotals = useMemo(() => {
@@ -227,10 +238,19 @@ export default function PurchaseDocumentModal({
             {/* Panel derecho — datos del documento */}
             <div className="flex-1 flex flex-col">
               <div className="p-4 border-b bg-white space-y-3">
-                <div className="grid grid-cols-5 gap-3">
+                <div className="grid grid-cols-6 gap-3">
                   <div>
                     <Label className="text-xs font-medium mb-1 block">ALMACÉN</Label>
                     <Input value={warehouse} onChange={(e) => setWarehouse(e.target.value)} className="h-8 text-sm" />
+                  </div>
+                  <div>
+                    <Label className="text-xs font-medium mb-1 block">FECHA *</Label>
+                    <Input
+                      type="date"
+                      value={documentDate}
+                      onChange={(e) => setDocumentDate(e.target.value)}
+                      className="h-8 text-sm"
+                    />
                   </div>
                   <div className="col-span-2">
                     <Label className="text-xs font-medium mb-1 block">PROVEEDOR *</Label>

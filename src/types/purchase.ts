@@ -26,6 +26,8 @@ export type PurchaseDocument = {
   tax?: number;
   total: number;
   notes?: string;
+  /** Fecha real del documento (independiente de cuándo se digitó en el sistema) */
+  documentDate?: Date;
   createdAt: Date;
   updatedAt?: Date;
 

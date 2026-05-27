@@ -25,6 +25,7 @@ type DocRow = {
   order_ref?: string;
   delivery_ref?: string;
   invoice_ref?: string;
+  document_date?: string;  // DATE → 'YYYY-MM-DD'
   created_at: string;
   updated_at?: string;
 };
@@ -101,11 +102,14 @@ function buildDoc(row: DocRow, items: ItemRow[], payments: PaymentRow[]): Purcha
       bankId:   p.bank_id,
       bankName: p.bank_name,
     })),
-    orderRef:    row.order_ref,
-    deliveryRef: row.delivery_ref,
-    invoiceRef:  row.invoice_ref,
-    createdAt:   new Date(row.created_at),
-    updatedAt:   row.updated_at ? new Date(row.updated_at) : undefined,
+    orderRef:     row.order_ref,
+    deliveryRef:  row.delivery_ref,
+    invoiceRef:   row.invoice_ref,
+    documentDate: row.document_date
+      ? (() => { const [y, m, d] = row.document_date.split('-').map(Number); return new Date(y, m - 1, d, 12, 0, 0); })()
+      : undefined,
+    createdAt:    new Date(row.created_at),
+    updatedAt:    row.updated_at ? new Date(row.updated_at) : undefined,
   };
 }
 
@@ -157,6 +161,10 @@ export class SupabasePurchaseRepository implements IPurchaseRepository {
     const id = uuidv4();
     const documentNumber = generateDocumentNumber(all, input.documentType);
 
+    const docDate = input.documentDate
+      ? `${input.documentDate.getFullYear()}-${String(input.documentDate.getMonth() + 1).padStart(2, '0')}-${String(input.documentDate.getDate()).padStart(2, '0')}`
+      : undefined;
+
     const { error: docErr } = await supabase.from('purchase_documents').insert({
       id,
       document_type:          input.documentType,
@@ -174,6 +182,7 @@ export class SupabasePurchaseRepository implements IPurchaseRepository {
       payment_details:        input.paymentDetails ?? null,
       order_ref:              input.orderRef,
       delivery_ref:           input.deliveryRef,
+      ...(docDate ? { document_date: docDate } : {}),
     });
     if (docErr) throw new Error(docErr.message);
 
@@ -210,6 +219,10 @@ export class SupabasePurchaseRepository implements IPurchaseRepository {
     if (data.tax           !== undefined) payload.tax             = data.tax;
     if (data.total         !== undefined) payload.total           = data.total;
     if (data.subtotal      !== undefined) payload.subtotal        = data.subtotal;
+    if (data.documentDate  !== undefined) {
+      const d = data.documentDate;
+      payload.document_date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
 
     const { error } = await supabase.from('purchase_documents').update(payload).eq('id', id);
     if (error) throw new Error(error.message);

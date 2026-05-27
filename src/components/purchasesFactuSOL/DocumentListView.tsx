@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +11,19 @@ import {
 } from 'lucide-react';
 import { PurchaseDocument, DocumentType, DocumentStatus } from '@/types';
 import DocumentDetailPanel from './DocumentDetailPanel';
+
+function getDocDate(doc: PurchaseDocument): Date {
+  return doc.documentDate ?? new Date(doc.createdAt);
+}
+
+function getPeriodKey(doc: PurchaseDocument): string {
+  const d = getDocDate(doc);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function getPeriodLabel(doc: PurchaseDocument): string {
+  return getDocDate(doc).toLocaleDateString('es-CO', { month: 'long', year: 'numeric' });
+}
 
 function getStatusBadge(status: DocumentStatus) {
   if (status === 'pending') return <Badge variant="secondary" className="gap-1"><Clock className="h-3 w-3" />Pendiente</Badge>;
@@ -173,31 +187,74 @@ export default function DocumentListView({
                       </div>
                     </TableCell>
                   </TableRow>
-                ) : (
-                  filteredDocuments.map((doc) => (
-                    <TableRow key={doc.id}
-                      className={`cursor-pointer ${selectedDocument?.id === doc.id ? 'bg-blue-50' : ''}`}
-                      onClick={() => onSelectDocument(doc)}>
-                      <TableCell className="font-mono font-medium">{doc.documentNumber}</TableCell>
-                      <TableCell className="font-mono text-sm">
-                        {doc.supplierInvoiceNumber
-                          ? <span className="text-blue-600">{doc.supplierInvoiceNumber}</span>
-                          : <span className="text-gray-400 text-xs">-</span>}
-                      </TableCell>
-                      <TableCell>{new Date(doc.createdAt).toLocaleDateString('es-CO')}</TableCell>
-                      <TableCell>{resolveSupplierName(doc)}</TableCell>
-                      <TableCell className="text-right">${doc.subtotal.toLocaleString('es-CO')}</TableCell>
-                      <TableCell className="text-right">${(doc.tax || 0).toLocaleString('es-CO')}</TableCell>
-                      <TableCell className="text-right font-bold">${doc.total.toLocaleString('es-CO')}</TableCell>
-                      <TableCell>{getStatusBadge(doc.status)}</TableCell>
-                      <TableCell>
-                        {doc.orderRef && <Badge variant="outline" className="text-xs">P</Badge>}
-                        {doc.deliveryRef && <Badge variant="outline" className="text-xs ml-1">A</Badge>}
-                        {doc.invoiceRef && <Badge variant="outline" className="text-xs ml-1">F</Badge>}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
+                ) : (() => {
+                  // Agrupar documentos por período (mes-año de documentDate)
+                  type PeriodGroup = { key: string; label: string; docs: PurchaseDocument[] };
+                  const groups: PeriodGroup[] = [];
+                  for (const doc of filteredDocuments) {
+                    const key = getPeriodKey(doc);
+                    const last = groups[groups.length - 1];
+                    if (last && last.key === key) {
+                      last.docs.push(doc);
+                    } else {
+                      groups.push({ key, label: getPeriodLabel(doc), docs: [doc] });
+                    }
+                  }
+
+                  return groups.map(({ key, label, docs }) => {
+                    const periodSubtotal = docs.reduce((s, d) => s + d.subtotal, 0);
+                    const periodTotal    = docs.reduce((s, d) => s + d.total, 0);
+                    return (
+                      <Fragment key={key}>
+                        {/* Encabezado de período */}
+                        <TableRow className="bg-slate-100 hover:bg-slate-100 border-t-2 border-slate-300">
+                          <TableCell colSpan={4} className="py-1.5 px-4">
+                            <span className="text-xs font-bold text-slate-600 uppercase tracking-wide">
+                              {label}
+                            </span>
+                            <span className="text-xs text-slate-400 ml-2">
+                              · {docs.length} documento{docs.length !== 1 ? 's' : ''}
+                            </span>
+                          </TableCell>
+                          <TableCell className="py-1.5 text-right text-xs font-semibold text-slate-500">
+                            ${periodSubtotal.toLocaleString('es-CO')}
+                          </TableCell>
+                          <TableCell className="py-1.5 text-right text-xs text-slate-400">—</TableCell>
+                          <TableCell className="py-1.5 text-right text-xs font-bold text-slate-700">
+                            ${periodTotal.toLocaleString('es-CO')}
+                          </TableCell>
+                          <TableCell colSpan={2} />
+                        </TableRow>
+                        {/* Filas del período */}
+                        {docs.map((doc) => (
+                          <TableRow key={doc.id}
+                            className={`cursor-pointer ${selectedDocument?.id === doc.id ? 'bg-blue-50' : ''}`}
+                            onClick={() => onSelectDocument(doc)}>
+                            <TableCell className="font-mono font-medium">{doc.documentNumber}</TableCell>
+                            <TableCell className="font-mono text-sm">
+                              {doc.supplierInvoiceNumber
+                                ? <span className="text-blue-600">{doc.supplierInvoiceNumber}</span>
+                                : <span className="text-gray-400 text-xs">-</span>}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {getDocDate(doc).toLocaleDateString('es-CO')}
+                            </TableCell>
+                            <TableCell>{resolveSupplierName(doc)}</TableCell>
+                            <TableCell className="text-right">${doc.subtotal.toLocaleString('es-CO')}</TableCell>
+                            <TableCell className="text-right">${(doc.tax || 0).toLocaleString('es-CO')}</TableCell>
+                            <TableCell className="text-right font-bold">${doc.total.toLocaleString('es-CO')}</TableCell>
+                            <TableCell>{getStatusBadge(doc.status)}</TableCell>
+                            <TableCell>
+                              {doc.orderRef && <Badge variant="outline" className="text-xs">P</Badge>}
+                              {doc.deliveryRef && <Badge variant="outline" className="text-xs ml-1">A</Badge>}
+                              {doc.invoiceRef && <Badge variant="outline" className="text-xs ml-1">F</Badge>}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </Fragment>
+                    );
+                  });
+                })()}
               </TableBody>
             </Table>
 

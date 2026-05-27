@@ -15,6 +15,8 @@ export type CreateDocumentInput = {
   status?: DocumentStatus;
   /** Bodega destino (opcional) */
   warehouse?: string;
+  /** Fecha real del documento (independiente de cuándo se digitó en el sistema) */
+  documentDate?: Date;
   paymentMethod?: PaymentMethod;
   paymentDetails?: PurchaseDocument['paymentDetails'];
   orderRef?: string;
@@ -46,6 +48,7 @@ export function buildDocument(purchases: PurchaseDocument[], data: CreateDocumen
     tax: data.tax,
     total: subtotal + (data.tax || 0),
     notes: data.notes,
+    documentDate: data.documentDate ?? new Date(),
     createdAt: new Date(),
     paymentMethod: data.paymentMethod,
     paymentDetails: data.paymentDetails,

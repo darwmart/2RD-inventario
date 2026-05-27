@@ -56,12 +56,15 @@ export default function PurchasesFactuSOL() {
   const getPendingAmount = (doc: PurchaseDocument): number =>
     Math.max(0, doc.total - getPaidAmount(doc));
 
+  const getDocDate = (doc: PurchaseDocument): Date =>
+    doc.documentDate ?? new Date(doc.createdAt);
+
   const filteredDocuments = useMemo(() => purchases.filter(doc => {
     if (doc.documentType !== activeTab) return false;
     if (doc.documentType === 'delivery' && doc.status === 'invoiced') return false;
-    const docDate = new Date(doc.createdAt); docDate.setHours(0, 0, 0, 0);
-    if (startDate) { const s = new Date(startDate); s.setHours(0, 0, 0, 0); if (docDate < s) return false; }
-    if (endDate) { const e = new Date(endDate); e.setHours(23, 59, 59, 999); if (docDate > e) return false; }
+    const docDate = new Date(getDocDate(doc)); docDate.setHours(0, 0, 0, 0);
+    if (startDate) { const s = new Date(startDate + 'T00:00:00'); s.setHours(0, 0, 0, 0); if (docDate < s) return false; }
+    if (endDate)   { const e = new Date(endDate   + 'T00:00:00'); e.setHours(23, 59, 59, 999); if (docDate > e) return false; }
     if (searchTerm) {
       const q = searchTerm.toLowerCase();
       const match = doc.documentNumber?.toLowerCase().includes(q) ||
@@ -71,7 +74,8 @@ export default function PurchasesFactuSOL() {
       if (!match) return false;
     }
     return true;
-  }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+  }).sort((a, b) => getDocDate(b).getTime() - getDocDate(a).getTime()),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   [purchases, activeTab, startDate, endDate, searchTerm]);
 
   const totals = useMemo(() => ({
@@ -80,11 +84,18 @@ export default function PurchasesFactuSOL() {
     total: filteredDocuments.reduce((s, d) => s + d.total, 0),
   }), [filteredDocuments]);
 
+  const parseDateStr = (dateStr: string): Date | undefined => {
+    if (!dateStr) return undefined;
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(y, m - 1, d, 12, 0, 0);
+  };
+
   const handleSave = (data: PurchaseDocumentFormData) => {
     const supplier = suppliers.find(s => s.id === data.supplierId);
     if (!supplier) return;
     const subtotal = data.items.reduce((sum: number, item: any) => sum + item.total, 0);
     const tax = taxSettings.ivaEnabled ? (subtotal * taxSettings.ivaPercentage / 100) : 0;
+    const documentDate = parseDateStr(data.documentDate);
 
     if (editingDocument) {
       const paidAmt = getPaidAmount(editingDocument);
@@ -102,6 +113,7 @@ export default function PurchasesFactuSOL() {
         tax,
         total: subtotal + tax,
         notes: data.notes,
+        documentDate,
         paymentMethod: editingDocument.paymentMethod || { id: 'efectivo', name: 'Efectivo', type: 'cash', isActive: true },
         paymentDetails: editingDocument.paymentDetails,
         ...(newStatus !== undefined ? { status: newStatus } : {}),
@@ -117,6 +129,7 @@ export default function PurchasesFactuSOL() {
         tax,
         notes: data.notes,
         supplierInvoiceNumber: data.supplierInvoiceNumber,
+        documentDate,
       });
     }
     setIsModalOpen(false);
