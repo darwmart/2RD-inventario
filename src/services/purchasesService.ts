@@ -1,4 +1,4 @@
-import type { PurchaseDocument, DocumentType, DocumentStatus } from '@/types/purchase';
+import type { PurchaseDocument, PurchaseItem, DocumentType, DocumentStatus } from '@/types/purchase';
 import type { IBaseRepository } from '@/repositories/interfaces/IBaseRepository';
 import type { IBankRepository } from '@/repositories/interfaces/IBankRepository';
 import type { IProductRepository } from '@/repositories/interfaces/IProductRepository';
@@ -37,7 +37,22 @@ export class PurchasesService {
   }
 
   async updateDocument(id: string, updates: Partial<PurchaseDocument>): Promise<PurchaseDocument> {
-    return this.purchases.update(id, updates);
+    // If items change, capture the originals before overwriting so we can adjust stock
+    let originalItems: PurchaseItem[] | undefined;
+    if (updates.items !== undefined) {
+      const original = await this.purchases.findById(id);
+      originalItems = original?.items;
+    }
+
+    const updated = await this.purchases.update(id, updates);
+
+    // Stock adjustment is best-effort — document is already saved regardless
+    if (updates.items !== undefined && originalItems !== undefined) {
+      this._applyStockAdjustment(originalItems, updates.items)
+        .catch(e => console.warn('Stock adjustment failed:', e));
+    }
+
+    return updated;
   }
 
   async deleteDocument(id: string): Promise<void> {
@@ -76,7 +91,7 @@ export class PurchasesService {
     return generateDocumentNumber(purchases, type);
   }
 
-  // Registra entradas de stock para todos los ítems del documento
+  // Registra entradas de stock para todos los ítems del documento (al crear)
   private async _applyStockEntries(doc: PurchaseDocument): Promise<void> {
     await Promise.all(
       doc.items.map(async item => {
@@ -84,6 +99,31 @@ export class PurchasesService {
         if (!product) return;
         await this.products.updateStock(product.id, product.stock + item.quantity);
       })
+    );
+  }
+
+  // Ajusta el stock cuando se editan los ítems de un documento existente.
+  // Calcula el delta neto por producto: (cantidad nueva) − (cantidad anterior).
+  private async _applyStockAdjustment(
+    oldItems: PurchaseItem[],
+    newItems: PurchaseItem[],
+  ): Promise<void> {
+    const deltas = new Map<string, number>();
+    for (const item of oldItems) {
+      deltas.set(item.productId, (deltas.get(item.productId) ?? 0) - item.quantity);
+    }
+    for (const item of newItems) {
+      deltas.set(item.productId, (deltas.get(item.productId) ?? 0) + item.quantity);
+    }
+
+    await Promise.all(
+      Array.from(deltas.entries())
+        .filter(([, delta]) => delta !== 0)
+        .map(async ([productId, delta]) => {
+          const product = await this.products.findById(productId);
+          if (!product) return;
+          await this.products.updateStock(product.id, product.stock + delta);
+        }),
     );
   }
 }
