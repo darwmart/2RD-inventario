@@ -31,7 +31,7 @@ export type PurchaseImportInvoice = {
   supplierName: string;
   invoiceNumber: string;
   warehouse: string;
-  tax: number;
+  applyIva: boolean;
   notes: string;
   items: PurchaseImportItem[];
 };
@@ -123,15 +123,15 @@ export function downloadPurchasesTemplate() {
   const headers = [
     'N Factura Proveedor', 'Codigo Proveedor*', 'Nombre Proveedor',
     'Bodega', 'Ref Producto*', 'Nombre Producto', 'Cantidad*', 'Costo Unitario*',
-    'IVA (solo primera linea)', 'Notas',
+    'Aplica IVA (SI/NO)', 'Notas',
   ];
 
   const sample = [
-    ['FAC-2024-001', '1', 'Distribuidora ABC', 'Principal', 'REF001', 'Gaseosa 2L', 10, 2500, 0, 'Pedido mensual'],
-    ['FAC-2024-001', '1', '', '', 'REF002', 'Agua 500ml', 20, 800, 0, ''],
-    ['FAC-2024-001', '1', '', '', 'REF003', 'Aceite 900ml', 5, 7000, 0, ''],
-    ['', '2', 'Proveedor XYZ', '', 'REF004', 'Producto D', 8, 15000, 0, ''],
-    ['', '2', '', '', 'REF005', 'Producto E', 12, 9000, 0, ''],
+    ['FAC-2024-001', '1', 'Distribuidora ABC', 'Principal', 'REF001', 'Gaseosa 2L', 10, 2500, 'SI', 'Pedido mensual'],
+    ['FAC-2024-001', '1', '', '', 'REF002', 'Agua 500ml', 20, 800, '', ''],
+    ['FAC-2024-001', '1', '', '', 'REF003', 'Aceite 900ml', 5, 7000, '', ''],
+    ['', '2', 'Proveedor XYZ', '', 'REF004', 'Producto D', 8, 15000, 'NO', ''],
+    ['', '2', '', '', 'REF005', 'Producto E', 12, 9000, '', ''],
   ];
 
   const instructions = [
@@ -147,7 +147,9 @@ export function downloadPurchasesTemplate() {
     ['Nombre Producto: Nombre de respaldo si el producto no se encuentra'],
     ['Cantidad: Cantidad recibida'],
     ['Costo Unitario: Precio de costo unitario'],
-    ['IVA: Valor del IVA para toda la factura (solo en la primera línea)'],
+    ['Aplica IVA: SI o NO (solo en la primera línea de cada factura)'],
+    ['  El sistema calcula el monto usando el % configurado en la empresa.'],
+    ['  Déjalo vacío o en NO si la factura no tiene IVA.'],
     ['Notas: Notas adicionales (solo primera línea)'],
     [''],
     ['AGRUPACION DE FACTURAS:'],
@@ -248,7 +250,7 @@ export function parsePurchasesFile(file: File): Promise<PurchaseImportInvoice[]>
               supplierName: toStr(r[2]),
               invoiceNumber: invoiceNum,
               warehouse: toStr(r[3]),
-              tax: toNum(r[8]),
+              applyIva: toBool(r[8]),
               notes: toStr(r[9]),
               items: [],
             });

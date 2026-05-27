@@ -6,6 +6,7 @@ import { Upload, Download, CheckCircle, AlertCircle, Loader2 } from 'lucide-reac
 import { downloadPurchasesTemplate, parsePurchasesFile, type PurchaseImportInvoice } from '@/utils/importExcel';
 import { usePurchasesData } from '@/hooks/queries/usePurchasesData';
 import { useProducts, useSuppliers } from '@/hooks/queries/useProducts';
+import { useCompanySettings } from '@/hooks/queries/useCompanySettings';
 import type { CreateDocumentInput } from '@/domain/purchases';
 import type { PurchaseItem } from '@/types/purchase';
 
@@ -26,6 +27,7 @@ export default function ImportPurchasesDialog({ open, onOpenChange }: Props) {
   const { createDocumentAsync } = usePurchasesData();
   const { products } = useProducts();
   const { suppliers } = useSuppliers();
+  const { taxSettings } = useCompanySettings();
 
   const reset = () => {
     setStep('idle');
@@ -104,6 +106,11 @@ export default function ImportPurchasesDialog({ open, onOpenChange }: Props) {
           ''
         ).trim();
 
+        const subtotal = items.reduce((s, it) => s + it.total, 0);
+        const tax = inv.applyIva && taxSettings.ivaEnabled
+          ? Math.round(subtotal * taxSettings.ivaPercentage / 100)
+          : 0;
+
         const input: CreateDocumentInput = {
           documentType:           'invoice',
           supplierId:             supplier.id,
@@ -111,7 +118,7 @@ export default function ImportPurchasesDialog({ open, onOpenChange }: Props) {
           supplierInvoiceNumber:  inv.invoiceNumber || undefined,
           warehouse:              inv.warehouse || undefined,
           items,
-          tax:                    inv.tax || 0,
+          tax,
           notes:                  inv.notes || undefined,
         };
 
@@ -183,21 +190,30 @@ export default function ImportPurchasesDialog({ open, onOpenChange }: Props) {
                   <tr>
                     <th className="text-left px-2 py-1.5 font-medium text-gray-600">Proveedor</th>
                     <th className="text-left px-2 py-1.5 font-medium text-gray-600">N° Factura</th>
+                    <th className="text-center px-2 py-1.5 font-medium text-gray-600">IVA</th>
                     <th className="text-right px-2 py-1.5 font-medium text-gray-600">Líneas</th>
-                    <th className="text-right px-2 py-1.5 font-medium text-gray-600">Subtotal</th>
+                    <th className="text-right px-2 py-1.5 font-medium text-gray-600">Total</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {invoices.map((inv, i) => {
                     const subtotal = inv.items.reduce((s, it) => s + it.quantity * it.unitCost, 0);
+                    const tax = inv.applyIva && taxSettings.ivaEnabled
+                      ? Math.round(subtotal * taxSettings.ivaPercentage / 100)
+                      : 0;
                     return (
                       <tr key={i} className="hover:bg-gray-50">
-                        <td className="px-2 py-1 max-w-[130px] truncate">
+                        <td className="px-2 py-1 max-w-[110px] truncate">
                           {inv.supplierName || `Cód: ${inv.supplierCode}`}
                         </td>
                         <td className="px-2 py-1 font-mono text-gray-600">{inv.invoiceNumber || '—'}</td>
+                        <td className="px-2 py-1 text-center">
+                          {inv.applyIva
+                            ? <span className="text-amber-600 font-medium">{taxSettings.ivaPercentage}%</span>
+                            : <span className="text-gray-300">—</span>}
+                        </td>
                         <td className="px-2 py-1 text-right">{inv.items.length}</td>
-                        <td className="px-2 py-1 text-right">${subtotal.toLocaleString('es-CO')}</td>
+                        <td className="px-2 py-1 text-right">${(subtotal + tax).toLocaleString('es-CO')}</td>
                       </tr>
                     );
                   })}
