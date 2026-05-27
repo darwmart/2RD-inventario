@@ -13,6 +13,7 @@ import SupplierFormDialog from '@/components/SupplierFormDialog';
 import DocumentListView from '@/components/purchasesFactuSOL/DocumentListView';
 import PurchaseDocumentModal, { PurchaseDocumentFormData } from '@/components/purchasesFactuSOL/PurchaseDocumentModal';
 import PayInvoiceDialog from '@/components/purchasesFactuSOL/PayInvoiceDialog';
+import ImportPurchasesDialog from '@/components/purchasesFactuSOL/ImportPurchasesDialog';
 
 export default function PurchasesFactuSOL() {
   const { products, updateStock, addProduct } = useProducts();
@@ -38,6 +39,7 @@ export default function PurchasesFactuSOL() {
 
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const [isImportOpen, setIsImportOpen] = useState(false);
 
   const getSupplierName = (s: Supplier): string =>
     (s?.commercialName || '').trim() || (s?.fiscalName || '').trim() || (s?.name || '').trim() || '';
@@ -188,6 +190,7 @@ export default function PurchasesFactuSOL() {
           onClearFilters={() => { setStartDate(''); setEndDate(''); setSearchTerm(''); }}
           onSelectDocument={setSelectedDocument}
           onNew={() => { setEditingDocument(null); setIsModalOpen(true); }}
+          onImport={() => setIsImportOpen(true)}
           onEdit={() => { if (selectedDocument) { setEditingDocument(selectedDocument); setIsModalOpen(true); } }}
           onDelete={handleDelete}
           onConvertToInvoice={handleConvertToInvoice}
@@ -222,6 +225,11 @@ export default function PurchasesFactuSOL() {
         />
 
         {ConfirmDialog}
+
+        <ImportPurchasesDialog
+          open={isImportOpen}
+          onOpenChange={setIsImportOpen}
+        />
 
         <SupplierFormDialog
           open={isSupplierModalOpen}

@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { Plus, FolderPlus, Settings2, Tag } from 'lucide-react';
+import { Plus, FolderPlus, Settings2, Tag, Upload } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface Props {
@@ -7,9 +7,10 @@ interface Props {
   onNewCategory: () => void;
   onPrintLabels: () => void;
   onColumnConfig: () => void;
+  onImport: () => void;
 }
 
-export default function InventoryToolbar({ onNewProduct, onNewCategory, onPrintLabels, onColumnConfig }: Props) {
+export default function InventoryToolbar({ onNewProduct, onNewCategory, onPrintLabels, onColumnConfig, onImport }: Props) {
   const { isAdmin } = useAuth();
   return (
     <div className="mb-2 md:mb-4 flex items-center justify-between gap-2">
@@ -25,6 +26,10 @@ export default function InventoryToolbar({ onNewProduct, onNewCategory, onPrintL
         </Button>
         {isAdmin() && (
           <>
+            <Button variant="outline" size="sm" onClick={onImport} className="h-8 px-2 md:px-3">
+              <Upload className="h-4 w-4" />
+              <span className="hidden md:inline ml-1.5">Importar</span>
+            </Button>
             <Button variant="outline" size="sm" onClick={onNewCategory} className="h-8 px-2 md:px-3">
               <FolderPlus className="h-4 w-4" />
               <span className="hidden md:inline ml-1.5">Categoría</span>

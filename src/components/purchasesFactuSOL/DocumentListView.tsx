@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Plus, Edit, Trash2, FileText, Package, ArrowRight, CheckCircle, Clock, XCircle, Search, Building2,
+  Plus, Edit, Trash2, FileText, Package, ArrowRight, CheckCircle, Clock, XCircle, Search, Building2, Upload,
 } from 'lucide-react';
 import { PurchaseDocument, DocumentType, DocumentStatus } from '@/types';
 import DocumentDetailPanel from './DocumentDetailPanel';
@@ -41,6 +41,7 @@ interface Props {
   onClearFilters: () => void;
   onSelectDocument: (doc: PurchaseDocument) => void;
   onNew: () => void;
+  onImport: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onConvertToInvoice: (id: string) => void;
@@ -53,7 +54,7 @@ export default function DocumentListView({
   activeTab, onTabChange, filteredDocuments, selectedDocument, purchases, totals,
   startDate, endDate, searchTerm,
   onStartDateChange, onEndDateChange, onSearchChange, onClearFilters,
-  onSelectDocument, onNew, onEdit, onDelete, onConvertToInvoice, onOpenPayment, onOpenSupplier,
+  onSelectDocument, onNew, onImport, onEdit, onDelete, onConvertToInvoice, onOpenPayment, onOpenSupplier,
   resolveSupplierName,
 }: Props) {
   const hasFilters = !!(startDate || endDate || searchTerm);
@@ -98,6 +99,9 @@ export default function DocumentListView({
       <Card className="p-3">
         <div className="flex items-center gap-2">
           <Button size="sm" onClick={onNew}><Plus className="h-4 w-4 mr-1" />Nuevo</Button>
+          <Button size="sm" variant="outline" onClick={onImport}>
+            <Upload className="h-4 w-4 mr-1" />Importar
+          </Button>
           <Button size="sm" variant="outline" disabled={!selectedDocument} onClick={onEdit}>
             <Edit className="h-4 w-4 mr-1" />Editar
           </Button>

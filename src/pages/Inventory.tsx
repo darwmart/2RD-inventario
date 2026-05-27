@@ -16,6 +16,7 @@ import CategoryFormDialog from '@/components/inventory/CategoryFormDialog';
 import PrintLabelsDialog from '@/components/inventory/PrintLabelsDialog';
 import ColumnConfigDialog, { VisibleColumns } from '@/components/inventory/ColumnConfigDialog';
 import InventoryToolbar from '@/components/inventory/InventoryToolbar';
+import ImportProductsDialog from '@/components/inventory/ImportProductsDialog';
 import type { CreateProductInput } from '@/domain/inventory';
 import { Edit, Trash2 } from 'lucide-react';
 
@@ -42,6 +43,7 @@ export default function Inventory() {
   const [editingCategory, setEditingCategory]   = useState<{ id: string; name: string; description: string } | null>(null);
   const [isPrintLabelsOpen, setIsPrintLabelsOpen] = useState(false);
   const [isColumnConfigOpen, setIsColumnConfigOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const [visibleColumns, setVisibleColumns] = useLocalStorage('inventoryVisibleColumns', DEFAULT_COLUMNS);
 
   const filteredProducts = useMemo(() => products.filter(p => {
@@ -102,6 +104,7 @@ export default function Inventory() {
           onNewCategory={() => { setEditingCategory(null); setIsCategoryModalOpen(true); }}
           onPrintLabels={() => setIsPrintLabelsOpen(true)}
           onColumnConfig={() => setIsColumnConfigOpen(true)}
+          onImport={() => setIsImportOpen(true)}
         />
 
         {/* ── LAYOUT MÓVIL ─────────────────────────────────── */}
@@ -230,6 +233,12 @@ export default function Inventory() {
           onClose={() => setIsColumnConfigOpen(false)}
           onChange={setVisibleColumns}
         />
+
+        <ImportProductsDialog
+          open={isImportOpen}
+          onOpenChange={setIsImportOpen}
+        />
+
         {ConfirmDialog}
       </div>
     </div>
