@@ -127,13 +127,14 @@ export class SupabasePurchaseRepository implements IPurchaseRepository {
 
     if (input.items.length > 0) {
       const { error: itemErr } = await supabase.from('purchase_items').insert(
-        input.items.map(i => ({
-          purchase_id: id,
+        input.items.map((i, idx) => ({
+          document_id: id,
           product_id: i.productId,
           product_name: i.productName,
           quantity: i.quantity,
           unit_cost: i.unitCost,
           total: i.total,
+          sort_order: idx,
         }))
       );
       if (itemErr) throw new Error(itemErr.message);
@@ -148,6 +149,8 @@ export class SupabasePurchaseRepository implements IPurchaseRepository {
     const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (data.status !== undefined)         payload.status           = data.status;
     if (data.notes !== undefined)          payload.notes            = data.notes;
+    if (data.supplierId !== undefined)     payload.supplier_id      = data.supplierId;
+    if (data.supplierName !== undefined)   payload.supplier_name    = data.supplierName;
     if (data.paymentMethod !== undefined)  payload.payment_method   = data.paymentMethod;
     if (data.paymentDetails !== undefined) payload.payment_details  = data.paymentDetails;
     if (data.invoiceRef !== undefined)     payload.invoice_ref      = data.invoiceRef;
@@ -156,12 +159,29 @@ export class SupabasePurchaseRepository implements IPurchaseRepository {
     if (data.total !== undefined)          payload.total            = data.total;
     if (data.subtotal !== undefined)       payload.subtotal         = data.subtotal;
 
+    if (data.items !== undefined) {
+      await supabase.from('purchase_items').delete().eq('document_id', id);
+      if (data.items.length > 0) {
+        await supabase.from('purchase_items').insert(
+          data.items.map((i, idx) => ({
+            document_id: id,
+            product_id: i.productId,
+            product_name: i.productName,
+            quantity: i.quantity,
+            unit_cost: i.unitCost,
+            total: i.total,
+            sort_order: idx,
+          }))
+        );
+      }
+    }
+
     if (data.payments !== undefined) {
-      await supabase.from('purchase_payments').delete().eq('purchase_id', id);
+      await supabase.from('purchase_payments').delete().eq('document_id', id);
       if (data.payments.length > 0) {
         await supabase.from('purchase_payments').insert(
           data.payments.map(p => ({
-            purchase_id: id,
+            document_id: id,
             date: p.date,
             amount: p.amount,
             bank_id: p.bankId,
