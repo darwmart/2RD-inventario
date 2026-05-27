@@ -27,7 +27,7 @@ export function usePurchasesData() {
       const label = doc.documentType === 'delivery' ? 'Remisión' : 'Factura';
       toast.success(`${label} ${doc.documentNumber} creada`);
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => { invalidate(); toast.error(e.message); },
   });
 
   const updateMutation = useMutation({

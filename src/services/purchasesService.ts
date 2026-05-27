@@ -31,7 +31,8 @@ export class PurchasesService {
     if (!data.supplierId) throw new Error('El proveedor es requerido');
     if (!data.items?.length) throw new Error('El documento debe tener al menos un artículo');
     const doc = await this.purchases.create(data);
-    await this._applyStockEntries(doc);
+    // Stock update is best-effort; if it fails the document is already saved
+    this._applyStockEntries(doc).catch(e => console.warn('Stock update failed:', e));
     return doc;
   }
 
