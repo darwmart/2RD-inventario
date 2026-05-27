@@ -31,8 +31,7 @@ export class PurchasesService {
     if (!data.supplierId) throw new Error('El proveedor es requerido');
     if (!data.items?.length) throw new Error('El documento debe tener al menos un artículo');
     const doc = await this.purchases.create(data);
-    // Stock update is best-effort; if it fails the document is already saved
-    this._applyStockEntries(doc).catch(e => console.warn('Stock update failed:', e));
+    this._applyStockEntries(doc).catch(e => console.error('[Compras] Error al actualizar stock:', e));
     return doc;
   }
 
@@ -49,7 +48,7 @@ export class PurchasesService {
     // Stock adjustment is best-effort — document is already saved regardless
     if (updates.items !== undefined && originalItems !== undefined) {
       this._applyStockAdjustment(originalItems, updates.items)
-        .catch(e => console.warn('Stock adjustment failed:', e));
+        .catch(e => console.error('[Compras] Error al ajustar stock:', e));
     }
 
     return updated;
