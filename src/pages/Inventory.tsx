@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useConfirm } from '@/hooks/useConfirm';
 import { useProducts, useCategories, useSuppliers } from '@/hooks/queries';
-import { useSettings } from '@/hooks/useSettings';
+import { useLabelDesigns } from '@/hooks/queries/useLabelDesigns';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
@@ -30,7 +30,7 @@ export default function Inventory() {
   const { confirm, ConfirmDialog } = useConfirm();
   const { categories, addCategory, updateCategory, deleteCategory } = useCategories();
   const { suppliers, addSupplier } = useSuppliers();
-  const { labelDesigns } = useSettings();
+  const { labelDesigns } = useLabelDesigns();
   const { isAdmin } = useAuth();
 
   const [searchTerm, setSearchTerm]       = useState('');
