@@ -12,6 +12,8 @@ export function useLabelDesigns() {
   const query = useQuery({
     queryKey: labelDesignKeys.all,
     queryFn: () => repositories.labelDesigns.findAll(),
+    staleTime: 0,
+    refetchOnMount: true,
   });
 
   const addMutation = useMutation({
