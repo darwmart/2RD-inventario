@@ -25,31 +25,24 @@ function resolveFormat(code: string): string {
   return 'CODE128';
 }
 
-/**
- * Genera un SVG en base64-dataURI para incrustar en HTML de impresión.
- * Usa JsBarcode en un SVG virtual (no necesita DOM real).
- */
-export function generateBarcodeSvg(
+function renderToSvg(
   code: string,
-  opts: { width?: number; height?: number; fontSize?: number } = {},
-): string {
-  if (!code) return '';
-  const { width = 2, height = 60, fontSize = 12 } = opts;
-
-  const svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  opts: { width: number; height: number; fontSize: number },
+): SVGSVGElement | null {
+  const svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg') as SVGSVGElement;
   const format = resolveFormat(code);
 
   const tryRender = (fmt: string): boolean => {
     try {
       JsBarcode(svgEl, code, {
         format: fmt,
-        width,
-        height,
-        fontSize,
+        width:        opts.width,
+        height:       opts.height,
+        fontSize:     opts.fontSize,
         displayValue: true,
-        margin: 4,
-        background: 'transparent',
-        xmlDocument: document,
+        margin:       4,
+        background:   '#ffffff',
+        xmlDocument:  document,
       });
       return true;
     } catch {
@@ -57,13 +50,49 @@ export function generateBarcodeSvg(
     }
   };
 
-  // Intentar con el formato detectado; si falla, reintentar con CODE128
   if (!tryRender(format) && (format !== 'CODE128' ? !tryRender('CODE128') : true)) {
-    return '';
+    return null;
   }
+  return svgEl;
+}
 
+/**
+ * Devuelve el SVG como string listo para incrustarse inline en HTML de impresión.
+ * Usa SVG inline (NO data-URI) para garantizar renderizado en popup de print.
+ */
+export function generateBarcodeSvgRaw(
+  code: string,
+  opts: { width?: number; height?: number; fontSize?: number } = {},
+): string {
+  if (!code) return '';
+  const { width = 2, height = 60, fontSize = 12 } = opts;
+  const svgEl = renderToSvg(code, { width, height, fontSize });
+  if (!svgEl) return '';
+  // Quitar dimensiones fijas y dejar que el contenedor CSS controle el tamaño
+  const raw = new XMLSerializer().serializeToString(svgEl);
+  return raw.replace(/<svg([^>]*)>/, (_m, attrs: string) => {
+    const wm = attrs.match(/\swidth="(\d+(?:\.\d+)?)"/);
+    const hm = attrs.match(/\sheight="(\d+(?:\.\d+)?)"/);
+    const vw = wm ? wm[1] : '200';
+    const vh = hm ? hm[1] : '60';
+    let a = attrs.replace(/\s(?:width|height)="[^"]*"/g, '');
+    if (!a.includes('viewBox')) a += ` viewBox="0 0 ${vw} ${vh}"`;
+    return `<svg${a} preserveAspectRatio="xMidYMid meet" style="display:block;width:100%;height:100%;">`;
+  });
+}
+
+/**
+ * Genera un SVG en base64-dataURI (para uso en <img> fuera de contextos de impresión).
+ */
+export function generateBarcodeSvg(
+  code: string,
+  opts: { width?: number; height?: number; fontSize?: number } = {},
+): string {
+  if (!code) return '';
+  const { width = 2, height = 60, fontSize = 12 } = opts;
+  const svgEl = renderToSvg(code, { width, height, fontSize });
+  if (!svgEl) return '';
   const serialized = new XMLSerializer().serializeToString(svgEl);
-  // Usar URL-encoding en lugar de btoa para evitar problemas con caracteres no-Latin1
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(serialized)}`;
 }
 

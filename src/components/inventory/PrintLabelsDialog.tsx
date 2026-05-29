@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Tag, Printer, Search } from 'lucide-react';
 import { Product, LabelDesign, LabelField } from '@/types';
 import { toast } from 'sonner';
-import { generateBarcodeSvg } from '@/utils/barcode';
+import { generateBarcodeSvgRaw } from '@/utils/barcode';
 import BarcodeDisplay from '@/components/barcode/BarcodeDisplay';
 
 interface Category {
@@ -24,6 +24,13 @@ interface Props {
   initialProductId?: string;
   onClose: () => void;
 }
+
+const FALLBACK_FIELDS: LabelField[] = [
+  { key: 'nombre',    x: 1,  y: 1,  width: 73, height: 4,  fontSize: 8, bold: false, italic: false, underline: false, align: 'left',   visible: true },
+  { key: 'referencia',x: 1,  y: 6,  width: 35, height: 4,  fontSize: 7, bold: false, italic: false, underline: false, align: 'left',   visible: true },
+  { key: 'precio1',   x: 38, y: 6,  width: 36, height: 4,  fontSize: 9, bold: true,  italic: false, underline: false, align: 'right',  visible: true },
+  { key: 'ean-barras',x: 8,  y: 11, width: 59, height: 12, fontSize: 7, bold: false, italic: false, underline: false, align: 'center', visible: true },
+];
 
 export default function PrintLabelsDialog({ open, products, categories, labelDesigns, initialProductId, onClose }: Props) {
   const [printDesignId, setPrintDesignId] = useState('');
@@ -59,7 +66,7 @@ export default function PrintLabelsDialog({ open, products, categories, labelDes
     const leftM = parseFloat(design.leftMargin.replace(',', '.')) || 5.6;
     const hGap = parseFloat(design.horizontalSpacing.replace(',', '.')) || 1;
     const vGap = parseFloat(design.verticalSpacing.replace(',', '.')) || 2;
-    const fields: LabelField[] = design.fields || [];
+    const fields: LabelField[] = (design.fields && design.fields.length > 0) ? design.fields : FALLBACK_FIELDS;
 
     const labelHtml = (p: Product): string => {
       const fieldsHtml = fields.filter(f => f.visible).map(f => {
@@ -70,23 +77,22 @@ export default function PrintLabelsDialog({ open, products, categories, labelDes
           + `text-align:${f.align};overflow:hidden;`;
 
         if (f.key === 'ean-barras') {
-          const svgUri = generateBarcodeSvg(p.barcode || p.reference || '', {
+          const svgRaw = generateBarcodeSvgRaw(p.barcode || p.reference || '', {
             width: 2,
             height: Math.round(f.height * 2.8),
             fontSize: Math.max(Math.round(f.height * 0.55), 6),
           });
-          if (!svgUri) {
+          if (!svgRaw) {
             return `<div style="${baseStyle}display:flex;align-items:center;justify-content:center;">
-              <span style="font-size:5pt;font-family:monospace">${p.barcode || 'Sin código'}</span></div>`;
+              <span style="font-size:5pt;font-family:monospace">${p.barcode || p.reference || 'Sin código'}</span></div>`;
           }
-          return `<div style="${baseStyle}display:flex;align-items:center;justify-content:center;">
-            <img src="${svgUri}" style="max-width:100%;max-height:100%;object-fit:contain;" /></div>`;
+          return `<div style="${baseStyle}display:flex;align-items:center;justify-content:center;">${svgRaw}</div>`;
         }
 
         let content = '';
         if (f.key === 'nombre') content = p.name;
         else if (f.key === 'referencia' || f.key === 'codigo') content = p.reference;
-        else if (f.key === 'ean-texto') content = p.barcode || '';
+        else if (f.key === 'ean-texto') content = p.barcode || p.reference || '';
         else if (f.key === 'precio1') content = `$${p.currentPrice.toLocaleString('es-CO')}`;
         else if (f.key === 'precio2') content = `$${p.suggestedPrice.toLocaleString('es-CO')}`;
         else if (f.key === 'precio3') content = `$${p.discountPrice.toLocaleString('es-CO')}`;
@@ -96,7 +102,7 @@ export default function PrintLabelsDialog({ open, products, categories, labelDes
 
         return `<div style="${baseStyle}display:flex;align-items:center;padding:0 0.3mm;">${content}</div>`;
       }).join('');
-      return `<div style="position:relative;width:${lw}mm;height:${lh}mm;overflow:hidden;">${fieldsHtml}</div>`;
+      return `<div style="position:relative;width:${lw}mm;height:${lh}mm;overflow:hidden;box-sizing:border-box;">${fieldsHtml}</div>`;
     };
 
     const allLabels: Product[] = [];
@@ -105,9 +111,11 @@ export default function PrintLabelsDialog({ open, products, categories, labelDes
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Etiquetas</title>
 <style>
   @page { size: A4 portrait; margin: ${topM}mm ${leftM}mm; }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body { font-family: Arial, sans-serif; }
   .grid { display: grid; grid-template-columns: repeat(${cols}, ${lw}mm); column-gap: ${hGap}mm; row-gap: ${vGap}mm; }
+  .grid > div { page-break-inside: avoid; break-inside: avoid; }
+  svg { overflow: visible; }
 </style></head><body>
 <div class="grid">${allLabels.map(labelHtml).join('')}</div>
 </body></html>`;
@@ -123,7 +131,7 @@ export default function PrintLabelsDialog({ open, products, categories, labelDes
     if (!items.length) { toast.error('Selecciona al menos un artículo'); return; }
     const html = generatePrintHtml(design, items);
     const win = window.open('', '_blank');
-    if (win) { win.document.write(html); win.document.close(); setTimeout(() => win.print(), 400); }
+    if (win) { win.document.write(html); win.document.close(); setTimeout(() => win.print(), 900); }
   };
 
   const filteredProducts = products.filter(p => {
