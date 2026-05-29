@@ -17,8 +17,10 @@ export function generateEan13Code(): string {
 }
 
 function resolveFormat(code: string): string {
-  if (/^\d{13}$/.test(code)) return 'EAN13';
-  if (/^\d{8}$/.test(code)) return 'EAN8';
+  // Validar dígito de verificación antes de usar EAN13/EAN8/UPCA.
+  // Si el código no pasa la validación, CODE128 puede codificar cualquier string.
+  if (/^\d{13}$/.test(code)) return validateEan13(code) ? 'EAN13' : 'CODE128';
+  if (/^\d{8}$/.test(code))  return 'EAN8';
   if (/^\d{12}$/.test(code)) return 'UPCA';
   return 'CODE128';
 }
@@ -34,26 +36,35 @@ export function generateBarcodeSvg(
   if (!code) return '';
   const { width = 2, height = 60, fontSize = 12 } = opts;
 
-  // Crear elemento SVG virtual
   const svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  try {
-    JsBarcode(svgEl, code, {
-      format: resolveFormat(code),
-      width,
-      height,
-      fontSize,
-      displayValue: true,
-      margin: 4,
-      background: 'transparent',
-      xmlDocument: document,
-    });
-  } catch {
+  const format = resolveFormat(code);
+
+  const tryRender = (fmt: string): boolean => {
+    try {
+      JsBarcode(svgEl, code, {
+        format: fmt,
+        width,
+        height,
+        fontSize,
+        displayValue: true,
+        margin: 4,
+        background: 'transparent',
+        xmlDocument: document,
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  // Intentar con el formato detectado; si falla, reintentar con CODE128
+  if (!tryRender(format) && (format !== 'CODE128' ? !tryRender('CODE128') : true)) {
     return '';
   }
 
   const serialized = new XMLSerializer().serializeToString(svgEl);
-  const encoded = btoa(unescape(encodeURIComponent(serialized)));
-  return `data:image/svg+xml;base64,${encoded}`;
+  // Usar URL-encoding en lugar de btoa para evitar problemas con caracteres no-Latin1
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(serialized)}`;
 }
 
 /** @deprecated Usar generateBarcodeSvg. Mantenida para compatibilidad. */

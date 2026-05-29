@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import JsBarcode from 'jsbarcode';
+import { validateEan13 } from '@/utils/barcode';
 
 interface Props {
   value: string;
@@ -25,7 +26,7 @@ export default function BarcodeDisplay({
 
   const resolveFormat = (code: string, hint?: string): string => {
     if (hint) return hint;
-    if (/^\d{13}$/.test(code)) return 'EAN13';
+    if (/^\d{13}$/.test(code)) return validateEan13(code) ? 'EAN13' : 'CODE128';
     if (/^\d{8}$/.test(code)) return 'EAN8';
     if (/^\d{12}$/.test(code)) return 'UPCA';
     return 'CODE128';

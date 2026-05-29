@@ -70,7 +70,7 @@ export default function PrintLabelsDialog({ open, products, categories, labelDes
           + `text-align:${f.align};overflow:hidden;`;
 
         if (f.key === 'ean-barras') {
-          const svgUri = generateBarcodeSvg(p.barcode || '', {
+          const svgUri = generateBarcodeSvg(p.barcode || p.reference || '', {
             width: 2,
             height: Math.round(f.height * 2.8),
             fontSize: Math.max(Math.round(f.height * 0.55), 6),
@@ -172,7 +172,7 @@ export default function PrintLabelsDialog({ open, products, categories, labelDes
             }}>
               {f.key === 'ean-barras' ? (
                 <BarcodeDisplay
-                  value={previewProduct?.barcode || ''}
+                  value={previewProduct?.barcode || previewProduct?.reference || ''}
                   height={Math.round(f.height * sc * 0.72)}
                   fontSize={Math.max(f.fontSize * sc / 6, 5)}
                   displayValue={true}
