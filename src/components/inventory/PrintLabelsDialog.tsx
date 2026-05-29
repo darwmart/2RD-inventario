@@ -108,11 +108,11 @@ export default function PrintLabelsDialog({ open, products, categories, labelDes
     const allLabels: Product[] = [];
     items.forEach(({ product, qty }) => { for (let i = 0; i < qty; i++) allLabels.push(product); });
 
-    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Etiquetas</title>
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title></title>
 <style>
-  @page { size: A4 portrait; margin: ${topM}mm ${leftM}mm; }
+  @page { size: A4 portrait; margin: 0; }
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  body { font-family: Arial, sans-serif; }
+  body { font-family: Arial, sans-serif; padding: ${topM}mm ${leftM}mm; }
   .grid { display: grid; grid-template-columns: repeat(${cols}, ${lw}mm); column-gap: ${hGap}mm; row-gap: ${vGap}mm; }
   .grid > div { page-break-inside: avoid; break-inside: avoid; }
   svg { overflow: visible; }
