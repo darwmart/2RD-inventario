@@ -200,7 +200,7 @@ export default function ProductFormDialog({
       discount: discountPrice,
       wholesale: wholesalePrice
     };
-    setTempMargin(margins[tariff]);
+    setTempMargin(parseFloat(margins[tariff].toFixed(2)));
     setTempPrice(prices[tariff]);
     setTempPriceStr(prices[tariff] ? Math.round(prices[tariff]).toLocaleString('es-CO') : '');
     setEditingTariff(tariff);
@@ -217,7 +217,7 @@ export default function ProductFormDialog({
 
   // Manejar cambio de margen en el modal
   const handleTempMarginChange = (newMargin: number) => {
-    setTempMargin(newMargin);
+    setTempMargin(parseFloat(newMargin.toFixed(2)));
     const newPrice = calculatePrice(cost, newMargin);
     setTempPrice(newPrice);
     setTempPriceStr(newPrice ? Math.round(newPrice).toLocaleString('es-CO') : '');
@@ -700,19 +700,6 @@ export default function ProductFormDialog({
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            {/* Campo de Margen */}
-            <div>
-              <Label className="text-sm font-medium">Margen %:</Label>
-              <Input
-                type="number"
-                value={tempMargin || ''}
-                onChange={(e) => handleTempMarginChange(parseFloat(e.target.value) || 0)}
-                className="mt-1"
-                step="0.01"
-                autoFocus
-              />
-            </div>
-
             {/* Precio de Venta Editable */}
             <div>
               <Label className="text-sm font-medium">Precio de venta:</Label>
@@ -722,6 +709,19 @@ export default function ProductFormDialog({
                 value={tempPriceStr}
                 onChange={(e) => { const f = fmtMoneyInput(e.target.value); setTempPriceStr(f); handleTempPriceChange(f === '' ? 0 : parseInt(f.replace(/\./g, ''), 10)); }}
                 className="mt-1"
+                autoFocus
+              />
+            </div>
+
+            {/* Campo de Margen */}
+            <div>
+              <Label className="text-sm font-medium">Margen %:</Label>
+              <Input
+                type="number"
+                value={tempMargin || ''}
+                onChange={(e) => handleTempMarginChange(parseFloat(e.target.value) || 0)}
+                className="mt-1"
+                step="0.01"
               />
               <p className="text-xs text-gray-500 mt-1">
                 Edita el precio o el margen - se calculan automáticamente
