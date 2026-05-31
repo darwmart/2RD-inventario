@@ -110,9 +110,9 @@ export default function PrintLabelsDialog({ open, products, categories, labelDes
 
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><title></title>
 <style>
-  @page { size: A4 portrait; margin: 0; }
+  @page { size: A4 portrait; margin: ${topM}mm ${leftM}mm 0mm ${leftM}mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  body { font-family: Arial, sans-serif; padding: ${topM}mm ${leftM}mm; }
+  body { font-family: Arial, sans-serif; }
   .grid { display: grid; grid-template-columns: repeat(${cols}, ${lw}mm); column-gap: ${hGap}mm; row-gap: ${vGap}mm; }
   .grid > div { page-break-inside: avoid; break-inside: avoid; }
   svg { overflow: visible; }
