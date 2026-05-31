@@ -245,11 +245,11 @@ export default function ProductTable({
               {visibleColumns.barcode       && <TableHead className="w-[120px]">C.Barras</TableHead>}
               {visibleColumns.category      && <TableHead className="w-[150px]">Familia</TableHead>}
               {visibleColumns.stock         && <TableHead className="text-right w-[80px]">Stock</TableHead>}
-              {visibleColumns.cost          && <TableHead className="text-right w-[100px]">Costo</TableHead>}
-              {visibleColumns.wholesalePrice && <TableHead className="text-right w-[100px]">P.Mayorista</TableHead>}
               {visibleColumns.suggestedPrice && <TableHead className="text-right w-[100px]">P.Sugerido</TableHead>}
               {visibleColumns.currentPrice  && <TableHead className="text-right w-[100px]">P.Venta</TableHead>}
               {visibleColumns.discountPrice && <TableHead className="text-right w-[100px]">P.Descuento</TableHead>}
+              {visibleColumns.wholesalePrice && <TableHead className="text-right w-[100px]">P.Mayorista</TableHead>}
+              {visibleColumns.cost          && <TableHead className="text-right w-[100px]">Costo</TableHead>}
               {isAdmin()                    && <TableHead className="w-[100px]">Acciones</TableHead>}
             </TableRow>
           </TableHeader>
@@ -286,15 +286,15 @@ export default function ProductTable({
                         <span className={isLowStock ? 'text-red-600 font-bold' : ''}>{product.stock}</span>
                       </TableCell>
                     )}
+                    {visibleColumns.suggestedPrice && <TableCell className="text-right font-mono text-sm">${product.suggestedPrice.toLocaleString('es-CO')}</TableCell>}
+                    {visibleColumns.currentPrice  && <TableCell className="text-right font-mono text-sm font-medium">${product.currentPrice.toLocaleString('es-CO')}</TableCell>}
+                    {visibleColumns.discountPrice && <TableCell className="text-right font-mono text-sm">${product.discountPrice.toLocaleString('es-CO')}</TableCell>}
+                    {visibleColumns.wholesalePrice && <TableCell className="text-right font-mono text-sm">${product.wholesalePrice.toLocaleString('es-CO')}</TableCell>}
                     {visibleColumns.cost          && (
                       <TableCell className="text-right font-mono text-sm">
                         ${(product.hasIva ? product.cost * 1.19 : product.cost).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </TableCell>
                     )}
-                    {visibleColumns.wholesalePrice && <TableCell className="text-right font-mono text-sm">${product.wholesalePrice.toLocaleString('es-CO')}</TableCell>}
-                    {visibleColumns.suggestedPrice && <TableCell className="text-right font-mono text-sm">${product.suggestedPrice.toLocaleString('es-CO')}</TableCell>}
-                    {visibleColumns.currentPrice  && <TableCell className="text-right font-mono text-sm font-medium">${product.currentPrice.toLocaleString('es-CO')}</TableCell>}
-                    {visibleColumns.discountPrice && <TableCell className="text-right font-mono text-sm">${product.discountPrice.toLocaleString('es-CO')}</TableCell>}
                     {isAdmin() && (
                       <TableCell>
                         <div className="flex gap-1">

@@ -27,11 +27,11 @@ const COLUMN_LABELS: { key: keyof VisibleColumns; label: string }[] = [
   { key: 'barcode', label: 'C.Barras' },
   { key: 'category', label: 'Familia' },
   { key: 'stock', label: 'Stock' },
-  { key: 'cost', label: 'Costo' },
   { key: 'suggestedPrice', label: 'P.Sugerido' },
-  { key: 'currentPrice', label: 'P.Actual' },
+  { key: 'currentPrice', label: 'P.Venta' },
   { key: 'discountPrice', label: 'P.Descuento' },
   { key: 'wholesalePrice', label: 'P.Mayorista' },
+  { key: 'cost', label: 'Costo' },
 ];
 
 interface Props {
