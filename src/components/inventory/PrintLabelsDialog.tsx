@@ -36,6 +36,8 @@ export default function PrintLabelsDialog({ open, products, categories, labelDes
   const [printDesignId, setPrintDesignId] = useState('');
   const [printItems, setPrintItems] = useState<{ productId: string; qty: number }[]>([]);
   const [printSearch, setPrintSearch] = useState('');
+  const [startCol, setStartCol] = useState(1);
+  const [startRow, setStartRow] = useState(1);
 
   useEffect(() => {
     if (!open) return;
@@ -43,6 +45,8 @@ export default function PrintLabelsDialog({ open, products, categories, labelDes
     const defaultDesign = labelDesigns.find(d => d.documentType === 'Etiquetas de artículos') || labelDesigns[0];
     setPrintDesignId(defaultDesign?.id || '');
     setPrintSearch('');
+    setStartCol(1);
+    setStartRow(1);
   }, [open, initialProductId, labelDesigns]);
 
   const togglePrintItem = (productId: string, checked: boolean) => {
@@ -58,7 +62,7 @@ export default function PrintLabelsDialog({ open, products, categories, labelDes
     setPrintItems(prev => prev.map(i => i.productId === productId ? { ...i, qty: Math.max(1, qty) } : i));
   };
 
-  const generatePrintHtml = (design: LabelDesign, items: { product: Product; qty: number }[]): string => {
+  const generatePrintHtml = (design: LabelDesign, items: { product: Product; qty: number }[], skipOffset: number): string => {
     const lw = parseFloat(design.labelWidth.replace(',', '.')) || 75;
     const lh = parseFloat(design.labelHeight.replace(',', '.')) || 25;
     const cols = parseInt(design.labelsPerRow) || 3;
@@ -108,6 +112,9 @@ export default function PrintLabelsDialog({ open, products, categories, labelDes
     const allLabels: Product[] = [];
     items.forEach(({ product, qty }) => { for (let i = 0; i < qty; i++) allLabels.push(product); });
 
+    const emptyLabel = `<div style="width:${lw}mm;height:${lh}mm;"></div>`;
+    const blanks = emptyLabel.repeat(Math.max(0, skipOffset));
+
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><title></title>
 <style>
   @page { size: A4 portrait; margin: ${topM}mm ${leftM}mm 0mm ${leftM}mm; }
@@ -117,7 +124,7 @@ export default function PrintLabelsDialog({ open, products, categories, labelDes
   .grid > div { page-break-inside: avoid; break-inside: avoid; }
   svg { overflow: visible; }
 </style></head><body>
-<div class="grid">${allLabels.map(labelHtml).join('')}</div>
+<div class="grid">${blanks}${allLabels.map(labelHtml).join('')}</div>
 </body></html>`;
   };
 
@@ -129,7 +136,9 @@ export default function PrintLabelsDialog({ open, products, categories, labelDes
       qty: i.qty,
     })).filter(i => !!i.product);
     if (!items.length) { toast.error('Selecciona al menos un artículo'); return; }
-    const html = generatePrintHtml(design, items);
+    const cols = parseInt(design.labelsPerRow) || 3;
+    const skipOffset = (Math.max(1, startRow) - 1) * cols + (Math.max(1, startCol) - 1);
+    const html = generatePrintHtml(design, items, skipOffset);
     const win = window.open('', '_blank');
     if (win) { win.document.write(html); win.document.close(); setTimeout(() => win.print(), 900); }
   };
@@ -227,6 +236,27 @@ export default function PrintLabelsDialog({ open, products, categories, labelDes
               {design.labelWidth}×{design.labelHeight}mm · {design.labelsPerRow}×{design.labelsPerColumn} por hoja
             </span>
           )}
+          <div className="flex items-center gap-2 ml-auto">
+            <span className="text-xs text-gray-500 whitespace-nowrap">Iniciar desde:</span>
+            <div className="flex items-center gap-1">
+              <Label className="text-xs text-gray-600 whitespace-nowrap">Col.</Label>
+              <Input
+                type="number" min={1} max={parseInt(design?.labelsPerRow || '99')}
+                value={startCol}
+                onChange={e => setStartCol(Math.max(1, parseInt(e.target.value) || 1))}
+                className="h-7 w-14 text-xs text-center px-1"
+              />
+            </div>
+            <div className="flex items-center gap-1">
+              <Label className="text-xs text-gray-600 whitespace-nowrap">Fila</Label>
+              <Input
+                type="number" min={1} max={parseInt(design?.labelsPerColumn || '99')}
+                value={startRow}
+                onChange={e => setStartRow(Math.max(1, parseInt(e.target.value) || 1))}
+                className="h-7 w-14 text-xs text-center px-1"
+              />
+            </div>
+          </div>
         </div>
 
         <div className="flex flex-1 overflow-hidden">
