@@ -38,6 +38,7 @@ interface Props {
   suppliers: Supplier[];
   categories: { id: string; name: string; description: string }[];
   taxSettings: TaxSettings;
+  existingDocuments: PurchaseDocument[];
   onClose: () => void;
   onSave: (data: PurchaseDocumentFormData) => void;
   onAddSupplier: (data: Omit<Supplier, 'id' | 'createdAt'>) => Supplier;
@@ -49,7 +50,7 @@ const DEFAULT_WAREHOUSE = 'Bodega Principal';
 
 export default function PurchaseDocumentModal({
   open, editingDocument, activeTab, products, suppliers, categories, taxSettings,
-  onClose, onSave, onAddSupplier, onAddProduct, onAddCategory,
+  existingDocuments, onClose, onSave, onAddSupplier, onAddProduct, onAddCategory,
 }: Props) {
   const [supplierId, setSupplierId] = useState('');
   const [supplierCode, setSupplierCode] = useState('');
@@ -194,6 +195,20 @@ export default function PurchaseDocumentModal({
     if (items.length === 0) { toast.error('Agrega al menos un artículo'); return; }
     const supplier = suppliers.find(s => s.id === supplierId);
     if (!supplier) { toast.error('Proveedor no válido'); return; }
+
+    if (supplierInvoiceNumber.trim()) {
+      const num = supplierInvoiceNumber.trim().toLowerCase();
+      const duplicate = existingDocuments.find(doc =>
+        doc.id !== editingDocument?.id &&
+        doc.supplierId === supplierId &&
+        doc.supplierInvoiceNumber?.trim().toLowerCase() === num
+      );
+      if (duplicate) {
+        toast.error(`La factura "${supplierInvoiceNumber}" ya existe para este proveedor (doc. ${duplicate.documentNumber})`);
+        return;
+      }
+    }
+
     onSave({ supplierId, supplierName: supplier.commercialName || supplier.fiscalName || supplierName, warehouse, supplierInvoiceNumber, documentDate: documentDate || todayStr, items, notes });
   };
 

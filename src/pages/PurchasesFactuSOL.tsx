@@ -220,6 +220,7 @@ export default function PurchasesFactuSOL() {
           suppliers={suppliers}
           categories={categories}
           taxSettings={taxSettings}
+          existingDocuments={purchases}
           onClose={() => { setIsModalOpen(false); setEditingDocument(null); }}
           onSave={handleSave}
           onAddSupplier={addSupplier}
