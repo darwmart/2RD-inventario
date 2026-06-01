@@ -4,9 +4,10 @@ import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useSalesData } from '@/hooks/queries/useSalesData';
 import { useBankSettings } from '@/hooks/queries/useBankSettings';
 import { useCompanySettings } from '@/hooks/queries/useCompanySettings';
-import { useExpenses } from '@/hooks/useExpenses';
+import { useExpensesData } from '@/hooks/queries/useExpensesData';
 import { usePurchasesData } from '@/hooks/queries/usePurchasesData';
 import { useAllCashMovements } from '@/hooks/queries/useCashSession';
+import { useCapitalInjectionsData } from '@/hooks/queries/useCapitalInjectionsData';
 import { AccountingRecord } from '@/types';
 import { formatDateToKey } from '@/hooks/useExpenses';
 import BankBalancesGrid from '@/components/accounting/BankBalancesGrid';
@@ -22,8 +23,9 @@ export default function Accounting() {
   const { expenses } = useExpenses();
   const { purchases } = usePurchasesData();
   const { data: cashMovements = [] } = useAllCashMovements();
-  const [accountingRecords, setAccountingRecords] = useLocalStorage<AccountingRecord[]>('accountingRecords', []);
-  const [capitalInjections, setCapitalInjections] = useLocalStorage<CapitalInjection[]>('capitalInjections', []);
+  const { expenses } = useExpensesData();
+  const { capitalInjections, addInjection, deleteInjection } = useCapitalInjectionsData();
+  const [accountingRecords] = useLocalStorage<AccountingRecord[]>('accountingRecords', []);
 
   const [fechaInicio, setFechaInicio] = useState('');
   const [fechaFin, setFechaFin] = useState('');
@@ -205,6 +207,16 @@ export default function Accounting() {
       }
     });
 
+    // ── Inyecciones de capital desde Supabase ────────────────────────────────
+    capitalInjections.forEach(ci => {
+      list.push({
+        id: `injection-${ci.id}`, date: new Date(ci.fecha), type: 'ingreso',
+        description: `${ci.typeLabel}${ci.detail ? ' — ' + ci.detail : ''}`,
+        amount: ci.amount, bank: ci.banco, bankLabel: getBankLabel(ci.banco),
+        direction: 'in', settled: true,
+      });
+    });
+
     // ── Movimientos de caja desde Supabase (cash_movements) ─────────────────
     cashMovements.forEach(m => {
       const date = new Date(m.createdAt);
@@ -253,7 +265,7 @@ export default function Accounting() {
     });
 
     return list.sort((a, b) => b.date.getTime() - a.date.getTime());
-  }, [sales, expenses, purchases, accountingRecords, cashMovements, banks, cardSettings]);
+  }, [sales, expenses, purchases, accountingRecords, cashMovements, capitalInjections, banks, cardSettings]);
 
   const filtered = useMemo(() => allMovements.filter(m => {
     const key = formatDateToKey(m.date);
@@ -297,14 +309,9 @@ export default function Accounting() {
   }, [filtered]);
 
   const handleAddCapitalInjection = (injection: Omit<CapitalInjection, 'id' | 'fecha'>) => {
-    const fecha = new Date().toISOString();
-    setCapitalInjections([...capitalInjections, { ...injection, id: Date.now(), fecha }]);
+    const fecha = new Date().toISOString().slice(0, 10);
+    addInjection({ ...injection, fecha });
     updateBankBalance(injection.banco, injection.amount);
-    setAccountingRecords([...accountingRecords, {
-      id: Date.now() + 1, tipo: 'ingreso',
-      descripcion: `${injection.typeLabel} — ${injection.detail}`,
-      monto: injection.amount, banco: injection.banco, fecha,
-    }]);
   };
 
   return (

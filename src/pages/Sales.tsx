@@ -3,7 +3,7 @@ import { useConfirm } from '@/hooks/useConfirm';
 import { useSalesData, useProducts, useAdvisors, usePaymentMethods } from '@/hooks/queries';
 import { useCompanySettings } from '@/hooks/queries/useCompanySettings';
 import { useBankSettings } from '@/hooks/queries/useBankSettings';
-import { useReturns } from '@/hooks/useReturns';
+import { useReturnsData as useReturns } from '@/hooks/queries/useReturnsData';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDailyDeposits } from '@/hooks/useDailyDeposits';
 import { toast } from 'sonner';

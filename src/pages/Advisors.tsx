@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { useAdvisors, useSalesData, useExpensesData } from '@/hooks/queries';
 import { useAuth } from '@/contexts/AuthContext';
-import { useSalaryPayments } from '@/hooks/useSalaryPayments';
-import { useLoanPayments } from '@/hooks/useLoanPayments';
+import { useSalaryPayments, useLoanPayments } from '@/hooks/queries/useSalaryLoanData';
 import { Users, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Advisor, LoanPayment, SalaryPayment } from '@/types';

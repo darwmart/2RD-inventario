@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useConfirm } from '@/hooks/useConfirm';
 import { useProducts } from '@/hooks/queries/useProducts';
-import { useStockCount } from '@/hooks/useStockCount';
+import { useStockCountData as useStockCount } from '@/hooks/queries/useStockCountData';
 import { StockCount, StockCountItem } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';

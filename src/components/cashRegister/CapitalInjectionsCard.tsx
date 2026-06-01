@@ -18,7 +18,7 @@ const INJECTION_TYPES = [
 ];
 
 export type CapitalInjection = {
-  id: number;
+  id: string;
   type: string;
   typeLabel: string;
   banco: string;
