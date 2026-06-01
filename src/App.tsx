@@ -8,6 +8,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { RBACProvider } from './contexts/RBACContext';
 import { useSessionManager } from './lib/sessionManager';
+import { migrateCashFromLocalStorage } from './utils/migrateCashFromLocalStorage';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
@@ -16,7 +17,7 @@ import Inventory from './pages/Inventory';
 import Sales from './pages/Sales';
 import Quotes from './pages/Quotes';
 import PurchasesFactuSOL from './pages/PurchasesFactuSOL';
-import CashRegister from './pages/CashRegister';
+import CashRegisterV2 from './pages/CashRegisterV2';
 import Advisors from './pages/Advisors';
 import Alerts from './pages/Alerts';
 import Settings from './pages/Settings';
@@ -31,6 +32,7 @@ import Reports from './pages/Reports';
 
 function SessionGuard({ children }: { children: React.ReactNode }) {
   useSessionManager();
+  const { user } = useAuth();
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -43,6 +45,13 @@ function SessionGuard({ children }: { children: React.ReactNode }) {
     window.addEventListener('pos:printer-guide', handler);
     return () => window.removeEventListener('pos:printer-guide', handler);
   }, []);
+
+  // Migración única de sesiones de caja desde localStorage → Supabase
+  useEffect(() => {
+    if (!user) return;
+    const name = (user as any)?.user_metadata?.full_name ?? user.email ?? 'Usuario';
+    migrateCashFromLocalStorage(name).catch(() => {});
+  }, [user?.id]);
 
   return <>{children}</>;
 }
@@ -114,7 +123,7 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Layout>
-              <CashRegister />
+              <CashRegisterV2 />
             </Layout>
           </ProtectedRoute>
         }

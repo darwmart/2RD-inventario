@@ -13,7 +13,8 @@ export function useCashRegisterSummary(
   accountingRecords: AccountingRecord[],
   currentSession: CashRegisterSession | undefined,
   totalExpenses: number,
-  getSalesByDate: (date: string) => Sale[]
+  getSalesByDate: (date: string) => Sale[],
+  totalCreditPayments: number = 0
 ) {
   const dailySales = useMemo(
     () => getSalesByDate(selectedDate).filter(s => s.status === 'completed'),
@@ -82,15 +83,15 @@ export function useCashRegisterSummary(
 
   const estimatedCloseCash = useMemo(() => {
     const opening = currentSession?.openingAmount ?? 0;
-    return opening + totalsWithDeposits.cash - totalExpenses - dailyTransfers;
-  }, [currentSession, totalsWithDeposits, totalExpenses, dailyTransfers]);
+    return opening + totalsWithDeposits.cash + totalCreditPayments - totalExpenses - dailyTransfers;
+  }, [currentSession, totalsWithDeposits, totalExpenses, dailyTransfers, totalCreditPayments]);
 
   const expectedCash = useMemo(() => {
     const initial = currentSession?.openingAmount || 0;
     const cashSaleAmt = dailySales.filter(s => s.paymentMethod.type === 'cash').reduce((sum, s) => sum + s.total, 0);
     const cashDepAmt = depositRecordsOfDay.filter(r => r.method.type === 'cash').reduce((sum, r) => sum + r.amount, 0);
-    return initial + cashSaleAmt + cashDepAmt - totalExpenses - dailyTransfers;
-  }, [currentSession, dailySales, depositRecordsOfDay, totalExpenses, dailyTransfers]);
+    return initial + cashSaleAmt + cashDepAmt + totalCreditPayments - totalExpenses - dailyTransfers;
+  }, [currentSession, dailySales, depositRecordsOfDay, totalExpenses, dailyTransfers, totalCreditPayments]);
 
   return { dailySales, depositRecordsOfDay, summary, depositSummary, totalsWithDeposits, dailyTransfers, estimatedCloseCash, expectedCash };
 }
