@@ -21,18 +21,21 @@ interface Props {
 
 export default function CreditPaymentsCard({ currentSession, dailyMovements, totalPayments, creditPlatforms, onAdd }: Props) {
   const [platform, setPlatform] = useState('');
+  const [customPlatform, setCustomPlatform] = useState('');
   const [amountStr, setAmountStr] = useState('');
   const [description, setDescription] = useState('');
 
   const isClosed = !currentSession || currentSession.status === 'closed';
+  const effectivePlatform = platform === '__otro__' ? customPlatform : platform;
 
   const handleAdd = () => {
     if (isClosed) { toast.error('La caja está cerrada. No se pueden registrar ingresos.'); return; }
-    if (!platform.trim()) { toast.error('Selecciona la plataforma de crédito'); return; }
+    if (!effectivePlatform.trim()) { toast.error('Indica la plataforma o concepto'); return; }
     const amount = parseMoney(amountStr);
     if (amount <= 0) { toast.error('El monto debe ser mayor a $0'); return; }
-    onAdd({ platform: platform.trim(), amount, description: description.trim() });
+    onAdd({ platform: effectivePlatform.trim(), amount, description: description.trim() });
     setPlatform('');
+    setCustomPlatform('');
     setAmountStr('');
     setDescription('');
   };
@@ -59,21 +62,25 @@ export default function CreditPaymentsCard({ currentSession, dailyMovements, tot
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
             <div>
               <Label>Plataforma de crédito</Label>
-              {creditPlatforms.length === 0 ? (
-                <p className="text-xs text-amber-600 mt-2">
-                  No hay plataformas de crédito configuradas. Agrégalas en Ajustes → Métodos de pago.
-                </p>
-              ) : (
-                <select
-                  value={platform}
-                  onChange={e => setPlatform(e.target.value)}
-                  className="w-full mt-1 border rounded p-2 text-sm h-9"
-                >
-                  <option value="">Seleccione...</option>
-                  {creditPlatforms.map(p => (
-                    <option key={p.id} value={p.name}>{p.name}</option>
-                  ))}
-                </select>
+              <select
+                value={platform}
+                onChange={e => { setPlatform(e.target.value); setCustomPlatform(''); }}
+                className="w-full mt-1 border rounded p-2 text-sm h-9"
+              >
+                <option value="">Seleccione...</option>
+                {creditPlatforms.map(p => (
+                  <option key={p.id} value={p.name}>{p.name}</option>
+                ))}
+                <option value="__otro__">Otro / Personalizado</option>
+              </select>
+              {platform === '__otro__' && (
+                <Input
+                  value={customPlatform}
+                  onChange={e => setCustomPlatform(e.target.value)}
+                  placeholder="Escribe el nombre..."
+                  className="mt-1 h-8 text-sm"
+                  autoFocus
+                />
               )}
             </div>
             <div>
