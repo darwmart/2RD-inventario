@@ -122,8 +122,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const isAdmin  = useCallback(() => user?.role === 'admin', [user]);
-  const canEdit  = useCallback(() => user?.role === 'admin', [user]);
+  const isAdmin  = useCallback(() => user?.role === 'admin' || user?.role === 'super_admin', [user]);
+  const canEdit  = useCallback(() => user?.role === 'admin' || user?.role === 'super_admin', [user]);
 
   return (
     <AuthContext.Provider value={{ user, session, isLoading, login, logout, isAdmin, canEdit }}>
