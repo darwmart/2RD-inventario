@@ -6,26 +6,54 @@ import { usePaymentMethods } from '@/hooks/queries/usePaymentMethods';
 import { useExpensesData } from '@/hooks/queries/useExpensesData';
 import { useBankSettings } from '@/hooks/queries/useBankSettings';
 import { useAuth } from '@/contexts/AuthContext';
-import { useLocalStorage } from '@/hooks/useLocalStorage';
-import { useCashRegisterSummary } from '@/hooks/useCashRegisterSummary';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { CashRegisterSession, AccountingRecord } from '@/types';
+import { CashRegisterSession } from '@/types';
 import { toast } from 'sonner';
 import { printReport } from '@/utils/reportPrint';
+import { supabase } from '@/lib/supabase';
+
+import {
+  useActiveSession,
+  useSessionsByDate,
+  useCashMovements,
+  useCashSessionMutations,
+} from '@/hooks/queries/useCashSession';
+import { useCashRegisterSummary } from '@/hooks/useCashRegisterSummary';
+
 import CashRegisterHeader from '@/components/cashRegister/CashRegisterHeader';
 import CashSessionCard from '@/components/cashRegister/CashSessionCard';
 import EditSessionDialog from '@/components/cashRegister/EditSessionDialog';
 import SummaryCards from '@/components/cashRegister/SummaryCards';
 import PaymentBreakdownCard from '@/components/cashRegister/PaymentBreakdownCard';
 import ExpensesCard from '@/components/cashRegister/ExpensesCard';
-import CreditPaymentsCard, { CreditPayment } from '@/components/cashRegister/CreditPaymentsCard';
+import CreditPaymentsCard from '@/components/cashRegister/CreditPaymentsCard';
+import ReopenSessionDialog from '@/components/cashRegister/ReopenSessionDialog';
+
+import type { CashSession } from '@/types/cashRegister';
 
 const toDateKey = (d = new Date()) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
+// Adapta CashSession (Supabase) → CashRegisterSession (formato UI existente)
+function toLegacySession(s: CashSession): CashRegisterSession {
+  return {
+    id: s.id,
+    date: s.dateKey,
+    openingAmount: s.openingAmount,
+    openingTime: s.openedAt,
+    closingAmount: s.closingAmount ?? undefined,
+    closingTime: s.closedAt ?? undefined,
+    status: (s.status === 'OPEN' || s.status === 'REOPENED') ? 'open' : 'closed',
+    difference: s.differenceAmount ?? undefined,
+    notes: s.notes ?? undefined,
+  };
+}
+
 export default function CashRegister() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const { confirm, ConfirmDialog } = useConfirm();
+  const userName = (user as any)?.user_metadata?.full_name ?? user?.email ?? 'Usuario';
+
   const { sales, getSalesByDate } = useSalesData();
   const { advisors } = useAdvisors();
   const { paymentMethods } = usePaymentMethods();
@@ -33,88 +61,133 @@ export default function CashRegister() {
   const { banks, updateBankBalance } = useBankSettings();
 
   const [selectedDate, setSelectedDate] = useState(() => toDateKey());
-  const [cashSessions, setCashSessions] = useLocalStorage<CashRegisterSession[]>('cashSessions', []);
-  const [accountingRecords, setAccountingRecords] = useLocalStorage<AccountingRecord[]>('accountingRecords', []);
-  const [creditPayments, setCreditPayments] = useLocalStorage<CreditPayment[]>('creditPayments', []);
   const [isEditSessionDialog, setIsEditSessionDialog] = useState(false);
+  const [isReopenDialogOpen, setIsReopenDialogOpen] = useState(false);
 
-  const currentSession = cashSessions.find(s => s.date === selectedDate);
+  // ── Datos Supabase ─────────────────────────────────────────────────────────
+  const { data: activeSession } = useActiveSession();
+  const { data: dateSessions = [] } = useSessionsByDate(selectedDate);
+
+  // Sesión a mostrar: la activa (si existe) o la del día seleccionado
+  const currentSupabase: CashSession | null =
+    activeSession ?? dateSessions.find(s => s.dateKey === selectedDate) ?? null;
+
+  const { data: movements = [] } = useCashMovements(currentSupabase?.id);
+
+  const { openSession, closeSession, reopenSession, addMovement } = useCashSessionMutations();
+
+  // Adaptar al formato legacy para los componentes UI existentes
+  const currentSession: CashRegisterSession | undefined =
+    currentSupabase ? toLegacySession(currentSupabase) : undefined;
+
+  // ── Derivados desde movimientos ────────────────────────────────────────────
+  const dailyTransfers = movements
+    .filter(m => m.movementType === 'SAFE_TRANSFER')
+    .reduce((sum, m) => sum + Math.abs(m.amount), 0);
+
+  const dailyCreditMovements = movements.filter(m => m.movementType === 'CREDIT_PAYMENT');
+  const totalCreditPayments = dailyCreditMovements.reduce((sum, m) => sum + m.amount, 0);
+
+  // Egresos (siguen en tabla expenses de Supabase)
   const dailyExpenses = getExpensesByDate(selectedDate);
   const totalExpenses = dailyExpenses.reduce((sum, e) => sum + e.amount, 0);
 
-  const dailyCreditPayments = creditPayments.filter(p => p.date === selectedDate);
-  const totalCreditPayments = dailyCreditPayments.reduce((sum, p) => sum + p.amount, 0);
+  // ── Resumen de ventas (sin cambios — viene de sales) ──────────────────────
+  const { dailySales, summary, depositSummary, totalsWithDeposits, estimatedCloseCash, expectedCash } =
+    useCashRegisterSummary(
+      sales, selectedDate, [], currentSession, totalExpenses,
+      getSalesByDate, totalCreditPayments, dailyTransfers
+    );
 
-  const { dailySales, summary, depositSummary, totalsWithDeposits, dailyTransfers, estimatedCloseCash, expectedCash } =
-    useCashRegisterSummary(sales, selectedDate, accountingRecords, currentSession, totalExpenses, getSalesByDate, totalCreditPayments);
+  // ── Handlers ───────────────────────────────────────────────────────────────
 
   const handleOpenCashRegister = (amount: number) => {
-    const newSession: CashRegisterSession = {
-      id: crypto.randomUUID(), date: selectedDate,
-      openingAmount: amount, openingTime: new Date().toISOString(), status: 'open',
-    };
-    setCashSessions([...cashSessions, newSession]);
+    openSession.mutate({ openingAmount: amount, openedByName: userName });
     updateBankBalance('caja-principal', -amount);
-    setAccountingRecords([...accountingRecords, {
-      id: Date.now(), tipo: 'traspaso',
-      descripcion: `Apertura de caja - ${selectedDate}`, monto: amount,
-      banco: 'caja-principal', fecha: selectedDate,
-    }]);
-    toast.success(`Caja abierta con $${amount.toLocaleString('es-CO')} — debitado de Caja Fuerte`);
+    toast.success(`Caja abierta con $${amount.toLocaleString('es-CO')}`);
   };
 
   const handleCloseCashRegister = (amount: number, notes: string) => {
-    if (!currentSession || currentSession.status === 'closed') { toast.error('No hay una caja abierta para cerrar'); return; }
-    const difference = amount - expectedCash;
-    setCashSessions(cashSessions.map(s => s.id === currentSession.id
-      ? { ...s, closingAmount: amount, closingTime: new Date().toISOString(), status: 'closed', difference, notes }
-      : s
-    ));
-    toast.success(difference === 0
-      ? 'Caja cerrada correctamente. Cuadre exacto.'
-      : `Caja cerrada. Diferencia: $${Math.abs(difference).toLocaleString('es-CO')} ${difference > 0 ? 'a favor' : 'en contra'}`
-    );
+    if (!currentSupabase || currentSupabase.status === 'CLOSED') {
+      toast.error('No hay una caja abierta para cerrar'); return;
+    }
+    closeSession.mutate({
+      sessionId: currentSupabase.id,
+      closingAmount: amount,
+      closedByName: userName,
+      notes,
+    });
   };
 
   const handleTransferCash = (amount: number, description: string) => {
-    if (!currentSession || currentSession.status === 'closed') { toast.error('Debe haber una caja abierta para hacer traspasos'); return; }
-    setAccountingRecords([...accountingRecords, {
-      id: Date.now(), tipo: 'traspaso',
-      descripcion: description || 'Traspaso de efectivo a Caja Fuerte', monto: amount,
-      banco: 'efectivo', fecha: selectedDate,
-    }]);
+    if (!currentSupabase || currentSupabase.status === 'CLOSED') {
+      toast.error('Debe haber una caja abierta para hacer traspasos'); return;
+    }
+    addMovement.mutate({
+      sessionId: currentSupabase.id,
+      movementType: 'SAFE_TRANSFER',
+      amount: -amount,
+      description: description || 'Traspaso de efectivo a Caja Fuerte',
+      createdByName: userName,
+    });
     updateBankBalance('caja-principal', amount);
     updateBankBalance('efectivo', -amount);
-    toast.success(`Traspaso de $${amount.toLocaleString('es-CO')} a Caja Fuerte realizado exitosamente`);
+    toast.success(`Traspaso de $${amount.toLocaleString('es-CO')} a Caja Fuerte realizado`);
   };
 
-  const handleSaveEditSession = (opening: number, closing: number, notes: string) => {
-    if (!currentSession) return;
+  const handleAddCreditPayment = (data: { platform: string; amount: number; description: string }) => {
+    if (!currentSupabase) return;
+    addMovement.mutate({
+      sessionId: currentSupabase.id,
+      movementType: 'CREDIT_PAYMENT',
+      amount: data.amount,
+      description: data.platform + (data.description ? ' — ' + data.description : ''),
+      createdByName: userName,
+      metadata: { platform: data.platform },
+    });
+  };
 
-    // Si cambió la base de apertura, ajustar Caja Fuerte por la diferencia
-    const openingDiff = opening - currentSession.openingAmount;
-    if (openingDiff !== 0) {
-      // La apertura debita de Caja Fuerte: si sube la base, debita más; si baja, devuelve
-      updateBankBalance('caja-principal', -openingDiff);
-    }
+  // Editar sesión — actualización directa en Supabase (admin)
+  const handleSaveEditSession = async (opening: number, closing: number, notes: string) => {
+    if (!currentSupabase) return;
 
-    if (currentSession.status === 'open') {
-      // Solo actualizar la apertura, no tocar cierre ni diferencia
-      setCashSessions(cashSessions.map(s => s.id === currentSession.id
-        ? { ...s, openingAmount: opening }
-        : s
-      ));
-      toast.success('Base de apertura actualizada');
+    if (currentSupabase.status === 'OPEN' || currentSupabase.status === 'REOPENED') {
+      const diff = opening - currentSupabase.openingAmount;
+      if (diff !== 0) {
+        await supabase.from('cash_sessions').update({ opening_amount: opening }).eq('id', currentSupabase.id);
+        updateBankBalance('caja-principal', -diff);
+        toast.success('Base de apertura actualizada');
+      }
     } else {
       const difference = closing - expectedCash;
-      setCashSessions(cashSessions.map(s => s.id === currentSession.id
-        ? { ...s, openingAmount: opening, closingAmount: closing, difference, notes }
-        : s
-      ));
+      await supabase.from('cash_sessions').update({
+        opening_amount: opening,
+        closing_amount: closing,
+        difference_amount: difference,
+        notes,
+      }).eq('id', currentSupabase.id);
       toast.success('Sesión de caja actualizada');
     }
     setIsEditSessionDialog(false);
   };
+
+  // El botón "Reabrir" en EditSessionDialog abre el diálogo con motivo obligatorio
+  const handleReopenRequest = () => {
+    setIsEditSessionDialog(false);
+    setIsReopenDialogOpen(true);
+  };
+
+  const handleConfirmReopen = (reason: string) => {
+    if (!currentSupabase) return;
+    reopenSession.mutate({
+      sessionId: currentSupabase.id,
+      reason,
+      reopenedByName: userName,
+    });
+    setIsReopenDialogOpen(false);
+  };
+
+  // ── Impresión ──────────────────────────────────────────────────────────────
 
   const handlePrintClosure = () => {
     const fmt = (n: number) => `$${Math.round(n).toLocaleString('es-CO')}`;
@@ -131,8 +204,8 @@ export default function CashRegister() {
       `<tr><td>${e.description}</td><td>${e.advisor}</td><td style="text-align:right">${fmt(e.amount)}</td></tr>`
     ).join('');
 
-    const creditRows = dailyCreditPayments.map(p =>
-      `<tr><td>${p.platform}</td><td>${p.description || '—'}</td><td style="text-align:right;color:green">${fmt(p.amount)}</td></tr>`
+    const creditRows = dailyCreditMovements.map(m =>
+      `<tr><td>${m.description}</td><td style="text-align:right;color:green">${fmt(m.amount)}</td></tr>`
     ).join('');
 
     const summaryHtml = `
@@ -144,42 +217,37 @@ export default function CashRegister() {
         <div class="scard"><b>${fmt(totalExpenses)}</b><span>Egresos</span></div>
         <div class="scard"><b>${fmt(estimatedCloseCash)}</b><span>Efectivo estimado</span></div>
         ${closing != null ? `<div class="scard"><b>${fmt(closing)}</b><span>Conteo real</span></div>` : ''}
-        ${difference != null ? `<div class="scard" style="color:${difference >= 0 ? 'green' : 'red'}"><b>${fmt(difference)}</b><span>Diferencia</span></div>` : ''}
+        ${difference != null ? `<div class="scard" style="color:${difference >= 0 ? 'green' : 'red'}"><b>${fmt(Math.abs(difference))}</b><span>Diferencia</span></div>` : ''}
       </div>`;
 
     const tableHtml = `
       <h3 style="margin:16px 0 6px">Ventas por método de pago</h3>
-      <table><thead><tr><th>Método</th><th>Transacciones</th><th>Monto</th></tr></thead><tbody>${methodRows || '<tr><td colspan="3">Sin ventas</td></tr>'}</tbody></table>
-      ${dailyCreditPayments.length > 0 ? `<h3 style="margin:16px 0 6px;color:green">Ingresos por Abonos a Créditos</h3><table><thead><tr><th>Plataforma</th><th>Descripción</th><th>Monto</th></tr></thead><tbody>${creditRows}</tbody></table><p style="text-align:right;font-weight:bold;color:green">Total: ${fmt(totalCreditPayments)}</p>` : ''}
-      ${dailyExpenses.length > 0 ? `<h3 style="margin:16px 0 6px">Egresos del día</h3><table><thead><tr><th>Descripción</th><th>Asesor</th><th>Monto</th></tr></thead><tbody>${expenseRows}</tbody></table>` : ''}
+      <table><thead><tr><th>Método</th><th>Transacciones</th><th>Monto</th></tr></thead>
+      <tbody>${methodRows || '<tr><td colspan="3">Sin ventas</td></tr>'}</tbody></table>
+      ${dailyCreditMovements.length > 0 ? `
+        <h3 style="margin:16px 0 6px;color:green">Ingresos por Abonos a Créditos</h3>
+        <table><thead><tr><th>Concepto</th><th>Monto</th></tr></thead>
+        <tbody>${creditRows}</tbody></table>
+        <p style="text-align:right;font-weight:bold;color:green">Total: ${fmt(totalCreditPayments)}</p>` : ''}
+      ${dailyExpenses.length > 0 ? `
+        <h3 style="margin:16px 0 6px">Egresos del día</h3>
+        <table><thead><tr><th>Descripción</th><th>Asesor</th><th>Monto</th></tr></thead>
+        <tbody>${expenseRows}</tbody></table>` : ''}
       ${dailyTransfers > 0 ? `<p style="margin-top:12px"><b>Traspasos a Caja Fuerte:</b> ${fmt(dailyTransfers)}</p>` : ''}
       ${currentSession?.notes ? `<p style="margin-top:8px"><b>Notas:</b> ${currentSession.notes}</p>` : ''}`;
 
     printReport(`Cierre de Caja — ${selectedDate}`, tableHtml, summaryHtml);
   };
 
-  const handleAddCreditPayment = (data: Omit<CreditPayment, 'id' | 'date'>) => {
-    setCreditPayments([...creditPayments, { ...data, id: crypto.randomUUID(), date: selectedDate }]);
-  };
-
-  const handleDeleteCreditPayment = (id: string) => {
-    setCreditPayments(creditPayments.filter(p => p.id !== id));
-  };
-
-  const handleReopenSession = async () => {
-    if (!currentSession) return;
-    if (!await confirm({ description: '¿Estás seguro de reabrir esta caja? Se podrán registrar nuevos egresos.', confirmLabel: 'Reabrir', destructive: false })) return;
-    setCashSessions(cashSessions.map(s => s.id === currentSession.id
-      ? { ...s, status: 'open', closingAmount: undefined, closingTime: undefined, difference: undefined, notes: undefined }
-      : s
-    ));
-    setIsEditSessionDialog(false);
-    toast.success('Caja reabierta correctamente');
-  };
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <ScrollArea className="h-screen p-6">
-      <CashRegisterHeader selectedDate={selectedDate} onDateChange={setSelectedDate} onPrintClosure={handlePrintClosure} />
+      <CashRegisterHeader
+        selectedDate={selectedDate}
+        onDateChange={setSelectedDate}
+        onPrintClosure={handlePrintClosure}
+      />
 
       <CashSessionCard
         currentSession={currentSession}
@@ -201,7 +269,22 @@ export default function CashRegister() {
         expectedCash={expectedCash}
         onClose={() => setIsEditSessionDialog(false)}
         onSave={handleSaveEditSession}
-        onReopen={handleReopenSession}
+        onReopen={handleReopenRequest}
+      />
+
+      <ReopenSessionDialog
+        open={isReopenDialogOpen}
+        session={currentSupabase}
+        onClose={() => setIsReopenDialogOpen(false)}
+        onConfirm={handleConfirmReopen}
+        isLoading={reopenSession.isPending}
+      />
+
+      <CreditPaymentsCard
+        currentSession={currentSession}
+        dailyMovements={dailyCreditMovements}
+        totalPayments={totalCreditPayments}
+        onAdd={handleAddCreditPayment}
       />
 
       <SummaryCards
@@ -209,15 +292,6 @@ export default function CashRegister() {
         summary={summary}
         depositSummary={depositSummary}
         estimatedCloseCash={estimatedCloseCash}
-      />
-
-      <CreditPaymentsCard
-        currentSession={currentSession}
-        dailyPayments={dailyCreditPayments}
-        totalPayments={totalCreditPayments}
-        isAdmin={isAdmin()}
-        onAdd={handleAddCreditPayment}
-        onDelete={handleDeleteCreditPayment}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

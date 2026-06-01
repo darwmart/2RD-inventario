@@ -17,7 +17,7 @@ import Inventory from './pages/Inventory';
 import Sales from './pages/Sales';
 import Quotes from './pages/Quotes';
 import PurchasesFactuSOL from './pages/PurchasesFactuSOL';
-import CashRegisterV2 from './pages/CashRegisterV2';
+import CashRegister from './pages/CashRegister';
 import Advisors from './pages/Advisors';
 import Alerts from './pages/Alerts';
 import Settings from './pages/Settings';
@@ -123,7 +123,7 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Layout>
-              <CashRegisterV2 />
+              <CashRegister />
             </Layout>
           </ProtectedRoute>
         }

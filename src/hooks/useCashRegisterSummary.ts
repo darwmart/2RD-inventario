@@ -14,7 +14,8 @@ export function useCashRegisterSummary(
   currentSession: CashRegisterSession | undefined,
   totalExpenses: number,
   getSalesByDate: (date: string) => Sale[],
-  totalCreditPayments: number = 0
+  totalCreditPayments: number = 0,
+  overrideDailyTransfers?: number
 ) {
   const dailySales = useMemo(
     () => getSalesByDate(selectedDate).filter(s => s.status === 'completed'),
@@ -75,11 +76,12 @@ export function useCashRegisterSummary(
     credit: summary.creditSales + depositSummary.depositCredit,
   }), [summary, depositSummary]);
 
-  const dailyTransfers = useMemo(() =>
-    accountingRecords
+  const dailyTransfers = useMemo(() => {
+    if (overrideDailyTransfers !== undefined) return overrideDailyTransfers;
+    return accountingRecords
       .filter(r => r.tipo === 'traspaso' && r.banco !== 'caja-principal' && toKey(r.fecha) === selectedDate)
-      .reduce((sum, r) => sum + r.monto, 0),
-  [accountingRecords, selectedDate]);
+      .reduce((sum, r) => sum + r.monto, 0);
+  }, [accountingRecords, selectedDate, overrideDailyTransfers]);
 
   const estimatedCloseCash = useMemo(() => {
     const opening = currentSession?.openingAmount ?? 0;
