@@ -83,11 +83,15 @@ export default function Sales() {
         const p = products.find(p => p.id === item.productId);
         if (p) updateStock(item.productId, p.stock - item.quantity);
       });
+      const { commission, commissionAmount, reteivaAmount } = calculateCardCommission(
+        paymentMethod.name, paymentMethod.type, total, cardSettings
+      );
       updateSale(editingSale.id, {
         advisorId,
         advisorName: advisors.find(a => a.id === advisorId)?.name ?? '',
         items: cart, paymentMethod, discount,
         subtotal: data.subtotal, total, ivaTotal: totalIVA,
+        commission, commissionAmount, reteivaAmount,
         customerName: customerName || undefined,
         customerDocument: customerDocument || undefined,
         customerPhone: customerPhone || undefined,
