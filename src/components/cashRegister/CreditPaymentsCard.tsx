@@ -9,31 +9,30 @@ import { CashRegisterSession } from '@/types';
 import { fmtMoneyInput, parseMoney } from '@/utils/formatters';
 import { toast } from 'sonner';
 import type { CashMovement } from '@/types/cashRegister';
-
-const PLATFORMS = ['Addi', 'Sistecrédito', 'Fincomercio', 'Alkosto', 'Codensa', 'Efectivo directo', 'Otro'];
+import type { PaymentMethod } from '@/types';
 
 interface Props {
   currentSession: CashRegisterSession | undefined;
   dailyMovements: CashMovement[];
   totalPayments: number;
+  creditPlatforms: PaymentMethod[];
   onAdd: (data: { platform: string; amount: number; description: string }) => void;
 }
 
-export default function CreditPaymentsCard({ currentSession, dailyMovements, totalPayments, onAdd }: Props) {
+export default function CreditPaymentsCard({ currentSession, dailyMovements, totalPayments, creditPlatforms, onAdd }: Props) {
   const [platform, setPlatform] = useState('');
-  const [customPlatform, setCustomPlatform] = useState('');
   const [amountStr, setAmountStr] = useState('');
   const [description, setDescription] = useState('');
 
   const isClosed = !currentSession || currentSession.status === 'closed';
-  const effectivePlatform = platform === 'Otro' ? customPlatform : platform;
 
   const handleAdd = () => {
     if (isClosed) { toast.error('La caja está cerrada. No se pueden registrar ingresos.'); return; }
-    if (!effectivePlatform.trim()) { toast.error('Selecciona o escribe la plataforma'); return; }
+    if (!platform.trim()) { toast.error('Selecciona la plataforma de crédito'); return; }
     const amount = parseMoney(amountStr);
     if (amount <= 0) { toast.error('El monto debe ser mayor a $0'); return; }
-    onAdd({ platform: effectivePlatform.trim(), amount, description: description.trim() });
+    onAdd({ platform: platform.trim(), amount, description: description.trim() });
+    setPlatform('');
     setAmountStr('');
     setDescription('');
   };
@@ -59,22 +58,22 @@ export default function CreditPaymentsCard({ currentSession, dailyMovements, tot
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
             <div>
-              <Label>Plataforma / Concepto</Label>
-              <select
-                value={platform}
-                onChange={e => { setPlatform(e.target.value); if (e.target.value !== 'Otro') setCustomPlatform(''); }}
-                className="w-full mt-1 border rounded p-2 text-sm h-9"
-              >
-                <option value="">Seleccione...</option>
-                {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
-              {platform === 'Otro' && (
-                <Input
-                  value={customPlatform}
-                  onChange={e => setCustomPlatform(e.target.value)}
-                  placeholder="Nombre de la plataforma"
-                  className="mt-1 h-8 text-sm"
-                />
+              <Label>Plataforma de crédito</Label>
+              {creditPlatforms.length === 0 ? (
+                <p className="text-xs text-amber-600 mt-2">
+                  No hay plataformas de crédito configuradas. Agrégalas en Ajustes → Métodos de pago.
+                </p>
+              ) : (
+                <select
+                  value={platform}
+                  onChange={e => setPlatform(e.target.value)}
+                  className="w-full mt-1 border rounded p-2 text-sm h-9"
+                >
+                  <option value="">Seleccione...</option>
+                  {creditPlatforms.map(p => (
+                    <option key={p.id} value={p.name}>{p.name}</option>
+                  ))}
+                </select>
               )}
             </div>
             <div>

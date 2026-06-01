@@ -284,6 +284,7 @@ export default function CashRegister() {
         currentSession={currentSession}
         dailyMovements={dailyCreditMovements}
         totalPayments={totalCreditPayments}
+        creditPlatforms={paymentMethods.filter(m => m.type === 'credit' && m.isActive)}
         onAdd={handleAddCreditPayment}
       />
 
