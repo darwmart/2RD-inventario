@@ -20,6 +20,7 @@ import {
 } from '@/hooks/queries/useCashSession';
 import { useCashRegisterSummary } from '@/hooks/useCashRegisterSummary';
 
+import { AlertTriangle } from 'lucide-react';
 import CashRegisterHeader from '@/components/cashRegister/CashRegisterHeader';
 import CashSessionCard from '@/components/cashRegister/CashSessionCard';
 import EditSessionDialog from '@/components/cashRegister/EditSessionDialog';
@@ -95,6 +96,10 @@ export default function CashRegister() {
   // Egresos (siguen en tabla expenses de Supabase)
   const dailyExpenses = getExpensesByDate(selectedDate);
   const totalExpenses = dailyExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+  // Sesión activa de otro día (huérfana — bloquea apertura de caja nueva)
+  const orphanSession: CashSession | null =
+    activeSession && activeSession.dateKey !== selectedDate ? activeSession : null;
 
   // ── Resumen de ventas (sin cambios — viene de sales) ──────────────────────
   const { dailySales, summary, depositSummary, totalsWithDeposits, estimatedCloseCash, expectedCash } =
@@ -181,6 +186,21 @@ export default function CashRegister() {
     setIsReopenDialogOpen(true);
   };
 
+  const handleCancelOrphan = async () => {
+    if (!orphanSession) return;
+    const ok = await confirm({
+      description: `¿Cancelar la sesión huérfana ${orphanSession.sessionNumber} del ${orphanSession.dateKey}? Esto permitirá abrir una nueva caja.`,
+      confirmLabel: 'Cancelar sesión',
+      destructive: true,
+    });
+    if (!ok) return;
+    await supabase.from('cash_sessions').update({
+      status: 'CANCELLED',
+      notes: 'Cancelada manualmente — sesión huérfana sin cierre',
+    }).eq('id', orphanSession.id);
+    toast.success('Sesión cancelada. Ya puedes abrir una nueva caja.');
+  };
+
   const handleConfirmReopen = (reason: string) => {
     if (!currentSupabase) return;
     reopenSession.mutate({
@@ -252,6 +272,44 @@ export default function CashRegister() {
         onDateChange={setSelectedDate}
         onPrintClosure={handlePrintClosure}
       />
+
+      {orphanSession && (
+        <div className="mb-4 flex items-start gap-3 p-4 bg-amber-50 border border-amber-300 rounded-lg">
+          <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="flex-1 text-sm text-amber-800">
+            <p className="font-semibold">Existe una sesión de caja abierta de otro día</p>
+            <p className="mt-0.5">
+              Sesión <strong>{orphanSession.sessionNumber}</strong> del{' '}
+              <strong>{orphanSession.dateKey}</strong> abierta por{' '}
+              <strong>{orphanSession.openedByName}</strong> — no fue cerrada correctamente.
+              Esto impide abrir una nueva caja.
+            </p>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <button
+              onClick={() => {
+                closeSession.mutate({
+                  sessionId: orphanSession.id,
+                  closingAmount: orphanSession.openingAmount,
+                  closedByName: userName,
+                  notes: 'Cierre automático — sesión huérfana',
+                });
+              }}
+              className="px-3 py-1.5 text-xs bg-amber-600 text-white rounded hover:bg-amber-700 font-medium"
+            >
+              Cerrar sesión
+            </button>
+            {isAdmin() && (
+              <button
+                onClick={handleCancelOrphan}
+                className="px-3 py-1.5 text-xs bg-red-100 text-red-700 border border-red-300 rounded hover:bg-red-200 font-medium"
+              >
+                Cancelar
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       <CashSessionCard
         currentSession={currentSession}
