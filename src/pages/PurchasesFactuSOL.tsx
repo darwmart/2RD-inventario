@@ -4,10 +4,9 @@ import { useProducts, useCategories, useSuppliers } from '@/hooks/queries/usePro
 import { usePurchasesData } from '@/hooks/queries/usePurchasesData';
 import { useBankSettings } from '@/hooks/queries/useBankSettings';
 import { useCompanySettings } from '@/hooks/queries/useCompanySettings';
-import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import TableSkeleton from '@/components/ui/TableSkeleton';
-import { PurchaseDocument, DocumentType, AccountingRecord, Supplier } from '@/types';
+import { PurchaseDocument, DocumentType, Supplier } from '@/types';
 import { toast } from 'sonner';
 import SupplierFormDialog from '@/components/SupplierFormDialog';
 import DocumentListView from '@/components/purchasesFactuSOL/DocumentListView';
@@ -22,8 +21,6 @@ export default function PurchasesFactuSOL() {
   const { purchases, isLoading: purchasesLoading, createDocument, updateDocument, deleteDocument, convertDeliveryToInvoice, markAsPaid } = usePurchasesData();
   const { banks, updateBankBalance } = useBankSettings();
   const { taxSettings } = useCompanySettings();
-  const [, setAccountingRecords] = useLocalStorage<AccountingRecord[]>('accountingRecords', []);
-
   const { confirm, ConfirmDialog } = useConfirm();
   const [activeTab, setActiveTab] = useState<DocumentType>('delivery');
   const [searchTerm, setSearchTerm] = useState('');
