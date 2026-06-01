@@ -68,9 +68,13 @@ export default function CashRegister() {
   const { data: activeSession } = useActiveSession();
   const { data: dateSessions = [] } = useSessionsByDate(selectedDate);
 
-  // Sesión a mostrar: la activa (si existe) o la del día seleccionado
+  // Sesión del día seleccionado: prioriza dateSessions (ya filtrados por fecha).
+  // activeSession solo se usa como fallback si coincide con selectedDate
+  // (evita que la sesión activa de hoy aparezca en días anteriores).
   const currentSupabase: CashSession | null =
-    activeSession ?? dateSessions.find(s => s.dateKey === selectedDate) ?? null;
+    dateSessions.find(s => s.dateKey === selectedDate)
+    ?? (activeSession?.dateKey === selectedDate ? activeSession : null)
+    ?? null;
 
   const { data: movements = [] } = useCashMovements(currentSupabase?.id);
 
