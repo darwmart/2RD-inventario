@@ -165,6 +165,15 @@ export class SupabaseCashSessionRepository {
     return (data ?? []).map(toMovement);
   }
 
+  async getAllMovements(): Promise<CashMovement[]> {
+    const { data, error } = await supabase
+      .from('v_cash_movements_detail')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw new Error(error.message);
+    return (data ?? []).map(toMovement);
+  }
+
   async addMovement(input: AddMovementInput): Promise<CashMovement> {
     const { data, error } = await supabase.rpc('rpc_add_cash_movement', {
       p_session_id:       input.sessionId,

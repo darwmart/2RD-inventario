@@ -6,6 +6,7 @@ import { useBankSettings } from '@/hooks/queries/useBankSettings';
 import { useCompanySettings } from '@/hooks/queries/useCompanySettings';
 import { useExpenses } from '@/hooks/useExpenses';
 import { usePurchasesData } from '@/hooks/queries/usePurchasesData';
+import { useAllCashMovements } from '@/hooks/queries/useCashSession';
 import { AccountingRecord } from '@/types';
 import { formatDateToKey } from '@/hooks/useExpenses';
 import BankBalancesGrid from '@/components/accounting/BankBalancesGrid';
@@ -20,6 +21,7 @@ export default function Accounting() {
   const { cardSettings } = useCompanySettings();
   const { expenses } = useExpenses();
   const { purchases } = usePurchasesData();
+  const { data: cashMovements = [] } = useAllCashMovements();
   const [accountingRecords, setAccountingRecords] = useLocalStorage<AccountingRecord[]>('accountingRecords', []);
   const [capitalInjections, setCapitalInjections] = useLocalStorage<CapitalInjection[]>('capitalInjections', []);
 
@@ -203,8 +205,55 @@ export default function Accounting() {
       }
     });
 
+    // ── Movimientos de caja desde Supabase (cash_movements) ─────────────────
+    cashMovements.forEach(m => {
+      const date = new Date(m.createdAt);
+
+      if (m.movementType === 'SAFE_TRANSFER') {
+        list.push({
+          id: `cash-transfer-out-${m.id}`, date, type: 'traspaso',
+          description: m.description || 'Traspaso a Caja Fuerte',
+          amount: Math.abs(m.amount), bank: 'efectivo', bankLabel: 'Efectivo',
+          direction: 'out', settled: true,
+        });
+        list.push({
+          id: `cash-transfer-in-${m.id}`, date, type: 'traspaso',
+          description: m.description || 'Traspaso a Caja Fuerte',
+          amount: Math.abs(m.amount), bank: 'caja-principal', bankLabel: getBankLabel('caja-principal'),
+          direction: 'in', settled: true,
+        });
+      }
+
+      if (m.movementType === 'CREDIT_PAYMENT') {
+        list.push({
+          id: `cash-credit-${m.id}`, date, type: 'ingreso',
+          description: m.description || 'Abono a crédito',
+          amount: m.amount, bank: 'efectivo', bankLabel: 'Efectivo',
+          direction: 'in', settled: true,
+        });
+      }
+
+      if (m.movementType === 'CAPITAL_INJECTION' && !m.description?.includes('Base de apertura')) {
+        list.push({
+          id: `cash-capital-${m.id}`, date, type: 'ingreso',
+          description: m.description || 'Inyección de capital',
+          amount: m.amount, bank: 'efectivo', bankLabel: 'Efectivo',
+          direction: 'in', settled: true,
+        });
+      }
+
+      if (m.movementType === 'CASH_WITHDRAWAL') {
+        list.push({
+          id: `cash-withdrawal-${m.id}`, date, type: 'gasto',
+          description: m.description || 'Retiro de efectivo',
+          amount: Math.abs(m.amount), bank: 'efectivo', bankLabel: 'Efectivo',
+          direction: 'out', settled: true,
+        });
+      }
+    });
+
     return list.sort((a, b) => b.date.getTime() - a.date.getTime());
-  }, [sales, expenses, purchases, accountingRecords, banks, cardSettings]);
+  }, [sales, expenses, purchases, accountingRecords, cashMovements, banks, cardSettings]);
 
   const filtered = useMemo(() => allMovements.filter(m => {
     const key = formatDateToKey(m.date);

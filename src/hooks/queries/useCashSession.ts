@@ -13,6 +13,7 @@ export const cashKeys = {
   sessionsByDate: (d: string) => ['cash', 'date', d] as const,
   movements:      (id: string) => ['cash', 'movements', id] as const,
   movementsByDate:(d: string) => ['cash', 'movements-date', d] as const,
+  allMovements:   ['cash', 'all-movements'] as const,
   withdrawals:    (id: string) => ['cash', 'withdrawals', id] as const,
   reopenHistory:  (id: string) => ['cash', 'reopen-history', id] as const,
   summary:        (id: string) => ['cash', 'summary', id] as const,
@@ -48,6 +49,13 @@ export function useCashMovementsByDate(dateKey: string) {
   return useQuery({
     queryKey: cashKeys.movementsByDate(dateKey),
     queryFn:  () => repo.getMovementsByDate(dateKey),
+  });
+}
+
+export function useAllCashMovements() {
+  return useQuery({
+    queryKey: cashKeys.allMovements,
+    queryFn:  () => repo.getAllMovements(),
   });
 }
 
