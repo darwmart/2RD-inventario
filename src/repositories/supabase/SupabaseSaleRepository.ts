@@ -203,30 +203,63 @@ export class SupabaseSaleRepository implements ISaleRepository {
   }
 
   async update(id: string, data: Partial<Sale>): Promise<Sale> {
-    // Extraemos los campos anidados — no se actualizan en update normal
-    const { items: _items, deposits: _deposits, ...flat } = data;
+    const { items, deposits: _deposits, ...flat } = data;
 
+    // ── 1. Actualizar cabecera ───────────────────────────────────────────────
     const row: Record<string, unknown> = {};
+    if (flat.advisorId        !== undefined) row.advisor_id        = flat.advisorId;
+    if (flat.advisorName      !== undefined) row.advisor_name      = flat.advisorName;
     if (flat.status           !== undefined) row.status            = flat.status;
     if (flat.type             !== undefined) row.type              = flat.type;
+    if (flat.subtotal         !== undefined) row.subtotal          = flat.subtotal;
+    if (flat.total            !== undefined) row.total             = flat.total;
+    if (flat.ivaTotal         !== undefined) row.iva_total         = flat.ivaTotal;
     if (flat.discount         !== undefined) row.discount          = flat.discount;
     if (flat.deposit          !== undefined) row.deposit           = flat.deposit;
     if (flat.paymentMethod    !== undefined) row.payment_method    = flat.paymentMethod;
     if (flat.commission       !== undefined) row.commission        = flat.commission;
     if (flat.commissionAmount !== undefined) row.commission_amount = flat.commissionAmount;
     if (flat.reteivaAmount    !== undefined) row.reteiva_amount    = flat.reteivaAmount;
-    if (flat.customerId       !== undefined) row.customer_id       = flat.customerId    ?? null;
-    if (flat.customerName     !== undefined) row.customer_name     = flat.customerName  ?? null;
+    if (flat.customerId       !== undefined) row.customer_id       = flat.customerId       ?? null;
+    if (flat.customerName     !== undefined) row.customer_name     = flat.customerName     ?? null;
     if (flat.customerDocument !== undefined) row.customer_document = flat.customerDocument ?? null;
-    if (flat.customerPhone    !== undefined) row.customer_phone    = flat.customerPhone ?? null;
+    if (flat.customerPhone    !== undefined) row.customer_phone    = flat.customerPhone    ?? null;
 
-    const { data: updated, error } = await supabase
+    if (Object.keys(row).length > 0) {
+      const { error } = await supabase.from(this.table).update(row).eq('id', id);
+      if (error) throw new Error(error.message);
+    }
+
+    // ── 2. Reemplazar items si se enviaron ───────────────────────────────────
+    if (items && items.length > 0) {
+      const { error: delError } = await supabase
+        .from('sale_items').delete().eq('sale_id', id);
+      if (delError) throw new Error(delError.message);
+
+      const itemRows = items.map((item, idx) => ({
+        sale_id:      id,
+        product_id:   item.productId,
+        product_name: item.productName,
+        description:  item.description  ?? '',
+        cost:         item.cost,
+        quantity:     item.quantity,
+        unit_price:   item.unitPrice,
+        total:        item.total,
+        has_iva:      item.hasIva        ?? false,
+        iva_amount:   item.ivaAmount     ?? 0,
+        sort_order:   idx,
+      }));
+      const { error: insError } = await supabase.from('sale_items').insert(itemRows);
+      if (insError) throw new Error(insError.message);
+    }
+
+    // ── 3. Leer y devolver la venta actualizada ──────────────────────────────
+    const { data: updated, error: selError } = await supabase
       .from(this.table)
-      .update(row)
-      .eq('id', id)
       .select(SELECT_WITH_RELATIONS)
+      .eq('id', id)
       .single();
-    if (error) throw new Error(error.message);
+    if (selError) throw new Error(selError.message);
     return toSale(updated as unknown as SaleRow);
   }
 
