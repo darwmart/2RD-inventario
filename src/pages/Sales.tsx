@@ -63,26 +63,29 @@ export default function Sales() {
     }
 
     if (editingSale) {
-      // Edición: revierte stock viejo, valida y aplica nuevo
-      editingSale.items.forEach(item => {
-        const p = products.find(p => p.id === item.productId);
-        if (p) updateStock(item.productId, p.stock + item.quantity);
-      });
+      // Calcular delta neto por producto (devolver viejo − descontar nuevo)
+      // Una sola actualización por producto evita condiciones de carrera con el caché.
+      const deltas = new Map<string, number>();
+      editingSale.items.forEach(i => deltas.set(i.productId, (deltas.get(i.productId) ?? 0) + i.quantity));
+      cart.forEach(i => deltas.set(i.productId, (deltas.get(i.productId) ?? 0) - i.quantity));
+
+      // Validar stock suficiente considerando el delta
       for (const item of cart) {
         const p = products.find(p => p.id === item.productId);
-        if (!p || p.stock < item.quantity) {
-          toast.error(`Stock insuficiente para ${item.productName}`);
-          editingSale.items.forEach(old => {
-            const prod = products.find(p => p.id === old.productId);
-            if (prod) updateStock(old.productId, prod.stock - old.quantity);
-          });
-          return;
+        const delta = deltas.get(item.productId) ?? 0;
+        const stockDisponible = (p?.stock ?? 0) + Math.max(0, delta);
+        if (!p || stockDisponible < item.quantity) {
+          toast.error(`Stock insuficiente para ${item.productName}`); return;
         }
       }
-      cart.forEach(item => {
-        const p = products.find(p => p.id === item.productId);
-        if (p) updateStock(item.productId, p.stock - item.quantity);
-      });
+
+      // Aplicar deltas: una sola llamada por producto
+      for (const [productId, delta] of deltas.entries()) {
+        if (delta === 0) continue;
+        const p = products.find(p => p.id === productId);
+        if (p) updateStock(productId, Math.max(0, p.stock + delta));
+      }
+
       const { commission, commissionAmount, reteivaAmount } = calculateCardCommission(
         paymentMethod.name, paymentMethod.type, total, cardSettings
       );
