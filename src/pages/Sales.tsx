@@ -54,11 +54,14 @@ export default function Sales() {
     const paymentMethod = paymentMethods.find(pm => pm.id === paymentMethodId);
     if (!paymentMethod) { toast.error('Método de pago no válido'); return; }
 
-    // Validación de stock (síncrona sobre datos ya cargados)
-    for (const item of cart) {
-      const product = products.find(p => p.id === item.productId);
-      if (!product || product.stock < item.quantity) {
-        toast.error(`Stock insuficiente para ${item.productName}`); return;
+    // Validación de stock solo para ventas nuevas.
+    // Las ediciones usan la validación delta-aware dentro del bloque editingSale.
+    if (!editingSale) {
+      for (const item of cart) {
+        const product = products.find(p => p.id === item.productId);
+        if (!product || product.stock < item.quantity) {
+          toast.error(`Stock insuficiente para ${item.productName}`); return;
+        }
       }
     }
 
