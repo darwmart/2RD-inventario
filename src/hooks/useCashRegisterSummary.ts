@@ -26,6 +26,7 @@ export function useCashRegisterSummary(
     const records: { amount: number; method: PaymentMethod }[] = [];
     sales.forEach(sale => {
       if (sale.type !== 'reserved') return;
+      if (sale.status === 'cancelled') return; // separados cancelados no cuentan
       if (sale.deposits && sale.deposits.length > 0) {
         sale.deposits.forEach(d => {
           if (toKey(new Date(d.createdAt)) === selectedDate) records.push({ amount: d.amount, method: d.method });
