@@ -90,8 +90,19 @@ export default function CashRegister() {
     .filter(m => m.movementType === 'SAFE_TRANSFER')
     .reduce((sum, m) => sum + Math.abs(m.amount), 0);
 
+  // IDs de movimientos de crédito que ya tienen un REVERSAL asociado
+  const reversedCreditIds = new Set(
+    movements
+      .filter(m => m.movementType === 'REVERSAL' && m.referenceTable === 'cash_movements')
+      .map(m => m.referenceId)
+      .filter(Boolean) as string[]
+  );
+
   const dailyCreditMovements = movements.filter(m => m.movementType === 'CREDIT_PAYMENT');
-  const totalCreditPayments = dailyCreditMovements.reduce((sum, m) => sum + m.amount, 0);
+  // Solo los no anulados suman al total
+  const totalCreditPayments = dailyCreditMovements
+    .filter(m => !reversedCreditIds.has(m.id))
+    .reduce((sum, m) => sum + m.amount, 0);
 
   // Egresos (siguen en tabla expenses de Supabase)
   const dailyExpenses = getExpensesByDate(selectedDate);
@@ -144,16 +155,45 @@ export default function CashRegister() {
     toast.success(`Traspaso de $${amount.toLocaleString('es-CO')} a Caja Fuerte realizado`);
   };
 
-  const handleAddCreditPayment = (data: { platform: string; amount: number; description: string }) => {
+  const handleAddCreditPayment = (data: {
+    platform: string; paymentMethodId: string; paymentMethodName: string;
+    amount: number; description: string;
+  }) => {
     if (!currentSupabase) return;
     addMovement.mutate({
       sessionId: currentSupabase.id,
       movementType: 'CREDIT_PAYMENT',
       amount: data.amount,
-      description: data.platform + (data.description ? ' — ' + data.description : ''),
+      description: `${data.platform}${data.paymentMethodName ? ' · ' + data.paymentMethodName : ''}${data.description ? ' — ' + data.description : ''}`,
       createdByName: userName,
-      metadata: { platform: data.platform },
+      metadata: { platform: data.platform, paymentMethodId: data.paymentMethodId },
     });
+    // Actualizar saldo del banco según método de pago
+    const pm = paymentMethods.find(p => p.id === data.paymentMethodId);
+    if (pm) {
+      const bankId = pm.type === 'cash' ? 'efectivo' : pm.bankId;
+      if (bankId) updateBankBalance(bankId, data.amount);
+    }
+  };
+
+  const handleReverseCreditPayment = (movementId: string, amount: number, metadata: Record<string, unknown>) => {
+    if (!currentSupabase) return;
+    addMovement.mutate({
+      sessionId: currentSupabase.id,
+      movementType: 'REVERSAL',
+      amount: -amount,
+      description: 'Anulación de ingreso por abono a crédito',
+      createdByName: userName,
+      referenceId: movementId,
+      referenceTable: 'cash_movements',
+    });
+    // Revertir el saldo del banco
+    const pmId = metadata?.paymentMethodId as string | undefined;
+    const pm = paymentMethods.find(p => p.id === pmId);
+    if (pm) {
+      const bankId = pm.type === 'cash' ? 'efectivo' : pm.bankId;
+      if (bankId) updateBankBalance(bankId, -amount);
+    }
   };
 
   // Editar sesión — actualización directa en Supabase (admin)
@@ -345,9 +385,13 @@ export default function CashRegister() {
       <CreditPaymentsCard
         currentSession={currentSession}
         dailyMovements={dailyCreditMovements}
+        reversedIds={reversedCreditIds}
         totalPayments={totalCreditPayments}
         creditPlatforms={paymentMethods.filter(m => m.type === 'credit' && m.isActive)}
+        paymentMethods={paymentMethods}
+        isAdmin={isAdmin()}
         onAdd={handleAddCreditPayment}
+        onReverse={handleReverseCreditPayment}
       />
 
       <SummaryCards
