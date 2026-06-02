@@ -34,9 +34,8 @@ async function searchAll(query: string): Promise<SearchResult[]> {
 
     supabase
       .from('customers')
-      .select('id, full_name, document, phone, email')
-      .or(`full_name.ilike.${q},document.ilike.${q},phone.ilike.${q}`)
-      .is('deleted_at', null)
+      .select('id, name, document, phone, email')
+      .or(`name.ilike.${q},document.ilike.${q},phone.ilike.${q}`)
       .limit(5),
 
     supabase
@@ -73,7 +72,7 @@ async function searchAll(query: string): Promise<SearchResult[]> {
       results.push({
         id: c.id,
         type: 'customer',
-        title: c.full_name,
+        title: c.name,
         subtitle: c.document ? `Doc: ${c.document}` : '',
         meta: c.phone ?? c.email ?? '',
         url: '/customers',

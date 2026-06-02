@@ -125,9 +125,8 @@ class SyncEngine {
     if (!supabase) return;
     const { data, error } = await supabase
       .from('customers')
-      .select('id,full_name,document,phone,email,updated_at')
-      .is('deleted_at', null)
-      .order('updated_at', { ascending: false })
+      .select('id,name,document,phone,email,created_at')
+      .order('created_at', { ascending: false })
       .limit(500);
 
     if (error || !data) return;
