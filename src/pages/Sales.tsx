@@ -72,13 +72,18 @@ export default function Sales() {
       editingSale.items.forEach(i => deltas.set(i.productId, (deltas.get(i.productId) ?? 0) + i.quantity));
       cart.forEach(i => deltas.set(i.productId, (deltas.get(i.productId) ?? 0) - i.quantity));
 
-      // Validar stock suficiente considerando el delta
-      for (const item of cart) {
-        const p = products.find(p => p.id === item.productId);
-        const delta = deltas.get(item.productId) ?? 0;
-        const stockDisponible = (p?.stock ?? 0) + Math.max(0, delta);
-        if (!p || stockDisponible < item.quantity) {
-          toast.error(`Stock insuficiente para ${item.productName}`); return;
+      // Solo validar artículos que INCREMENTAN la demanda de stock (delta < 0).
+      // delta = 0 → misma cantidad, no toca stock → no valida.
+      // delta > 0 → devuelve stock → no valida.
+      // delta < 0 → necesita |delta| unidades adicionales del stock actual.
+      for (const [productId, delta] of deltas.entries()) {
+        if (delta >= 0) continue;
+        const needed = -delta;
+        const p = products.find(p => p.id === productId);
+        if (!p || p.stock < needed) {
+          const nombre = cart.find(i => i.productId === productId)?.productName ?? productId;
+          toast.error(`Stock insuficiente para ${nombre} (disponible: ${p?.stock ?? 0}, necesario: ${needed})`);
+          return;
         }
       }
 
