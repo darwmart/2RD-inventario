@@ -108,7 +108,7 @@ export default function Accounting() {
       });
     });
 
-    sales.filter(s => s.type === 'reserved').forEach(s => {
+    sales.filter(s => s.type === 'reserved' && s.status !== 'cancelled').forEach(s => {
       if (s.deposits && s.deposits.length > 0) {
         s.deposits.forEach(d => {
           const pmName = d.method?.name ?? s.paymentMethod.name;

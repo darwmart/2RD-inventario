@@ -14,10 +14,12 @@ import QuotesList from '@/components/quotes/QuotesList';
 import ReservedList from '@/components/quotes/ReservedList';
 import DepositDialog from '@/components/quotes/DepositDialog';
 
-const PAYMENT_TO_BANK: Record<string, string | null> = {
-  '1': 'efectivo', '2': 'colpatria', '3': 'colpatria', '4': 'bbva',
-  '5': 'nequi', '6': 'daviplata', '7': 'bbva',
-  '8': null, '9': null, '10': null,
+// Resuelve el banco a partir del método de pago (compatible con IDs UUID de Supabase)
+const resolveBankId = (method: { type?: string; bankId?: string } | undefined): string | null => {
+  if (!method) return null;
+  if (method.type === 'cash') return 'efectivo';
+  if (method.bankId) return method.bankId;
+  return null;
 };
 
 export default function Quotes() {
@@ -39,20 +41,21 @@ export default function Quotes() {
   const applyBankDeposit = (paymentMethodId: string, amount: number) => {
     const pm = paymentMethods.find(p => p.id === paymentMethodId);
     if (!pm) return;
-    const bankId = PAYMENT_TO_BANK[pm.id];
+    const bankId = resolveBankId(pm);
     if (bankId && banks.find(b => b.id === bankId)) updateBankBalance(bankId, amount);
   };
 
   const handleCancelSale = (id: string) => {
     const sale = sales.find(s => s.id === id);
     if (sale?.type === 'reserved') {
+      // Revertir cada abono recibido en el banco correspondiente
       const depositsToReverse = sale.deposits && sale.deposits.length > 0
         ? sale.deposits
         : (sale.deposit ?? 0) > 0
           ? [{ amount: sale.deposit as number, method: sale.paymentMethod }]
           : [];
       depositsToReverse.forEach(d => {
-        const bankId = PAYMENT_TO_BANK[d.method?.id ?? ''];
+        const bankId = resolveBankId(d.method);
         if (bankId && banks.find(b => b.id === bankId)) updateBankBalance(bankId, -d.amount);
       });
     }
