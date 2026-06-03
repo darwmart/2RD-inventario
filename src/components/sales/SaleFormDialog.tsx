@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,6 +49,7 @@ export default function SaleFormDialog({ open, editingSale, products, advisors, 
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const savingRef = useRef(false);
 
   // Stock efectivo al editar: stock real + cantidad original que se "devuelve"
   const effectiveStock = (product: Product): number => {
@@ -57,6 +58,8 @@ export default function SaleFormDialog({ open, editingSale, products, advisors, 
   };
 
   useEffect(() => {
+    savingRef.current = false;
+    setIsSaving(false);
     if (!open) return;
     if (editingSale) {
       setCart(editingSale.items);
@@ -146,12 +149,13 @@ export default function SaleFormDialog({ open, editingSale, products, advisors, 
   };
 
   const handleSave = () => {
-    if (isSaving) return;
+    if (savingRef.current) return;
     if (cart.length === 0) { toast.error('El carrito está vacío'); return; }
     if (!selectedAdvisor || !selectedPaymentMethod) { toast.error('Selecciona un asesor y método de pago'); return; }
     if (discount < 0) { toast.error('El descuento no puede ser negativo'); return; }
     if (discount > subtotal) { toast.error('El descuento no puede superar el subtotal'); return; }
     if (!paymentMethods.find(pm => pm.id === selectedPaymentMethod)) { toast.error('Método de pago no válido'); return; }
+    savingRef.current = true;
     setIsSaving(true);
     onSave({ cart, originalItems: editingSale?.items ?? [], advisorId: selectedAdvisor, paymentMethodId: selectedPaymentMethod, discount, customerName: customerName.trim(), customerDocument: customerDocument.trim(), customerPhone: customerPhone.trim(), subtotal, totalIVA, total });
     resetForm();
