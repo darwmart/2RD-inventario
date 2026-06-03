@@ -48,6 +48,12 @@ export default function SaleFormDialog({ open, editingSale, products, advisors, 
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
 
+  // Stock efectivo al editar: stock real + cantidad original que se "devuelve"
+  const effectiveStock = (product: Product): number => {
+    const originalQty = editingSale?.items.find(i => i.productId === product.id)?.quantity ?? 0;
+    return product.stock + originalQty;
+  };
+
   useEffect(() => {
     if (!open) return;
     if (editingSale) {
@@ -75,14 +81,15 @@ export default function SaleFormDialog({ open, editingSale, products, advisors, 
   const total = Math.round(subtotal + totalIVA - discount);
 
   const addToCart = (product: Product, quantity = 1) => {
-    if (product.stock < quantity) { toast.error(`Stock insuficiente. Solo hay ${product.stock} unidades disponibles.`); return; }
+    const avail = effectiveStock(product);
+    if (avail < quantity) { toast.error(`Stock insuficiente. Solo hay ${avail} unidades disponibles.`); return; }
     const price = customPrice[product.id] || product.currentPrice;
     const { hasIva, ivaAmount } = calculateItemIVA(product, price, quantity, taxSettings);
     setCart(prev => {
       const idx = prev.findIndex(i => i.productId === product.id);
       if (idx >= 0) {
         const newQty = prev[idx].quantity + quantity;
-        if (newQty > product.stock) { toast.error(`Stock insuficiente. Solo hay ${product.stock} unidades disponibles.`); return prev; }
+        if (newQty > avail) { toast.error(`Stock insuficiente. Solo hay ${avail} unidades disponibles.`); return prev; }
         const iva = calculateItemIVA(product, prev[idx].unitPrice, newQty, taxSettings);
         const updated = [...prev];
         updated[idx] = { ...updated[idx], quantity: newQty, total: newQty * updated[idx].unitPrice, hasIva: iva.hasIva, ivaAmount: iva.ivaAmount };
@@ -96,7 +103,8 @@ export default function SaleFormDialog({ open, editingSale, products, advisors, 
     const product = products.find(p => p.id === productId);
     if (!product) return;
     if (qty <= 0) { removeFromCart(productId); return; }
-    if (qty > product.stock) { toast.error(`Stock insuficiente. Solo hay ${product.stock} unidades disponibles.`); return; }
+    const avail = effectiveStock(product);
+    if (qty > avail) { toast.error(`Stock insuficiente. Solo hay ${avail} unidades disponibles.`); return; }
     setCart(prev => prev.map(item => {
       if (item.productId !== productId) return item;
       const { hasIva, ivaAmount } = calculateItemIVA(product, item.unitPrice, qty, taxSettings);
@@ -141,7 +149,7 @@ export default function SaleFormDialog({ open, editingSale, products, advisors, 
   const handleClose = () => { resetForm(); onClose(); };
 
   const availableProducts = products.filter(p =>
-    p.stock > 0 && (
+    effectiveStock(p) > 0 && (
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.barcode.includes(searchTerm)
