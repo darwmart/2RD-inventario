@@ -14,6 +14,7 @@ import { calculateItemIVA } from '@/utils/ivaUtils';
 
 export interface SaleFormData {
   cart: SaleItem[];
+  originalItems: SaleItem[];
   advisorId: string;
   paymentMethodId: string;
   discount: number;
@@ -47,6 +48,7 @@ export default function SaleFormDialog({ open, editingSale, products, advisors, 
   const [customerDocument, setCustomerDocument] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   // Stock efectivo al editar: stock real + cantidad original que se "devuelve"
   const effectiveStock = (product: Product): number => {
@@ -74,6 +76,7 @@ export default function SaleFormDialog({ open, editingSale, products, advisors, 
     setCart([]); setCustomPrice({}); setSelectedAdvisor(''); setSelectedPaymentMethod('');
     setDiscount(0); setSearchTerm('');
     setCustomerName(''); setCustomerDocument(''); setCustomerPhone(''); setCustomerEmail('');
+    setIsSaving(false);
   };
 
   const totalIVA = Math.round(cart.reduce((sum, item) => sum + (item.ivaAmount || 0), 0));
@@ -129,27 +132,37 @@ export default function SaleFormDialog({ open, editingSale, products, advisors, 
   };
 
   const handleSearch = (value: string) => {
+    const addable = (p: Product) => effectiveStock(p) > cartQty(p.id);
     const byBarcode = products.find(p => p.barcode === value);
-    if (byBarcode) { addToCart(byBarcode); setSearchTerm(''); toast.success(`${byBarcode.name} agregado al carrito`); return; }
-    const byRef = products.filter(p => p.reference.toLowerCase().includes(value.toLowerCase()) || p.name.toLowerCase().includes(value.toLowerCase()));
+    if (byBarcode) {
+      if (!addable(byBarcode)) { toast.info(`${byBarcode.name} ya está en el carrito (sin unidades adicionales disponibles)`); return; }
+      addToCart(byBarcode); setSearchTerm(''); toast.success(`${byBarcode.name} agregado al carrito`); return;
+    }
+    const byRef = products.filter(p =>
+      (p.reference.toLowerCase().includes(value.toLowerCase()) || p.name.toLowerCase().includes(value.toLowerCase())) && addable(p)
+    );
     if (byRef.length === 1) { addToCart(byRef[0]); setSearchTerm(''); toast.success(`${byRef[0].name} agregado al carrito`); return; }
     toast.error('Producto no encontrado');
   };
 
   const handleSave = () => {
+    if (isSaving) return;
     if (cart.length === 0) { toast.error('El carrito está vacío'); return; }
     if (!selectedAdvisor || !selectedPaymentMethod) { toast.error('Selecciona un asesor y método de pago'); return; }
     if (discount < 0) { toast.error('El descuento no puede ser negativo'); return; }
     if (discount > subtotal) { toast.error('El descuento no puede superar el subtotal'); return; }
     if (!paymentMethods.find(pm => pm.id === selectedPaymentMethod)) { toast.error('Método de pago no válido'); return; }
-    onSave({ cart, advisorId: selectedAdvisor, paymentMethodId: selectedPaymentMethod, discount, customerName: customerName.trim(), customerDocument: customerDocument.trim(), customerPhone: customerPhone.trim(), subtotal, totalIVA, total });
+    setIsSaving(true);
+    onSave({ cart, originalItems: editingSale?.items ?? [], advisorId: selectedAdvisor, paymentMethodId: selectedPaymentMethod, discount, customerName: customerName.trim(), customerDocument: customerDocument.trim(), customerPhone: customerPhone.trim(), subtotal, totalIVA, total });
     resetForm();
   };
 
   const handleClose = () => { resetForm(); onClose(); };
 
+  const cartQty = (productId: string) => cart.find(i => i.productId === productId)?.quantity ?? 0;
+
   const availableProducts = products.filter(p =>
-    effectiveStock(p) > 0 && (
+    effectiveStock(p) > cartQty(p.id) && (
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.barcode.includes(searchTerm)
@@ -338,7 +351,7 @@ export default function SaleFormDialog({ open, editingSale, products, advisors, 
                   </div>
                 </div>
 
-                <Button className="w-full" onClick={handleSave} disabled={cart.length === 0}>
+                <Button className="w-full" onClick={handleSave} disabled={cart.length === 0 || isSaving}>
                   <Calculator className="h-4 w-4 mr-2" />
                   {editingSale ? 'Actualizar Venta' : 'Completar Venta'}
                 </Button>
