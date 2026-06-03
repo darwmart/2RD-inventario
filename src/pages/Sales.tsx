@@ -48,7 +48,7 @@ export default function Sales() {
   // ─── Handlers ────────────────────────────────────────────────────────────────
 
   const handleSave = async (data: SaleFormData) => {
-    const { cart, advisorId, paymentMethodId, discount, customerName,
+    const { cart, originalItems, advisorId, paymentMethodId, discount, customerName,
             customerDocument, customerPhone, totalIVA, total } = data;
 
     const paymentMethod = paymentMethods.find(pm => pm.id === paymentMethodId);
@@ -66,23 +66,23 @@ export default function Sales() {
     }
 
     if (editingSale) {
-      // Calcular delta neto por producto (devolver viejo − descontar nuevo)
-      // Una sola actualización por producto evita condiciones de carrera con el caché.
+      // Usar originalItems (enviados desde el diálogo al abrirse) como base del delta.
+      // Esto evita depender de editingSale.items que puede estar desincronizado.
+      const baseItems = originalItems.length > 0 ? originalItems : editingSale.items;
+
       const deltas = new Map<string, number>();
-      editingSale.items.forEach(i => deltas.set(i.productId, (deltas.get(i.productId) ?? 0) + i.quantity));
+      baseItems.forEach(i => deltas.set(i.productId, (deltas.get(i.productId) ?? 0) + i.quantity));
       cart.forEach(i => deltas.set(i.productId, (deltas.get(i.productId) ?? 0) - i.quantity));
 
-      // Solo validar artículos que INCREMENTAN la demanda de stock (delta < 0).
-      // delta = 0 → misma cantidad, no toca stock → no valida.
-      // delta > 0 → devuelve stock → no valida.
-      // delta < 0 → necesita |delta| unidades adicionales del stock actual.
       for (const [productId, delta] of deltas.entries()) {
         if (delta >= 0) continue;
         const needed = -delta;
         const p = products.find(p => p.id === productId);
-        if (!p || p.stock < needed) {
+        const originalQty = baseItems.find(i => i.productId === productId)?.quantity ?? 0;
+        const stockEfectivo = (p?.stock ?? 0) + originalQty;
+        if (!p || stockEfectivo < needed) {
           const nombre = cart.find(i => i.productId === productId)?.productName ?? productId;
-          toast.error(`Stock insuficiente para ${nombre} (disponible: ${p?.stock ?? 0}, necesario: ${needed})`);
+          toast.error(`Stock insuficiente para ${nombre} (disponible: ${stockEfectivo}, necesario: ${needed})`);
           return;
         }
       }
