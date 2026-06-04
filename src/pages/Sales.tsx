@@ -74,6 +74,10 @@ export default function Sales() {
       baseItems.forEach(i => deltas.set(i.productId, (deltas.get(i.productId) ?? 0) + i.quantity));
       cart.forEach(i => deltas.set(i.productId, (deltas.get(i.productId) ?? 0) - i.quantity));
 
+      console.log('BASE ITEMS', baseItems);
+      console.log('CART', cart);
+      console.log('DELTAS', Array.from(deltas.entries()));
+
       for (const [productId, delta] of deltas.entries()) {
         if (delta >= 0) continue;
         const needed = -delta;
@@ -91,7 +95,10 @@ export default function Sales() {
       for (const [productId, delta] of deltas.entries()) {
         if (delta === 0) continue;
         const p = products.find(p => p.id === productId);
-        if (p) updateStock(productId, Math.max(0, p.stock + delta));
+        if (p) {
+          console.log('updateStock', productId, delta, p.stock);
+          updateStock(productId, Math.max(0, p.stock + delta));
+        }
       }
 
       const { commission, commissionAmount, reteivaAmount } = calculateCardCommission(
