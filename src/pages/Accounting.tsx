@@ -20,7 +20,6 @@ export default function Accounting() {
   const { sales } = useSalesData();
   const { banks, updateBankBalance } = useBankSettings();
   const { cardSettings } = useCompanySettings();
-  const { expenses } = useExpenses();
   const { purchases } = usePurchasesData();
   const { data: cashMovements = [] } = useAllCashMovements();
   const { expenses } = useExpensesData();
