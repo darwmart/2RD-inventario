@@ -27,11 +27,7 @@ export class SalesService {
     if (data.type === 'sale') {
       await Promise.all(
         data.items.map(item =>
-          this.products.findById(item.productId).then(product => {
-            if (!product) return;
-            const newStock = Math.max(0, product.stock - item.quantity);
-            return this.products.updateStock(product.id, newStock, product.reservedStock);
-          })
+          this.products.updateStock(item.productId, -item.quantity)
         )
       );
     }
@@ -40,11 +36,7 @@ export class SalesService {
     if (data.type === 'reserved') {
       await Promise.all(
         data.items.map(item =>
-          this.products.findById(item.productId).then(product => {
-            if (!product) return;
-            const reserved = (product.reservedStock ?? 0) + item.quantity;
-            return this.products.updateStock(product.id, product.stock, reserved);
-          })
+          this.products.updateStock(item.productId, 0, item.quantity)
         )
       );
     }
@@ -80,11 +72,7 @@ export class SalesService {
     if (sale.type === 'reserved') {
       await Promise.all(
         sale.items.map(item =>
-          this.products.findById(item.productId).then(product => {
-            if (!product) return;
-            const newStock = Math.max(0, product.stock - item.quantity);
-            return this.products.updateStock(product.id, newStock, 0);
-          })
+          this.products.updateStock(item.productId, -item.quantity, -item.quantity)
         )
       );
     }
@@ -99,11 +87,7 @@ export class SalesService {
     if (sale.type === 'reserved') {
       await Promise.all(
         sale.items.map(item =>
-          this.products.findById(item.productId).then(product => {
-            if (!product) return;
-            const reserved = Math.max(0, (product.reservedStock ?? 0) - item.quantity);
-            return this.products.updateStock(product.id, product.stock, reserved);
-          })
+          this.products.updateStock(item.productId, 0, -item.quantity)
         )
       );
     }

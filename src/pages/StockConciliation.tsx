@@ -28,7 +28,7 @@ export default function StockConciliation() {
   const handleApplyCount = async (count: StockCount) => {
     if (!await confirm({ description: '¿Aplicar este conteo? El stock del sistema se ajustará a las cantidades contadas.', confirmLabel: 'Aplicar', destructive: false })) return;
     count.items.forEach(item => {
-      if (item.difference !== 0) updateStock(item.productId, item.countedStock);
+      if (item.difference !== 0) updateStock(item.productId, item.difference);
     });
     completeCount(count.id);
     toast.success('Conteo aplicado. Stock actualizado.');
