@@ -96,7 +96,7 @@ export class PurchasesService {
       doc.items.map(async item => {
         const product = await this.products.findById(item.productId);
         if (!product) return;
-        await this.products.updateStock(product.id, product.stock + item.quantity);
+        await this.products.updateStock(product.id, item.quantity);
       })
     );
   }
@@ -121,7 +121,7 @@ export class PurchasesService {
         .map(async ([productId, delta]) => {
           const product = await this.products.findById(productId);
           if (!product) return;
-          await this.products.updateStock(product.id, product.stock + delta);
+          await this.products.updateStock(product.id, delta);
         }),
     );
   }

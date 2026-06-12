@@ -147,13 +147,11 @@ export class SupabaseProductRepository implements IProductRepository {
     return (data ?? []).map(toProduct).filter(p => p.stock <= p.minStock);
   }
 
-  async updateStock(id: string, stock: number, reservedStock?: number): Promise<void> {
-    // Usa RPC con SECURITY DEFINER para evitar el bloqueo RLS de "Products update privileged".
-    // La función valida que stock >= 0 en la BD antes de aplicar el cambio.
+  async updateStock(id: string, delta: number, reservedDelta?: number): Promise<void> {
     const { error } = await supabase.rpc('update_product_stock', {
       p_product_id:     id,
-      p_new_stock:      stock,
-      p_reserved_stock: reservedStock ?? null,
+      p_delta:          delta,
+      p_reserved_delta: reservedDelta ?? 0,
     });
     if (error) throw new Error(error.message);
   }

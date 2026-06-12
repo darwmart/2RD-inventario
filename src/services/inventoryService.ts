@@ -43,9 +43,8 @@ export class InventoryService {
     return this.products.delete(id);
   }
 
-  async updateStock(id: string, stock: number, reservedStock?: number): Promise<void> {
-    if (stock < 0) throw new Error('El stock no puede ser negativo');
-    return this.products.updateStock(id, stock, reservedStock);
+  async updateStock(id: string, delta: number, reservedDelta?: number): Promise<void> {
+    return this.products.updateStock(id, delta, reservedDelta);
   }
 
   async getLowStockProducts(): Promise<Product[]> {

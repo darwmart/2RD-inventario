@@ -8,5 +8,5 @@ export interface IProductRepository extends IBaseRepository<Product, CreateProdu
   findByCategory(categoryId: string): Promise<Product[]>;
   findBySupplier(supplierId: string): Promise<Product[]>;
   getLowStock(): Promise<Product[]>;
-  updateStock(id: string, stock: number, reservedStock?: number): Promise<void>;
+  updateStock(id: string, delta: number, reservedDelta?: number): Promise<void>;
 }

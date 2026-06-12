@@ -48,8 +48,15 @@ export class LocalStorageProductRepository
     return this.read().filter(p => p.stock > 0 && p.stock <= p.minStock);
   }
 
-  async updateStock(id: string, stock: number, reservedStock?: number): Promise<void> {
-    const updated = applyStockUpdate(this.read(), id, stock, reservedStock);
+  async updateStock(id: string, delta: number, reservedDelta?: number): Promise<void> {
+    const products = this.read();
+    const current = products.find(p => p.id === id);
+    if (!current) return;
+    const newStock = Math.max(0, current.stock + delta);
+    const newReserved = reservedDelta !== undefined
+      ? Math.max(0, (current.reservedStock ?? 0) + reservedDelta)
+      : undefined;
+    const updated = applyStockUpdate(products, id, newStock, newReserved);
     this.write(updated);
   }
 }
