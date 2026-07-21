@@ -91,7 +91,8 @@ export default function PurchasesFactuSOL() {
     const supplier = suppliers.find(s => s.id === data.supplierId);
     if (!supplier) return;
     const subtotal = data.items.reduce((sum: number, item: any) => sum + item.total, 0);
-    const tax = taxSettings.ivaEnabled ? (subtotal * taxSettings.ivaPercentage / 100) : 0;
+    const isDelivery = (editingDocument?.documentType ?? activeTab) === 'delivery';
+    const tax = !isDelivery && taxSettings.ivaEnabled ? (subtotal * taxSettings.ivaPercentage / 100) : 0;
     const documentDate = parseDateStr(data.documentDate);
 
     if (editingDocument) {

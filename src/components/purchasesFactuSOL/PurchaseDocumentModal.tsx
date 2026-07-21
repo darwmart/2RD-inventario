@@ -214,9 +214,10 @@ export default function PurchaseDocumentModal({
 
   const modalTotals = useMemo(() => {
     const subtotal = items.reduce((sum, item) => sum + item.total, 0);
-    const tax = taxSettings.ivaEnabled ? (subtotal * taxSettings.ivaPercentage / 100) : 0;
+    const isDelivery = (editingDocument?.documentType ?? activeTab) === 'delivery';
+    const tax = !isDelivery && taxSettings.ivaEnabled ? (subtotal * taxSettings.ivaPercentage / 100) : 0;
     return { subtotal, tax, total: subtotal + tax };
-  }, [items, taxSettings]);
+  }, [items, taxSettings, activeTab, editingDocument]);
 
   return (
     <>
