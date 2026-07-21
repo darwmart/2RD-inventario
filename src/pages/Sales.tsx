@@ -201,6 +201,7 @@ export default function Sales() {
         advisors={advisors}
         paymentMethods={paymentMethods}
         taxSettings={taxSettings}
+        selectedDate={selectedDate}
         onSave={handleSave}
         onClose={() => { setIsFormOpen(false); setEditingSale(null); }}
       />

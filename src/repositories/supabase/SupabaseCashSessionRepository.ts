@@ -112,11 +112,14 @@ export class SupabaseCashSessionRepository {
   }
 
   async openSession(input: OpenSessionInput): Promise<CashSession> {
+    const now = new Date();
+    const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const { data, error } = await supabase.rpc('rpc_open_cash_session', {
       p_opening_amount:  input.openingAmount,
       p_opened_by_name:  input.openedByName,
       p_pos_id:          input.posId ?? 'main',
       p_notes:           input.notes ?? null,
+      p_date_key:        localDate,
     });
     if (error) throw new Error(error.message);
     return toSession(data);

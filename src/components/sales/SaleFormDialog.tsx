@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Search, Minus, Trash2, Calculator } from 'lucide-react';
+import { Plus, Search, Minus, Trash2, Calculator, CalendarDays } from 'lucide-react';
 import { toast } from 'sonner';
 import { Advisor, PaymentMethod, Product, Sale, SaleItem, TaxSettings } from '@/types';
 import { calculateItemIVA } from '@/utils/ivaUtils';
@@ -33,11 +33,20 @@ interface Props {
   advisors: Advisor[];
   paymentMethods: PaymentMethod[];
   taxSettings: TaxSettings;
+  selectedDate?: string;
   onSave: (data: SaleFormData) => void;
   onClose: () => void;
 }
 
-export default function SaleFormDialog({ open, editingSale, products, advisors, paymentMethods, taxSettings, onSave, onClose }: Props) {
+const toDateKey = (d = new Date()) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+const fmtDate = (dateKey: string) => {
+  const [y, m, d] = dateKey.split('-');
+  return `${d}/${m}/${y}`;
+};
+
+export default function SaleFormDialog({ open, editingSale, products, advisors, paymentMethods, taxSettings, selectedDate, onSave, onClose }: Props) {
   const [cart, setCart] = useState<SaleItem[]>([]);
   const [customPrice, setCustomPrice] = useState<{ [key: string]: number }>({});
   const [selectedAdvisor, setSelectedAdvisor] = useState('');
@@ -179,6 +188,13 @@ export default function SaleFormDialog({ open, editingSale, products, advisors, 
         <DialogHeader>
           <DialogTitle>{editingSale ? 'Editar Venta' : 'Nueva Venta'}</DialogTitle>
         </DialogHeader>
+
+        {!editingSale && selectedDate && selectedDate !== toDateKey() && (
+          <div className="flex items-center gap-2 rounded-md bg-amber-50 border border-amber-300 px-3 py-2 text-sm text-amber-800">
+            <CalendarDays className="h-4 w-4 shrink-0" />
+            Esta venta quedará registrada el <strong>{fmtDate(selectedDate)}</strong>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Panel izquierdo */}
