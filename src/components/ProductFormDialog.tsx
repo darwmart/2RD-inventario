@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -76,6 +76,8 @@ export default function ProductFormDialog({
   // Otros
   const [image, setImage] = useState('');
 
+  const savingRef = useRef(false);
+
   // Estados para modal de edición de tarifa
   const [editingTariff, setEditingTariff] = useState<'suggested' | 'current' | 'discount' | 'wholesale' | null>(null);
   const [tempMargin, setTempMargin] = useState(0);
@@ -128,8 +130,12 @@ export default function ProductFormDialog({
     setWholesalePrice(calculatePrice(cost, marginWholesale));
   }, [cost, marginWholesale]);
 
-  // Cargar datos si estamos editando
+  // Cargar datos o limpiar el formulario cada vez que el diálogo abre
   useEffect(() => {
+    if (!open) {
+      savingRef.current = false;
+      return;
+    }
     if (product) {
       setReference(product.reference.toUpperCase());
       setBarcode(product.barcode);
@@ -141,7 +147,6 @@ export default function ProductFormDialog({
       setCost(product.cost);
       setCostStr(product.cost ? Math.round(product.cost).toLocaleString('es-CO') : '');
 
-      // Calcular márgenes basados en precios existentes
       setMarginSuggested(calculateMargin(product.cost, product.suggestedPrice));
       setMarginCurrent(calculateMargin(product.cost, product.currentPrice));
       setMarginDiscount(calculateMargin(product.cost, product.discountPrice));
@@ -159,7 +164,7 @@ export default function ProductFormDialog({
     } else {
       resetForm();
     }
-  }, [product]);
+  }, [open, product]);
 
   const resetForm = () => {
     setReference('');
@@ -246,6 +251,8 @@ export default function ProductFormDialog({
   };
 
   const handleSave = () => {
+    if (savingRef.current) return;
+
     // Validaciones básicas
     if (!reference.trim()) {
       toast.error('El código de artículo es obligatorio');
@@ -314,9 +321,9 @@ export default function ProductFormDialog({
       image
     };
 
+    savingRef.current = true;
     onSave(productData);
     onOpenChange(false);
-    resetForm();
   };
 
   // ── EAN-13 ────────────────────────────────────────────────────────────────

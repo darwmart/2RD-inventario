@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { supabase } from '@/lib/supabase';
+import { supabase, ensureFreshSession } from '@/lib/supabase';
 import type { Sale, SaleItem } from '@/types/sale';
 import type { PaymentMethod, Deposit } from '@/types/shared';
 import type { ISaleRepository } from '../interfaces/ISaleRepository';
@@ -155,6 +155,7 @@ export class SupabaseSaleRepository implements ISaleRepository {
   }
 
   async create(data: CreateSaleInput): Promise<Sale> {
+    await ensureFreshSession();
     const sale = buildSale(data);
 
     // 1 — Insertar cabecera de venta

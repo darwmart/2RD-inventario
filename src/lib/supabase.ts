@@ -4,8 +4,27 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 export const supabase: SupabaseClient = supabaseUrl
-  ? createClient(supabaseUrl, supabaseAnonKey)
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: false,
+      },
+    })
   : (null as unknown as SupabaseClient);
+
+/**
+ * Asegura que la sesión esté activa y el token sea válido.
+ * Llama esto antes de operaciones críticas (crear venta, etc.).
+ * Lanza un error con mensaje amigable si la sesión expiró.
+ */
+export async function ensureFreshSession(): Promise<void> {
+  if (!supabase) return;
+  const { data, error } = await supabase.auth.getSession();
+  if (error || !data.session) {
+    throw new Error('Tu sesión ha expirado. Por favor vuelve a iniciar sesión.');
+  }
+}
 
 // Función para subir imagen a Supabase Storage
 export async function uploadProductImage(file: File): Promise<string> {

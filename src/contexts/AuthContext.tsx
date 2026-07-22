@@ -71,12 +71,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     // Escucha cambios de autenticación (login, logout, token refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       setUser(session?.user ? supabaseUserToAuthUser(session.user) : null);
+
+      // Si el refresh token expiró, redirigir al login
+      if (event === 'SIGNED_OUT' && !session) {
+        window.location.href = '/login?reason=expired';
+      }
     });
 
-    return () => subscription.unsubscribe();
+    // Al volver al tab, forzar verificación de sesión para detectar expiración
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        supabase.auth.getSession().then(({ data }) => {
+          if (!data.session) {
+            setSession(null);
+            setUser(null);
+          }
+        });
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      subscription.unsubscribe();
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
 
   // ─── Sincroniza fallback con localStorage ─────────────────────────────────
