@@ -34,7 +34,10 @@ export function useProducts() {
 
   const addMutation = useMutation({
     mutationFn: (data: CreateProductInput) => inventoryService.addProduct(data),
-    onSuccess: () => {
+    onSuccess: (newProduct) => {
+      // Insertar en caché inmediatamente sin esperar re-fetch
+      qc.setQueryData<Product[]>(productKeys.all, (old) => [newProduct, ...(old ?? [])]);
+      // Re-fetch en segundo plano para sincronizar con el servidor
       qc.invalidateQueries({ queryKey: productKeys.all });
       toast.success('Artículo creado correctamente');
     },
@@ -44,7 +47,10 @@ export function useProducts() {
   const updateMutation = useMutation({
     mutationFn: ({ id, updates }: { id: string; updates: Partial<Product> }) =>
       inventoryService.updateProduct(id, updates),
-    onSuccess: () => {
+    onSuccess: (updatedProduct) => {
+      qc.setQueryData<Product[]>(productKeys.all, (old) =>
+        (old ?? []).map(p => p.id === updatedProduct.id ? updatedProduct : p)
+      );
       qc.invalidateQueries({ queryKey: productKeys.all });
       toast.success('Artículo actualizado correctamente');
     },
@@ -53,7 +59,10 @@ export function useProducts() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => inventoryService.deleteProduct(id),
-    onSuccess: () => {
+    onSuccess: (_, id) => {
+      qc.setQueryData<Product[]>(productKeys.all, (old) =>
+        (old ?? []).filter(p => p.id !== id)
+      );
       qc.invalidateQueries({ queryKey: productKeys.all });
       toast.success('Artículo eliminado');
     },
